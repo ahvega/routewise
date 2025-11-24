@@ -12,6 +12,7 @@ import {
   AppError
 } from '@/types';
 import { convertDistance, convertFuelEfficiency } from '@/utils/unitConversion';
+import { parameterManagementService } from './ParameterManagementService';
 
 /**
  * Fuel calculation service
@@ -168,16 +169,8 @@ export class CostCalculationServiceImpl implements CostCalculationService {
    */
   async calculateTotalCosts(request: CostCalculationRequest): Promise<DetailedCosts> {
     try {
-      // Get system parameters (this would typically come from ParameterManagementService)
-      const parameters: SystemParameters = {
-        fuelPrice: 100, // Default values - should be injected
-        mealCostPerDay: 450, // 3 meals * 150 Lps
-        hotelCostPerNight: 700,
-        exchangeRate: 24.66,
-        useCustomExchangeRate: false,
-        preferredDistanceUnit: 'km',
-        preferredCurrency: 'HNL'
-      };
+      // Get current system parameters from ParameterManagementService
+      const parameters = parameterManagementService.getParameters();
 
       const { route, vehicle, extraMileage = 0 } = request;
       const totalDistance = route.totalDistance + extraMileage;
@@ -208,7 +201,7 @@ export class CostCalculationServiceImpl implements CostCalculationService {
    * Calculate fuel costs using the fuel calculator
    */
   calculateFuelCosts(distance: number, vehicle: Vehicle, fuelPrice?: number): FuelCosts {
-    const price = fuelPrice || 100; // Default fuel price
+    const price = fuelPrice || parameterManagementService.getParameters().fuelPrice;
     return this.fuelCalculator.calculateFuelCosts(distance, vehicle, price);
   }
 
@@ -216,15 +209,7 @@ export class CostCalculationServiceImpl implements CostCalculationService {
    * Calculate driver expenses using the driver expense calculator
    */
   calculateDriverExpenses(duration: number, parameters?: SystemParameters): DriverExpenses {
-    const params = parameters || {
-      fuelPrice: 100,
-      mealCostPerDay: 450,
-      hotelCostPerNight: 700,
-      exchangeRate: 24.66,
-      useCustomExchangeRate: false,
-      preferredDistanceUnit: 'km' as const,
-      preferredCurrency: 'HNL' as const
-    };
+    const params = parameters || parameterManagementService.getParameters();
     return this.driverExpenseCalculator.calculateDriverExpenses(duration, params);
   }
 
