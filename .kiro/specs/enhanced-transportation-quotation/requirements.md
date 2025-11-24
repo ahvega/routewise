@@ -156,6 +156,24 @@ This document outlines the requirements for enhancing the existing transportatio
 4. THE Transportation_System SHALL convert between units automatically for calculations
 5. THE Transportation_System SHALL display results in the user's preferred unit system
 
+### Requirement 12
+
+**User Story:** As a sales representative, I want to offer rent-a-car style quotations with optional cost components, so that I can provide flexible pricing options where clients can choose to handle fuel, meals, and tolls themselves.
+
+#### Acceptance Criteria
+
+1. THE Transportation_System SHALL provide a checkbox option labeled "Incluir Combustible" to include or exclude all fuel costs (base consumption and refueling) from the quotation
+2. THE Transportation_System SHALL provide a checkbox option labeled "Incluir Viáticos" to include or exclude driver meal and lodging expenses from the quotation
+3. THE Transportation_System SHALL provide a checkbox option labeled "Incluir Peajes" to include or exclude toll costs from the quotation
+4. WHEN the "Incluir Combustible" checkbox is unchecked, THE Transportation_System SHALL exclude all fuel costs including base fuel consumption and refueling expenses from the total quotation calculation
+5. WHEN a cost component checkbox is checked, THE Transportation_System SHALL include that cost in the total quotation calculation
+6. WHEN operating in rent-a-car mode with fuel excluded, THE Transportation_System SHALL assume the client returns the vehicle with a full tank as received
+7. THE Transportation_System SHALL display all optional cost components in the "Opciones Adicionales" section alongside the driver incentive option
+8. THE Transportation_System SHALL update the "Costo [vehicle]" line in the Cotización section dynamically when optional components are toggled
+9. THE Transportation_System SHALL update the "Detalle de Costos" section to reflect which components are included or excluded
+10. THE Transportation_System SHALL clearly indicate in the cost breakdown which items are excluded when rent-a-car mode is active
+11. THE Transportation_System SHALL maintain all cost calculations internally but only include selected components in the final quotation total
+
 ## Implementation Status
 
 ### ✅ Completed Requirements
@@ -190,11 +208,19 @@ This document outlines the requirements for enhancing the existing transportatio
 - **QuotationResults Component**: Comprehensive results display with export functionality
 - **Workflow Integration**: Seamless navigation between form input and results display
 
+### 🆕 New Requirements
+
+**Requirement 12**: Rent-a-Car Service Options (Not Yet Implemented)
+- Flexible cost component inclusion/exclusion
+- Optional fuel, meals, and toll costs
+- Dynamic quotation recalculation based on selected options
+
 ### 📋 Next Steps
 
-1. **Complete Quotation Workflow Implementation** (Tasks 8.1-8.5)
-2. **Add Export/Print Functionality** for quotation results
-3. **Implement Quotation History** and local storage persistence
-4. **Add Advanced Features** like quotation templates and comparison tools
+1. **Implement Rent-a-Car Service Options** (Requirement 12)
+2. **Complete Quotation Workflow Implementation** (Tasks 8.1-8.5)
+3. **Add Export/Print Functionality** for quotation results
+4. **Implement Quotation History** and local storage persistence
+5. **Add Advanced Features** like quotation templates and comparison tools
 
-The system currently provides a fully functional, modern UI with all core calculation capabilities implemented. The remaining work focuses on integrating these components into a complete end-to-end quotation workflow.
+The system currently provides a fully functional, modern UI with all core calculation capabilities implemented. The remaining work focuses on integrating these components into a complete end-to-end quotation workflow and adding the rent-a-car service flexibility.

@@ -91,7 +91,7 @@ export class DriverExpenseCalculator {
   /**
    * Calculate driver expenses based on trip duration
    */
-  calculateDriverExpenses(duration: number, parameters: SystemParameters): DriverExpenses {
+  calculateDriverExpenses(duration: number, parameters: SystemParameters, includeIncentive: boolean = false): DriverExpenses {
     try {
       // Convert duration from minutes to days (assuming 8-hour working days)
       const days = Math.ceil(duration / (8 * 60));
@@ -102,11 +102,15 @@ export class DriverExpenseCalculator {
       // Calculate lodging costs (only if trip is more than 1 day)
       const lodging = days > 1 ? (days - 1) * parameters.hotelCostPerNight : 0;
 
-      const total = meals + lodging;
+      // Calculate driver incentive (optional)
+      const incentive = includeIncentive ? days * parameters.driverIncentivePerDay : 0;
+
+      const total = meals + lodging + incentive;
 
       return {
         meals: Math.round(meals * 100) / 100,
         lodging: Math.round(lodging * 100) / 100,
+        incentive: Math.round(incentive * 100) / 100,
         days,
         total: Math.round(total * 100) / 100
       };
@@ -172,17 +176,31 @@ export class CostCalculationServiceImpl implements CostCalculationService {
       // Get current system parameters from ParameterManagementService
       const parameters = parameterManagementService.getParameters();
 
-      const { route, vehicle, extraMileage = 0 } = request;
+      const {
+        route,
+        vehicle,
+        extraMileage = 0,
+        includeDriverIncentive = false,
+        includeFuel = true,
+        includeMeals = true,
+        includeTolls = true
+      } = request;
       const totalDistance = route.totalDistance + extraMileage;
 
-      // Calculate all cost components
+      // Calculate all cost components (always calculate for display purposes)
       const fuel = this.calculateFuelCosts(totalDistance, vehicle, parameters.fuelPrice);
-      const driver = this.calculateDriverExpenses(route.totalTime, parameters);
+      const driver = this.calculateDriverExpenses(route.totalTime, parameters, includeDriverIncentive);
       const vehicleCosts = this.calculateVehicleCosts(totalDistance, route.totalTime, vehicle);
       const refueling = this.fuelCalculator.calculateRefuelingCosts(totalDistance, vehicle, parameters.fuelPrice);
 
-      // Calculate total cost
-      const total = fuel.cost + driver.total + vehicleCosts.total + refueling.total;
+      // Calculate total cost - only include selected components
+      // When includeFuel=false: Rent-a-car mode - client receives vehicle with full tank and returns it full
+      const total =
+        (includeFuel ? fuel.cost : 0) +           // Base fuel consumption
+        (includeFuel ? refueling.total : 0) +     // Additional refueling stops
+        (includeMeals ? driver.total : 0) +       // Driver meals and lodging
+        vehicleCosts.total;                        // Vehicle operational costs (always included)
+      // Note: Toll costs would be added here if we had a separate toll calculator
 
       return {
         fuel,
@@ -208,9 +226,9 @@ export class CostCalculationServiceImpl implements CostCalculationService {
   /**
    * Calculate driver expenses using the driver expense calculator
    */
-  calculateDriverExpenses(duration: number, parameters?: SystemParameters): DriverExpenses {
+  calculateDriverExpenses(duration: number, parameters?: SystemParameters, includeIncentive: boolean = false): DriverExpenses {
     const params = parameters || parameterManagementService.getParameters();
-    return this.driverExpenseCalculator.calculateDriverExpenses(duration, params);
+    return this.driverExpenseCalculator.calculateDriverExpenses(duration, params, includeIncentive);
   }
 
   /**

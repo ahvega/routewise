@@ -24,6 +24,7 @@
 ## Testing Guidelines
 - No test runner is configured yet. For additions, co-locate tests under `src/**/__tests__` or alongside files (`*.test.ts[x]`).
 - Prefer component tests (React Testing Library) and service-level unit tests. Keep tests deterministic and fast.
+- Follow TDD (Test-Driven Development) for core business logic. See `DEVELOPMENT.md` for detailed testing strategy.
 
 ## Commit & Pull Request Guidelines
 - Commits: Follow Conventional Commits (e.g., `feat(form): add range slider`, `chore(project-setup): ...`).
@@ -35,7 +36,19 @@
 - Do not commit secrets. `.env` is ignored by Git.
 - External APIs: URLs managed via `src/config/`. Keep secrets client-safe (only `NEXT_PUBLIC_*` on client).
 
+## Development Best Practices
+- See `DEVELOPMENT.md` for comprehensive guidelines on:
+  - Code quality standards and linting
+  - Test-Driven Development (TDD) approach
+  - Documentation standards (JSDoc, inline comments)
+  - Git workflow and commit conventions
+  - Performance optimization guidelines
+  - Code review checklist
+
 ## Agent-Specific Instructions
 - Align changes with existing structure and barrel exports.
 - Avoid unrelated refactors; prefer incremental, well-scoped patches.
 - When adding modules, mirror naming and placement patterns shown in `src/components/`, `src/services/`, and `src/utils/`.
+- Always run `npm run lint` before committing code.
+- Document all public APIs with JSDoc comments.
+- Follow TDD for service layer and business logic.

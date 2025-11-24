@@ -37,12 +37,117 @@ export default function DataForm({ onSubmit, loading: externalLoading }: DataFor
       destination: itinerary.destino.lugar || '',
       baseLocation: itinerary.base.lugar || '',
       groupSize: 1,
-      extraMileage: itinerary.kms.extra || 0
+      extraMileage: itinerary.kms.extra || 0,
+      includeDriverIncentive: itinerary.incentivar || false,
+      includeFuel: itinerary.includeFuel !== undefined ? itinerary.includeFuel : true,
+      includeMeals: itinerary.includeMeals !== undefined ? itinerary.includeMeals : true,
+      includeTolls: itinerary.includeTolls !== undefined ? itinerary.includeTolls : true
     }
   });
 
   const groupSize = watch('groupSize');
   const extraMileage = watch('extraMileage');
+  const includeDriverIncentive = watch('includeDriverIncentive');
+  const includeFuel = watch('includeFuel');
+  const includeMeals = watch('includeMeals');
+  const includeTolls = watch('includeTolls');
+
+  // Calculate common costs whenever relevant fields change
+  React.useEffect(() => {
+    const { parameters, options } = state;
+    const { dias, nacional, incentivar } = itinerary;
+
+    // Calculate travel expenses (meals, hotel, incentive)
+    const ventaUSD = options.ventaUSD || 24.66;
+    let incentivo = 0;
+    let comida = 0;
+    let hotel = 0;
+    let autentica = 0;
+    let extra = 0;
+
+    if (nacional) {
+      incentivo = parameters.incentivo_hn?.valor ? parseFloat(parameters.incentivo_hn.valor) : 0;
+      comida = parameters.alimentacion_hn?.valor ? parseFloat(parameters.alimentacion_hn.valor) * 3 : 0;
+      hotel = parameters.hotel_hn_1?.valor ? parseFloat(parameters.hotel_hn_1.valor) : 0;
+    } else {
+      incentivo = parameters.incentivo_ca?.valor ? Math.round(parseFloat(parameters.incentivo_ca.valor) * ventaUSD) : 0;
+      comida = parameters.alimentacion_ca?.valor ? Math.round(parseFloat(parameters.alimentacion_ca.valor) * ventaUSD * 3) : 0;
+      hotel = parameters.hotel_ca?.valor ? Math.round(parseFloat(parameters.hotel_ca.valor) * ventaUSD) : 0;
+      extra = parameters.gastos_frontera?.valor ? Math.round(parseFloat(parameters.gastos_frontera.valor) * ventaUSD) : 0;
+      autentica = parameters.autentica?.valor ? parseFloat(parameters.autentica.valor) : 0;
+    }
+
+    incentivo = incentivar ? incentivo : 0;
+
+    // Calculate tolls
+    const peajeSalida = parameters.peaje_salida_sap?.valor ? parseFloat(parameters.peaje_salida_sap.valor) : 0;
+
+    // Calculate fuel costs based on selected vehicle and total distance
+    let totalFuelCost = 0;
+    if (itinerary.vehiculos.length > 0 && itinerary.kms.total > 0) {
+      const vehicleSlug = itinerary.vehiculos[0]; // Use first selected vehicle
+      const vehicle = vehicles[vehicleSlug];
+
+      if (vehicle) {
+        // Get vehicle fuel efficiency (rendimiento in km/gal)
+        const fuelEfficiency = (vehicle as any).rendimiento || 0;
+        // Get fuel price
+        const fuelPrice = options.precioFuel || 150;
+
+        if (fuelEfficiency > 0) {
+          // Calculate gallons needed: total km / km per gallon
+          const gallonsNeeded = itinerary.kms.total / fuelEfficiency;
+          // Calculate total fuel cost
+          totalFuelCost = Math.round(gallonsNeeded * fuelPrice);
+        }
+      }
+    }
+
+    // Determine which costs to include based on flags
+    const shouldIncludeFuel = includeFuel !== undefined ? includeFuel : true;
+    const shouldIncludeMeals = includeMeals !== undefined ? includeMeals : true;
+    const shouldIncludeTolls = includeTolls !== undefined ? includeTolls : true;
+
+    // Calculate total common costs per day
+    const viaticosPerDay = comida + hotel + incentivo;
+    const totalViaticos = viaticosPerDay * dias;
+    const totalPeajes = peajeSalida;
+    const totalFrontera = autentica + extra;
+
+    // Only include costs that are selected
+    const costoComun =
+      (shouldIncludeFuel ? totalFuelCost : 0) +
+      (shouldIncludeMeals ? totalViaticos : 0) +
+      (shouldIncludeTolls ? totalPeajes : 0) +
+      totalFrontera; // Border costs always included for international trips
+
+    // Update itinerary costs
+    dispatch({
+      type: 'UPDATE_ITINERARY',
+      payload: {
+        costo: {
+          comun: costoComun,
+          viaticos: { comida: comida * dias, hotel: hotel * (dias > 1 ? dias - 1 : 0), incentivo: incentivo * dias },
+          peaje: { salida: peajeSalida, sapTGU: 0, sapTLA: 0, ptzSAP: 0 },
+          frontera: { autentica, extra }
+        }
+      }
+    });
+  }, [
+    itinerary.dias,
+    itinerary.nacional,
+    itinerary.incentivar,
+    itinerary.vehiculos,
+    itinerary.kms.total,
+    includeFuel,
+    includeMeals,
+    includeTolls,
+    state.parameters,
+    state.options,
+    state.vehicles,
+    vehicles,
+    dispatch
+  ]);
 
   // Filter vehicles based on group size
   const availableVehicles = React.useMemo(() => {
@@ -67,11 +172,22 @@ export default function DataForm({ onSubmit, loading: externalLoading }: DataFor
   // Suggest vehicles automatically based on group size (greedy capacity fill)
   React.useEffect(() => {
     if (!groupSize || availableVehicles.length === 0) return;
+
+    // Sort vehicles with Coaster preferred first, then by capacity
     const byCapacity = [...availableVehicles].sort((a: any, b: any) => {
+      const aSlug = a.slug || a.id || '';
+      const bSlug = b.slug || b.id || '';
+
+      // Prefer Coaster first
+      if (aSlug === 'coaster' && bSlug !== 'coaster') return -1;
+      if (bSlug === 'coaster' && aSlug !== 'coaster') return 1;
+
+      // Otherwise sort by capacity (largest first)
       const aCapacity = (a as any).capacidad_real || (a as Vehicle).passengerCapacity || 0;
       const bCapacity = (b as any).capacidad_real || (b as Vehicle).passengerCapacity || 0;
       return bCapacity - aCapacity;
     });
+
     const result: any[] = [];
     let remaining = groupSize;
     for (const v of byCapacity) {
@@ -86,7 +202,7 @@ export default function DataForm({ onSubmit, loading: externalLoading }: DataFor
     if (result.length > 0) {
       handleVehicleSelect(result);
     }
-  }, [groupSize, availableVehicles]);
+  }, [groupSize, availableVehicles, handleVehicleSelect]);
 
   const handleLocationChange = React.useCallback((field: 'origin' | 'destination' | 'baseLocation', value: string) => {
     setValue(field, value);
@@ -376,13 +492,100 @@ export default function DataForm({ onSubmit, loading: externalLoading }: DataFor
                   <input
                     type="checkbox"
                     className="sr-only peer"
-                    checked={itinerary.incentivar}
-                    onChange={React.useCallback((e: React.ChangeEvent<HTMLInputElement>) => dispatch({
-                      type: 'UPDATE_ITINERARY',
-                      payload: { incentivar: e.target.checked }
-                    }), [dispatch])}
+                    checked={includeDriverIncentive || false}
+                    onChange={React.useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+                      setValue('includeDriverIncentive', e.target.checked);
+                      dispatch({
+                        type: 'UPDATE_ITINERARY',
+                        payload: { incentivar: e.target.checked }
+                      });
+                    }, [setValue, dispatch])}
                   />
                   <div className="w-11 h-6 bg-slate-600 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-500/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-gradient-to-r peer-checked:from-blue-500 peer-checked:to-cyan-500"></div>
+                </label>
+              </div>
+
+              {/* Incluir Combustible */}
+              <div className="flex items-center justify-between pt-4 border-t border-slate-600/30">
+                <div className="flex items-center space-x-3">
+                  <div className="flex items-center justify-center w-8 h-8 bg-gradient-to-r from-orange-500 to-amber-500 rounded-lg">
+                    <i className="fas fa-gas-pump text-white text-xs"></i>
+                  </div>
+                  <div>
+                    <span className="text-sm font-medium text-slate-200">Incluir Combustible</span>
+                    <p className="text-xs text-slate-400">Cliente devuelve tanque lleno (sin costo de combustible)</p>
+                  </div>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    className="sr-only peer"
+                    checked={includeFuel !== undefined ? includeFuel : true}
+                    onChange={React.useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+                      setValue('includeFuel', e.target.checked);
+                      dispatch({
+                        type: 'UPDATE_ITINERARY',
+                        payload: { includeFuel: e.target.checked }
+                      });
+                    }, [setValue, dispatch])}
+                  />
+                  <div className="w-11 h-6 bg-slate-600 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-orange-500/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-gradient-to-r peer-checked:from-orange-500 peer-checked:to-amber-500"></div>
+                </label>
+              </div>
+
+              {/* Incluir Viáticos */}
+              <div className="flex items-center justify-between pt-4 border-t border-slate-600/30">
+                <div className="flex items-center space-x-3">
+                  <div className="flex items-center justify-center w-8 h-8 bg-gradient-to-r from-green-500 to-emerald-500 rounded-lg">
+                    <i className="fas fa-utensils text-white text-xs"></i>
+                  </div>
+                  <div>
+                    <span className="text-sm font-medium text-slate-200">Incluir Viáticos</span>
+                    <p className="text-xs text-slate-400">Incluir alimentación y hospedaje del conductor</p>
+                  </div>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    className="sr-only peer"
+                    checked={includeMeals !== undefined ? includeMeals : true}
+                    onChange={React.useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+                      setValue('includeMeals', e.target.checked);
+                      dispatch({
+                        type: 'UPDATE_ITINERARY',
+                        payload: { includeMeals: e.target.checked }
+                      });
+                    }, [setValue, dispatch])}
+                  />
+                  <div className="w-11 h-6 bg-slate-600 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-green-500/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-gradient-to-r peer-checked:from-green-500 peer-checked:to-emerald-500"></div>
+                </label>
+              </div>
+
+              {/* Incluir Peajes */}
+              <div className="flex items-center justify-between pt-4 border-t border-slate-600/30">
+                <div className="flex items-center space-x-3">
+                  <div className="flex items-center justify-center w-8 h-8 bg-gradient-to-r from-purple-500 to-violet-500 rounded-lg">
+                    <i className="fas fa-road text-white text-xs"></i>
+                  </div>
+                  <div>
+                    <span className="text-sm font-medium text-slate-200">Incluir Peajes</span>
+                    <p className="text-xs text-slate-400">Incluir costos de peajes en la cotización</p>
+                  </div>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    className="sr-only peer"
+                    checked={includeTolls !== undefined ? includeTolls : true}
+                    onChange={React.useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+                      setValue('includeTolls', e.target.checked);
+                      dispatch({
+                        type: 'UPDATE_ITINERARY',
+                        payload: { includeTolls: e.target.checked }
+                      });
+                    }, [setValue, dispatch])}
+                  />
+                  <div className="w-11 h-6 bg-slate-600 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-500/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-gradient-to-r peer-checked:from-purple-500 peer-checked:to-violet-500"></div>
                 </label>
               </div>
             </div>

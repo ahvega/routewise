@@ -13,7 +13,11 @@ export const quotationFormSchema = z.object({
   extraMileage: z.number()
     .min(VALIDATION_LIMITS.extraMileage.min, 'Extra mileage cannot be negative')
     .max(VALIDATION_LIMITS.extraMileage.max, `Extra mileage cannot exceed ${VALIDATION_LIMITS.extraMileage.max}`)
-    .optional()
+    .optional(),
+  includeDriverIncentive: z.boolean().optional(),
+  includeFuel: z.boolean().optional(),
+  includeMeals: z.boolean().optional(),
+  includeTolls: z.boolean().optional()
 });
 
 // Vehicle Validation Schema
@@ -38,6 +42,7 @@ export const systemParametersSchema = z.object({
   fuelPrice: z.number().min(0, 'Fuel price cannot be negative'),
   mealCostPerDay: z.number().min(0, 'Meal cost cannot be negative'),
   hotelCostPerNight: z.number().min(0, 'Hotel cost cannot be negative'),
+  driverIncentivePerDay: z.number().min(0, 'Driver incentive cannot be negative'),
   exchangeRate: z.number().min(0, 'Exchange rate must be positive'),
   useCustomExchangeRate: z.boolean(),
   preferredDistanceUnit: z.enum(['km', 'mile']),

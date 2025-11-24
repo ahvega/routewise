@@ -151,7 +151,11 @@ export function useQuotationWorkflow(): UseQuotationWorkflowReturn {
         route,
         vehicle: selectedVehicle,
         groupSize: request.groupSize,
-        extraMileage: request.extraMileage || 0
+        extraMileage: request.extraMileage || 0,
+        includeDriverIncentive: request.includeDriverIncentive || false,
+        includeFuel: request.includeFuel !== undefined ? request.includeFuel : true,
+        includeMeals: request.includeMeals !== undefined ? request.includeMeals : true,
+        includeTolls: request.includeTolls !== undefined ? request.includeTolls : true
       });
 
       // Step 4: Generate pricing options
@@ -208,8 +212,12 @@ export function useQuotationWorkflow(): UseQuotationWorkflowReturn {
       const costs = await costCalculationService.calculateTotalCosts({
         route: state.result.route,
         vehicle: selectedVehicle,
-        groupSize: 1, // This should be stored from original request
-        extraMileage: 0 // This should be stored from original request
+        groupSize: 1, // TODO: This should be stored from original request
+        extraMileage: 0, // TODO: This should be stored from original request
+        includeDriverIncentive: false, // TODO: This should be stored from original request
+        includeFuel: true, // TODO: This should be stored from original request
+        includeMeals: true, // TODO: This should be stored from original request
+        includeTolls: true // TODO: This should be stored from original request
       });
 
       // Regenerate pricing options

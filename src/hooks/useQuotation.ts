@@ -98,7 +98,11 @@ export function useQuotation() {
           route,
           vehicle: modern,
           groupSize: 1,
-          extraMileage: 0
+          extraMileage: 0,
+          includeDriverIncentive: false,
+          includeFuel: true,
+          includeMeals: true,
+          includeTolls: true
         });
 
         setCosts(detailed);

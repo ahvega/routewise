@@ -378,6 +378,115 @@ interface QuotationResult {
 }
 ```
 
+#### Rent-a-Car Service Options (NEW FEATURE - Requirement 12)
+
+The system now supports flexible cost component inclusion/exclusion to accommodate rent-a-car style quotations where clients may choose to handle certain costs themselves.
+
+##### Updated Itinerary Interface
+```typescript
+interface Itinerary {
+  vehiculos: string[];
+  dias: number;
+  incentivar: boolean;
+  nacional: boolean;
+  // NEW: Optional cost component flags for rent-a-car mode
+  includeFuel?: boolean;      // Default: true (include fuel costs)
+  includeMeals?: boolean;     // Default: true (include meal/lodging costs)
+  includeTolls?: boolean;     // Default: true (include toll costs)
+  kms: {
+    extra: number;
+    total: number;
+  };
+  // ... rest of interface
+}
+```
+
+##### Updated QuotationRequest Interface
+```typescript
+interface QuotationRequest {
+  origin: string;
+  destination: string;
+  baseLocation: string;
+  groupSize: number;
+  extraMileage?: number;
+  includeDriverIncentive?: boolean;
+  // NEW: Optional cost component flags
+  includeFuel?: boolean;
+  includeMeals?: boolean;
+  includeTolls?: boolean;
+}
+```
+
+##### Updated CostCalculationRequest Interface
+```typescript
+interface CostCalculationRequest {
+  route: RouteResult;
+  vehicle: Vehicle;
+  groupSize: number;
+  extraMileage?: number;
+  includeDriverIncentive?: boolean;
+  // NEW: Optional cost component flags
+  includeFuel?: boolean;
+  includeMeals?: boolean;
+  includeTolls?: boolean;
+}
+```
+
+##### Cost Calculation Logic
+
+When optional components are excluded:
+1. **Fuel Costs**: When `includeFuel = false`, ALL fuel costs (base fuel consumption + refueling expenses) are calculated internally but excluded from `costo.comun` and final totals. This represents a rent-a-car model where the client receives the vehicle with a full tank and returns it full, covering all fuel consumption themselves.
+2. **Meal/Lodging Costs**: When `includeMeals = false`, driver per-diem expenses are excluded from `costo.comun` and final totals
+3. **Toll Costs**: When `includeTolls = false`, toll/peaje costs are excluded from `costo.comun` and final totals
+
+The `costo.comun` calculation becomes:
+```typescript
+const costoComun =
+  (includeFuel ? fuelCosts : 0) +
+  (includeMeals ? (meals + lodging) : 0) +
+  (includeTolls ? tollCosts : 0) +
+  (includeDriverIncentive ? incentive : 0) +
+  borderCosts; // Border costs always included for international trips
+```
+
+##### UI Components
+
+**Opciones Adicionales Section** (in DataForm):
+```typescript
+// Existing checkbox
+- Incentivo para el conductor (includeDriverIncentive)
+
+// NEW checkboxes
+- Incluir Combustible (includeFuel)
+- Incluir Viáticos (includeMeals)
+- Incluir Peajes (includeTolls)
+```
+
+**Cost Display Behavior**:
+- Excluded costs are shown in the detailed breakdown with visual indicators (strikethrough, grayed out, "(No incluido)" label)
+- The "Costo [vehicle]" line in Cotización reflects only included components
+- Pricing tiers (10%, 15%, 20%, 25%, 30%) calculate based only on included costs
+- A summary section shows which components are included/excluded
+
+##### Use Cases
+
+**Full Service Mode** (Default):
+- All checkboxes checked
+- Traditional transportation service with all costs included
+- Client pays one price for complete service
+
+**Rent-a-Car Mode**:
+- Some or all optional checkboxes unchecked
+- Client handles fuel, meals, and/or tolls themselves
+- When fuel is excluded: Client receives vehicle with full tank and returns it full, covering all fuel consumption
+- Lower base price with client responsibility for excluded items
+- Useful for long-term rentals or corporate clients with fuel cards
+
+**Hybrid Mode**:
+- Mix of included/excluded components
+- Example: Include fuel and tolls, but client handles meals
+- Flexible pricing for different client needs
+
 ## Error Handling
 
 ### Error Types

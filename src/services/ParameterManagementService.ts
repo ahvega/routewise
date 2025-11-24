@@ -57,6 +57,7 @@ export class ParameterManagementServiceImpl implements ParameterManagementServic
       fuelPrice: 100, // Lps per gallon
       mealCostPerDay: 450, // 3 meals * 150 Lps
       hotelCostPerNight: 700, // Lps per night
+      driverIncentivePerDay: 500, // Lps per day (optional driver incentive)
       exchangeRate: 24.66, // HNL per USD
       useCustomExchangeRate: false,
       preferredDistanceUnit: 'km',
@@ -148,6 +149,9 @@ export class ParameterManagementServiceImpl implements ParameterManagementServic
           break;
         case `${currentYear}-hotel-hn-1`:
           params.hotelCostPerNight = value;
+          break;
+        case `${currentYear}-incentivo-hn`:
+          params.driverIncentivePerDay = value;
           break;
         case `${currentYear}-tasa-venta-us`:
           params.exchangeRate = value;
@@ -409,6 +413,7 @@ export class ParameterManagementServiceImpl implements ParameterManagementServic
       'fuelPrice',
       'mealCostPerDay',
       'hotelCostPerNight',
+      'driverIncentivePerDay',
       'exchangeRate',
       'useCustomExchangeRate',
       'preferredDistanceUnit',
@@ -437,6 +442,9 @@ export class ParameterManagementServiceImpl implements ParameterManagementServic
         break;
       case 'hotelCostPerNight':
         if (value < 0) throw new Error('Hotel cost per night cannot be negative');
+        break;
+      case 'driverIncentivePerDay':
+        if (value < 0) throw new Error('Driver incentive per day cannot be negative');
         break;
       case 'exchangeRate':
         if (value <= 0) throw new Error('Exchange rate must be greater than 0');

@@ -35,6 +35,7 @@ export interface SystemParameters {
   fuelPrice: number;
   mealCostPerDay: number;
   hotelCostPerNight: number;
+  driverIncentivePerDay: number;
   exchangeRate: number;
   useCustomExchangeRate: boolean;
   preferredDistanceUnit: 'km' | 'mile';
@@ -74,6 +75,9 @@ export interface Itinerary {
   dias: number;
   incentivar: boolean;
   nacional: boolean;
+  includeFuel?: boolean;
+  includeMeals?: boolean;
+  includeTolls?: boolean;
   kms: {
     extra: number;
     total: number;
@@ -166,6 +170,7 @@ export interface FuelCosts {
 export interface DriverExpenses {
   meals: number;
   lodging: number;
+  incentive: number;
   days: number;
   total: number;
 }
@@ -219,6 +224,10 @@ export interface QuotationRequest {
   baseLocation: string;
   groupSize: number;
   extraMileage?: number;
+  includeDriverIncentive?: boolean;
+  includeFuel?: boolean;
+  includeMeals?: boolean;
+  includeTolls?: boolean;
 }
 
 export interface PricingOption {
@@ -244,6 +253,10 @@ export interface CostCalculationRequest {
   vehicle: Vehicle;
   groupSize: number;
   extraMileage?: number;
+  includeDriverIncentive?: boolean;
+  includeFuel?: boolean;
+  includeMeals?: boolean;
+  includeTolls?: boolean;
 }
 
 // Error Handling

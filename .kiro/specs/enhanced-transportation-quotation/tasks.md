@@ -319,3 +319,94 @@
     - Create user onboarding and help system
     - Add advanced filtering and search capabilities
     - _Requirements: All requirements_
+
+- [-] 11. Implement Rent-a-Car Service Options (NEW FEATURE)
+
+
+  - [x] 11.1 Update type definitions for optional cost components
+
+
+
+    - Add `includeFuel`, `includeMeals`, and `includeTolls` boolean flags to `Itinerary` interface
+    - Add `includeFuel`, `includeMeals`, and `includeTolls` optional flags to `QuotationRequest` interface
+    - Add `includeFuel`, `includeMeals`, and `includeTolls` optional flags to `CostCalculationRequest` interface
+    - Update `QuotationFormData` validation schema to include the new optional flags
+    - _Requirements: 12.1, 12.2, 12.3_
+
+  - [x] 11.2 Add UI checkboxes for optional cost components
+
+
+
+    - Add "Incluir Combustible" checkbox in the "Opciones Adicionales" section of DataForm
+    - Add "Incluir Viáticos" checkbox in the "Opciones Adicionales" section of DataForm
+    - Add "Incluir Peajes" checkbox in the "Opciones Adicionales" section of DataForm
+    - Style checkboxes consistently with existing "Incentivo para el conductor" toggle
+    - Connect checkboxes to form state using react-hook-form
+    - Update form default values to include all three flags (defaulted to true for full service)
+    - _Requirements: 12.1, 12.2, 12.3, 12.6_
+
+  - [x] 11.3 Update cost calculation logic to support optional components
+
+
+
+    - Modify the cost calculation effect in DataForm to conditionally include/exclude fuel costs based on `includeFuel` flag
+    - Modify the cost calculation effect to conditionally include/exclude meals and hotel costs based on `includeMeals` flag
+    - Modify the cost calculation effect to conditionally include/exclude toll costs based on `includeTolls` flag
+    - Update `costo.comun` calculation to only sum included cost components
+    - Ensure internal cost tracking maintains all values even when excluded from totals
+    - _Requirements: 12.4, 12.5, 12.10_
+
+  - [x] 11.4 Update CostCalculationService to handle optional components
+
+
+
+    - Add `includeFuel` parameter to `CostCalculationService.calculateTotalCosts()` method
+    - Add `includeMeals` parameter to `CostCalculationService.calculateTotalCosts()` method
+    - Add `includeTolls` parameter to `CostCalculationService.calculateTotalCosts()` method
+    - Modify total cost calculation to conditionally include/exclude components based on flags
+    - Ensure DetailedCosts interface still returns all cost breakdowns for display purposes
+    - _Requirements: 12.4, 12.5, 12.10_
+
+  - [ ] 11.5 Update quotation display to show excluded components
+
+    - Modify CostsDisplay component to visually indicate which cost components are excluded
+    - Add strikethrough or grayed-out styling for excluded cost items in the detailed breakdown
+    - Add text labels like "(No incluido)" or "(Cliente provee)" for excluded items
+    - Ensure the "Costo [vehicle]" line in Cotización reflects only included components
+    - Update pricing tiers to calculate based only on included costs
+    - _Requirements: 12.7, 12.8, 12.9_
+
+  - [ ] 11.6 Update PricingDisplay to reflect optional components
+
+    - Ensure pricing calculations use only included cost components
+    - Update the "Costo [vehicle]" display to show correct totals based on selected options
+    - Add a summary section showing which components are included/excluded in the quotation
+    - Ensure all markup percentages (10%, 15%, 20%, 25%, 30%) calculate correctly with optional components
+    - _Requirements: 12.7, 12.8_
+
+  - [ ] 11.7 Add visual indicators and help text for rent-a-car mode
+
+    - Add tooltip or help text explaining what each optional component includes
+    - Add a visual indicator when in "rent-a-car mode" (multiple components excluded)
+    - Consider adding a preset toggle for "Full Service" vs "Rent-a-Car" mode
+    - Ensure the UI clearly communicates which costs are client responsibility
+    - _Requirements: 12.6, 12.9_
+
+  - [x] 11.8 Update hooks to pass optional component flags
+
+
+
+
+    - Update `useQuotationWorkflow` to pass `includeFuel`, `includeMeals`, and `includeTolls` flags to cost calculation
+    - Update `useQuotation` to handle optional component flags
+    - Ensure all cost recalculations respect the current state of optional component flags
+    - _Requirements: 12.4, 12.5_
+
+  - [ ] 11.9 Testing and validation
+
+    - Test that toggling each checkbox correctly updates the quotation totals
+    - Verify that excluded costs are still calculated internally but not included in totals
+    - Test that the cost breakdown clearly shows which items are excluded
+    - Verify that pricing tiers calculate correctly with various combinations of included/excluded components
+    - Test edge cases like excluding all optional components
+    - _Requirements: 12.1, 12.2, 12.3, 12.4, 12.5, 12.6, 12.7, 12.8, 12.9, 12.10_
