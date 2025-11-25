@@ -1,412 +1,615 @@
-# Implementation Plan
-
-- [x] 1. Set up project structure and core interfaces
-
-  - Create directory structure for components, services, hooks, and types
-  - Define TypeScript interfaces for all data models (Vehicle, SystemParameters, CostModels, etc.)
-  - Set up environment configuration for Google API keys
-  - _Requirements: 1.1, 2.1, 11.1_
-
-- [x] 2. Implement data models and validation
-
-  - [x] 2.1 Create core data model interfaces and types
-
-    - Write TypeScript interfaces for Vehicle, SystemParameters, DetailedCosts, and QuotationResult
-    - Implement validation schemas using Zod for form inputs and data validation
-    - _Requirements: 2.1, 2.2, 2.3, 2.4, 11.1, 11.2, 11.3_
-
-  - [x] 2.2 Implement Vehicle model with validation
-
-    - Create Vehicle interface with all required properties (make, model, capacity, fuel efficiency)
-    - Add validation for fuel efficiency units and distance units
-    - _Requirements: 2.1, 2.2, 2.3, 2.4, 11.2, 11.3_
-
-  - [x] 2.3 Implement cost calculation data structures
-
-    - Define interfaces for FuelCosts, DriverExpenses, VehicleCosts, and RefuelingCosts
-    - Create PricingOption and QuotationResult interfaces
-    - _Requirements: 3.1, 4.1, 5.1, 8.1_
-
-  - [x] 2.4 Implement unit conversion utilities
-    - Create utility functions for converting between distance units (km/miles)
-    - Implement fuel efficiency unit conversions (mpg, mpl, kpl, kpg)
-    - _Requirements: 11.1, 11.2, 11.3, 11.4, 11.5_
-
-- [x] 3. Modernize and enhance service layer
-
-  - [x] 3.1 Create RouteCalculatorService
-
-    - Refactor existing Google Maps integration into a proper service class
-    - Implement RouteCalculatorService interface with proper error handling
-    - Add support for calculating distances between origin, destination, and base location
-    - _Requirements: 1.4, 9.3, 9.4_
-
-  - [x] 3.2 Create CostCalculationService
-
-    - Refactor existing cost calculation logic into new service architecture
-    - Implement FuelCalculator, DriverExpenseCalculator, and VehicleCostCalculator services
-    - Create comprehensive CostCalculationService that integrates all cost components
-    - _Requirements: 3.1, 3.2, 3.4, 3.5, 4.1, 4.3, 4.5, 8.1, 8.2, 8.3, 8.4, 8.5_
-
-  - [x] 3.3 Create VehicleManagementService
-
-    - Implement service for CRUD operations on vehicles
-    - Add vehicle filtering by passenger capacity
-    - Integrate with existing vehicle data loading system
-    - _Requirements: 2.1, 2.4, 10.1, 10.2, 10.3_
-
-  - [x] 3.4 Create ParameterManagementService
-
-    - Implement service for managing system parameters
-    - Add parameter change history tracking with timestamps
-    - Implement localStorage-based parameter persistence
-    - _Requirements: 6.1, 6.2, 7.1, 7.2, 7.3, 7.4, 7.5_
-
-  - [x] 3.5 Create ExchangeRateService
-    - Implement configurable exchange rate management between USD and HNL
-    - Add support for manual exchange rate override
-    - Integrate with external exchange rate API for default rates
-    - _Requirements: 6.1, 6.2, 6.3, 6.5_
-
-- [x] 4. Enhance quotation form and user interface
-
-  - [x] 4.1 Modernize QuotationForm component
-
-    - Update existing DataForm to match new QuotationForm requirements
-    - Implement proper form validation using Zod schemas
-    - Add group size input and capacity-based vehicle filtering
-    - _Requirements: 1.1, 1.2, 1.5, 10.1, 10.2, 10.3, 10.4, 10.5_
-
-  - [x] 4.2 Enhance vehicle selection component
-
-    - Update existing VehicleSelection to support capacity filtering
-    - Display vehicle specifications and capacity information
-    - Add support for multiple vehicle selection when group exceeds capacity
-    - _Requirements: 10.1, 10.2, 10.3, 10.4, 10.5_
-
-  - [x] 4.3 Modernize cost breakdown display
-
-    - Update existing CostsDisplay to match new DetailedCosts interface
-    - Implement comprehensive cost breakdown showing all components
-    - Add refueling costs display for long-distance trips
-    - _Requirements: 8.1, 8.2, 8.3, 8.4, 8.5_
-
-  - [x] 4.4 Enhance pricing display component
-
-    - Update existing PricingDisplay to show recommended markup (15%)
-    - Display prices in both USD and HNL currencies
-    - Implement proper PricingTable component with all markup options
-    - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5, 6.4_
-
-- [x] 5. Create parameter management interface
-
-  - [x] 5.1 Build parameter management UI components
-
-    - Create admin interface for updating fuel prices, meal costs, and hotel costs
-    - Implement form validation and real-time parameter updates
-    - Add parameter change history display
-    - _Requirements: 7.1, 7.2, 7.3, 7.5_
-
-  - [x] 5.2 Integrate parameter management with existing system
-
-    - Connect parameter management UI with ParameterManagementService
-    - Update existing parameter loading system to support new interface
-    - Ensure parameter changes apply to new quotations immediately
-    - _Requirements: 7.1, 7.2, 7.3, 7.4, 7.5_
-
-- [x] 6. Enhance Google Maps integration
-
-  - [x] 6.1 Improve RouteMap component
-
-    - Update existing MapComponent to display origin, destination, and base location markers
-    - Add support for alternative routes when available
-    - Improve route information display and user interaction
-    - _Requirements: 1.6, 9.1, 9.2, 9.3, 9.5_
-
-  - [x] 6.2 Add Google Places API integration
-
-    - Integrate Google Places API for location validation in forms
-    - Add location autocomplete functionality to LocationInput component
-    - Implement location validation and error handling
-    - _Requirements: 1.3, 1.4_
-
-- [x] 7. Add performance optimizations and final enhancements
-
-  - [x] 7.1 Add performance optimizations
-
-    - Implement API response caching for repeated Google Maps requests
-    - Add debouncing for location input to reduce API calls
-    - Optimize component rendering with React.memo where appropriate
-    - _Requirements: 1.3, 1.4_
-
-  - [x] 7.2 Fix type safety issues and improve error handling
-
-    - Fix TypeScript errors in MapComponent related to route data types
-    - Improve error handling for Google Maps API failures
-    - Add proper error boundaries for component error handling
-    - _Requirements: 1.3, 1.4_
-
-- [ ]\* 9. Testing and quality assurance
-
-  - [ ]\* 9.1 Write unit tests for services
-
-    - Test RouteCalculatorService, CostCalculationService, and other services
-    - Test unit conversion functions and validation schemas
-    - Test parameter management and exchange rate functionality
-    - _Requirements: 2.1, 11.1, 11.5, 7.4, 7.5, 6.1, 6.3_
-
-  - [ ]\* 9.2 Write component tests
-
-    - Test enhanced form validation and submission
-    - Test results display and cost breakdown rendering
-    - Test vehicle selection and capacity filtering
-    - _Requirements: 1.1, 8.5, 10.5_
-
-  - [ ]\* 9.3 Write integration tests
-    - Test complete quotation workflow end-to-end
-    - Test Google Maps API integration and route calculation
-    - Test error scenarios and edge cases
-    - _Requirements: 1.1, 1.4, 10.5, 9.3_
-
-- [x] 8. Complete Quotation Workflow Implementation
-
-  - [x] 8.1 Create quotation workflow hook (useQuotationWorkflow)
-
-    - Create useQuotationWorkflow hook in src/hooks/ to orchestrate the complete quotation process
-    - Integrate RouteCalculatorService for route calculation from form data
-
-    - Connect CostCalculationService for detailed cost analysis
-    - Handle vehicle selection and capacity validation logic
-    - Implement proper error handling and loading states throughout the workflow
-    - Add progress indicators for multi-step quotation process
-    - _Requirements: All requirements_
-
-  - [ ] 8.2 Create comprehensive QuotationResults component
-
-    - Build QuotationResults component in src/components/Quotation/
-    - Display route information with integrated map component
-    - Show detailed cost breakdown using DetailedCosts interface and ModernCostBreakdown
-    - Display pricing table with all markup options (10%, 15%, 20%, 25%, 30%) using ModernPricingTable
-    - Include vehicle information and trip details
-    - Add export/print functionality for quotation results
-    - Implement proper error boundaries and loading states
-    - _Requirements: 1.1, 5.1, 5.2, 5.3, 5.4, 5.5, 8.1, 8.2, 8.3, 8.4, 8.5, 9.1, 9.2_
-
-  - [ ] 8.3 Update main application to support complete quotation workflow
-
-    - Modify DesktopLayout and MobileLayout to integrate quotation workflow
-    - Update DataForm to use useQuotationWorkflow hook for form submission
-    - Add state management for switching between form input and results view
-    - Implement "New Quotation" functionality to reset and start over
-    - Add quotation history and local storage persistence
-    - Ensure proper navigation between form and results states
-    - _Requirements: All requirements_
-
-  - [ ] 8.4 Add quotation export and sharing features
-
-    - Implement PDF export functionality for quotation results
-    - Add print-friendly styling for quotation display
-    - Create shareable quotation functionality (local storage based)
-    - Add quotation comparison features between different options
-    - Implement quotation templates for common routes
-    - _Requirements: 5.1, 5.2, 5.3, 8.1, 8.2, 8.3_
-
-  - [ ] 8.5 Final integration testing and validation
-    - Test complete quotation workflow end-to-end with real Google Maps API
-    - Validate all requirements and acceptance criteria are met
-    - Test vehicle capacity filtering and multi-vehicle scenarios
-    - Verify currency conversion and exchange rate functionality
-    - Test parameter management integration with quotation generation
-    - Performance testing and optimization for API calls and calculations
-    - _Requirements: All requirements_
-
-- [x] 9. UI Modernization and Enhancement - MAJOR REDESIGN COMPLETED
-
-  - [x] 9.1 Upgrade dependencies and tech stack
-
-    - ✅ Upgraded Next.js to version 15.5.6
-    - ✅ Upgraded Tailwind CSS to v4 with proper PostCSS configuration
-    - ✅ Installed and configured @headlessui/react v2.2.9 for accessible UI components
-    - ✅ Added DaisyUI v5.3.7 for enhanced component library
-    - ✅ Fixed package.json to match working configuration with proper dependency versions
-    - _Requirements: All requirements_
-
-  - [x] 9.2 Create modern UI component library
-
-    - ✅ Created comprehensive `src/components/ui` directory for reusable UI components
-    - ✅ Implemented Button component using modern styling and proper states
-    - ✅ Implemented Input component with dark mode and validation states
-    - ✅ Implemented Select component with search and filtering capabilities
-    - ✅ Implemented Card component with glassmorphism effects and variants
-    - ✅ Added Badge, Modal, and Tooltip components for complete UI library
-    - _Requirements: All requirements_
-
-  - [x] 9.3 Refactor main form components - COMPLETELY REDESIGNED
-
-    - ✅ Completely redesigned DataForm.tsx with modern dark theme
-    - ✅ Implemented grouped sections with proper visual hierarchy
-    - ✅ Added gradient submit buttons with loading animations
-    - ✅ Enhanced form validation feedback with better error states
-    - ✅ Improved mobile responsiveness and touch interactions
-    - ✅ Fixed type conversion errors for vehicle cost display
-    - _Requirements: 1.1, 1.2, 1.5_
-
-  - [x] 9.4 Modernize layout components - MAJOR REDESIGN
-
-    - ✅ Completely redesigned DesktopLayout.tsx with glassmorphism header
-    - ✅ Implemented modern card-based layout with backdrop blur effects
-    - ✅ Added gradient backgrounds and modern visual hierarchy
-    - ✅ Updated MobileLayout.tsx for better mobile experience
-    - ✅ Implemented consistent spacing and typography system
-    - ✅ Added proper loading states and smooth transitions
-    - _Requirements: All requirements_
-
-  - [x] 9.5 Update styling configuration - DARK MODE AS DEFAULT
-
-    - ✅ Updated tailwind.config.js for Tailwind CSS v4 with DaisyUI integration
-    - ✅ Configured custom DaisyUI themes (business/corporate) with proper colors
-    - ✅ Updated globals.css with modern design system and dark mode support
-    - ✅ Implemented dark mode as default with proper theme switching
-    - ✅ Added custom animations, gradients, and glassmorphism effects
-    - ✅ Fixed theme initialization to prevent flash of unstyled content
-    - _Requirements: All requirements_
-
-  - [x] 9.6 Enhance vehicle selection and results display - REDESIGNED
-
-    - ✅ Completely redesigned VehicleSelection.tsx with modern dark cards
-    - ✅ Added color-coded sections for performance and costs (cyan/emerald themes)
-    - ✅ Implemented modern badges and status indicators with proper contrast
-    - ✅ Updated cost breakdown display with improved readability
-    - ✅ Added interactive elements, hover states, and glassmorphism effects
-    - ✅ Fixed contrast issues and improved visual hierarchy throughout
-    - _Requirements: 10.1, 10.2, 10.3, 8.1, 8.2, 8.3_
-
-  - [x] 9.7 Complete interface redesign and testing
-
-    - ✅ Redesigned entire interface with modern dark-first aesthetic
-    - ✅ Implemented consistent visual language across all components
-    - ✅ Added gradient accents and modern spacing throughout
-    - ✅ Tested all components across different screen sizes
-    - ✅ Verified accessibility improvements and proper contrast ratios
-    - ✅ Validated visual consistency and modern design patterns
-    - _Requirements: All requirements_
-
-- [x] 10. Accessibility and Performance Enhancements
-
-  - [x] 10.1 Add accessibility improvements
-
-    - Add proper ARIA labels and keyboard navigation support to all components
-    - Ensure screen reader compatibility for form inputs and results display
-    - Implement focus management for better accessibility
-    - Add loading indicators and progress feedback for long operations
-    - Improve mobile responsiveness and touch interactions
-    - _Requirements: All requirements_
-
-  - [x] 10.2 Performance optimizations
-
-    - Implement React.memo for expensive components
-    - Add service worker for offline functionality
-    - Optimize Google Maps API calls with better caching strategies
-    - Implement lazy loading for non-critical components
-    - Add performance monitoring and metrics
-    - _Requirements: All requirements_
-
-  - [x] 10.3 Advanced features and polish
-
-    - Add keyboard shortcuts for power users
-    - Implement dark mode improvements
-    - Add animation and transition effects
-    - Create user onboarding and help system
-    - Add advanced filtering and search capabilities
-    - _Requirements: All requirements_
-
-- [-] 11. Implement Rent-a-Car Service Options (NEW FEATURE)
-
-
-  - [x] 11.1 Update type definitions for optional cost components
-
-
-
-    - Add `includeFuel`, `includeMeals`, and `includeTolls` boolean flags to `Itinerary` interface
-    - Add `includeFuel`, `includeMeals`, and `includeTolls` optional flags to `QuotationRequest` interface
-    - Add `includeFuel`, `includeMeals`, and `includeTolls` optional flags to `CostCalculationRequest` interface
-    - Update `QuotationFormData` validation schema to include the new optional flags
-    - _Requirements: 12.1, 12.2, 12.3_
-
-  - [x] 11.2 Add UI checkboxes for optional cost components
-
-
-
-    - Add "Incluir Combustible" checkbox in the "Opciones Adicionales" section of DataForm
-    - Add "Incluir Viáticos" checkbox in the "Opciones Adicionales" section of DataForm
-    - Add "Incluir Peajes" checkbox in the "Opciones Adicionales" section of DataForm
-    - Style checkboxes consistently with existing "Incentivo para el conductor" toggle
-    - Connect checkboxes to form state using react-hook-form
-    - Update form default values to include all three flags (defaulted to true for full service)
-    - _Requirements: 12.1, 12.2, 12.3, 12.6_
-
-  - [x] 11.3 Update cost calculation logic to support optional components
-
-
-
-    - Modify the cost calculation effect in DataForm to conditionally include/exclude fuel costs based on `includeFuel` flag
-    - Modify the cost calculation effect to conditionally include/exclude meals and hotel costs based on `includeMeals` flag
-    - Modify the cost calculation effect to conditionally include/exclude toll costs based on `includeTolls` flag
-    - Update `costo.comun` calculation to only sum included cost components
-    - Ensure internal cost tracking maintains all values even when excluded from totals
-    - _Requirements: 12.4, 12.5, 12.10_
-
-  - [x] 11.4 Update CostCalculationService to handle optional components
-
-
-
-    - Add `includeFuel` parameter to `CostCalculationService.calculateTotalCosts()` method
-    - Add `includeMeals` parameter to `CostCalculationService.calculateTotalCosts()` method
-    - Add `includeTolls` parameter to `CostCalculationService.calculateTotalCosts()` method
-    - Modify total cost calculation to conditionally include/exclude components based on flags
-    - Ensure DetailedCosts interface still returns all cost breakdowns for display purposes
-    - _Requirements: 12.4, 12.5, 12.10_
-
-  - [ ] 11.5 Update quotation display to show excluded components
-
-    - Modify CostsDisplay component to visually indicate which cost components are excluded
-    - Add strikethrough or grayed-out styling for excluded cost items in the detailed breakdown
-    - Add text labels like "(No incluido)" or "(Cliente provee)" for excluded items
-    - Ensure the "Costo [vehicle]" line in Cotización reflects only included components
-    - Update pricing tiers to calculate based only on included costs
-    - _Requirements: 12.7, 12.8, 12.9_
-
-  - [ ] 11.6 Update PricingDisplay to reflect optional components
-
-    - Ensure pricing calculations use only included cost components
-    - Update the "Costo [vehicle]" display to show correct totals based on selected options
-    - Add a summary section showing which components are included/excluded in the quotation
-    - Ensure all markup percentages (10%, 15%, 20%, 25%, 30%) calculate correctly with optional components
-    - _Requirements: 12.7, 12.8_
-
-  - [ ] 11.7 Add visual indicators and help text for rent-a-car mode
-
-    - Add tooltip or help text explaining what each optional component includes
-    - Add a visual indicator when in "rent-a-car mode" (multiple components excluded)
-    - Consider adding a preset toggle for "Full Service" vs "Rent-a-Car" mode
-    - Ensure the UI clearly communicates which costs are client responsibility
-    - _Requirements: 12.6, 12.9_
-
-  - [x] 11.8 Update hooks to pass optional component flags
-
-
-
-
-    - Update `useQuotationWorkflow` to pass `includeFuel`, `includeMeals`, and `includeTolls` flags to cost calculation
-    - Update `useQuotation` to handle optional component flags
-    - Ensure all cost recalculations respect the current state of optional component flags
-    - _Requirements: 12.4, 12.5_
-
-  - [ ] 11.9 Testing and validation
-
-    - Test that toggling each checkbox correctly updates the quotation totals
-    - Verify that excluded costs are still calculated internally but not included in totals
-    - Test that the cost breakdown clearly shows which items are excluded
-    - Verify that pricing tiers calculate correctly with various combinations of included/excluded components
-    - Test edge cases like excluding all optional components
-    - _Requirements: 12.1, 12.2, 12.3, 12.4, 12.5, 12.6, 12.7, 12.8, 12.9, 12.10_
+# RouteWise Implementation Plan
+
+**Project**: RouteWise (formerly PlannerTours)
+**Version**: 2.0 - SaaS Transformation
+**Timeline**: 14-18 weeks
+**Status**: Planning Phase
+
+---
+
+## Overview
+
+This document outlines the phased implementation plan for transforming PlannerTours into RouteWise, a multi-tenant SaaS platform. The plan follows the development roadmap with 10 distinct phases over 18 weeks.
+
+### Technology Stack
+
+- **Frontend**: SvelteKit 2.x + TypeScript 5.x
+- **Styling**: Tailwind CSS 4 + Flowbite-svelte
+- **Backend**: Convex (reactive database + serverless)
+- **Auth**: WorkOS AuthKit
+- **Deployment**: Vercel (frontend) + Convex Cloud (backend)
+- **PDF**: Puppeteer
+- **Email**: Resend
+- **Maps**: Google Maps JavaScript API
+- **Monitoring**: Sentry
+
+### Key Milestones
+
+| Phase | Duration | Deliverable |
+|-------|----------|-------------|
+| Phase 0 | Weeks 1-2 | Team trained, project initialized |
+| Phase 1 | Weeks 2-4 | Auth & multi-tenancy working |
+| Phase 2 | Week 5 | Business logic ported |
+| Phase 3 | Week 6 | Client management complete |
+| Phase 4 | Weeks 7-8 | Quotation system complete |
+| Phase 5 | Week 9 | PDF & email working |
+| Phase 6 | Week 10 | Driver management complete |
+| Phase 7 | Weeks 11-12 | Itinerary system complete |
+| Phase 8 | Weeks 13-14 | Invoice system complete |
+| Phase 9 | Week 15 | Expense advances complete |
+| Phase 10 | Weeks 16-18 | Dashboard, reports, launch prep |
+
+---
+
+## Phase 0: Learning & Project Setup (Weeks 1-2)
+
+### Week 1: Team Training
+
+- [ ] 1.1 Complete Svelte Tutorial
+  - Each team member completes official Svelte tutorial
+  - Understand reactivity (`$:`, `bind:`, stores)
+  - Practice component composition
+  - Compare with React patterns
+  - _Requirements: All (foundation)_
+
+- [ ] 1.2 Complete SvelteKit Tutorial
+  - Learn file-based routing (`+page.svelte`, `+layout.svelte`)
+  - Understand SSR vs client-side rendering
+  - Learn form actions and progressive enhancement
+  - Master load functions (`+page.ts`, `+page.server.ts`)
+  - _Requirements: All (foundation)_
+
+- [ ] 1.3 Complete Convex Tutorial
+  - Learn schema definition
+  - Understand mutations and queries
+  - Practice real-time subscriptions
+  - Master TypeScript integration
+  - _Requirements: All (foundation)_
+
+### Week 2: Project Initialization
+
+- [ ] 2.1 Create accounts and configure services
+  - Create Convex account (convex.dev)
+  - Create WorkOS account (workos.com)
+  - Create Vercel account (vercel.com)
+  - Create Resend account (resend.com)
+  - Create Sentry account (sentry.io)
+  - Verify Google Maps API key
+  - _Requirements: All (infrastructure)_
+
+- [ ] 2.2 Initialize SvelteKit project
+  - Create new SvelteKit project with TypeScript
+  - Install Tailwind CSS 4 with @tailwindcss/vite
+  - Install Flowbite-svelte and Flowbite-svelte-icons
+  - Install Convex and initialize
+  - Install WorkOS, Resend, Puppeteer, Google Maps loader
+  - Configure vite.config.ts for Tailwind CSS 4
+  - _Requirements: 19 (UI/UX)_
+
+- [ ] 2.3 Configure dark mode as default
+  - Set up app.html with `class="dark"` on html element
+  - Create theme store (src/lib/stores/theme.ts)
+  - Implement ThemeToggle component with sun/moon icons
+  - Configure Tailwind for dark mode (`darkMode: 'class'`)
+  - Test theme persistence to localStorage
+  - _Requirements: 19.1, 19.2_
+
+- [ ] 2.4 Set up project structure
+  - Create directory structure (routes, lib, components, stores)
+  - Set up environment variables (.env.local)
+  - Configure Convex deployment
+  - Set up CI/CD with Vercel
+  - Configure Sentry error tracking
+  - _Requirements: All (foundation)_
+
+**Phase 0 Deliverables**:
+- ✅ Team trained on Svelte, SvelteKit, Convex
+- ✅ Project initialized and deployed to Vercel
+- ✅ Dark mode working with theme toggle
+- ✅ CI/CD pipeline operational
+
+---
+
+## Phase 1: Foundation (Weeks 2-4)
+
+### Week 2 (continued): Convex Schema
+
+- [ ] 3.1 Define complete Convex schema
+  - Create schema.ts with all tables (tenants, users, vehicles, clients, etc.)
+  - Define indexes for common queries
+  - Set up tenant isolation patterns
+  - Document schema relationships
+  - Deploy schema to Convex
+  - _Requirements: 1 (multi-tenancy), 2-21 (all entities)_
+
+### Week 3: Authentication with WorkOS
+
+- [ ] 3.2 Implement WorkOS authentication
+  - Set up WorkOS AuthKit integration
+  - Create auth routes (login, signup, callback)
+  - Implement sign-up flow (creates tenant + user)
+  - Implement sign-in flow
+  - Implement sign-out
+  - Create auth middleware/guards (hooks.server.ts)
+  - Implement session management
+  - _Requirements: 2 (authentication)_
+
+### Week 4: User & Tenant Management
+
+- [ ] 3.3 Build user and tenant management
+  - Create tenant on signup
+  - Build user profile page
+  - Build user settings page
+  - Implement team member invitation
+  - Create role management (admin, sales, operations, finance, viewer)
+  - Build user list for admins
+  - Create tenant settings page
+  - _Requirements: 2 (user management), 1 (multi-tenancy)_
+
+**Phase 1 Deliverables**:
+- ✅ Database schema deployed to Convex
+- ✅ Authentication working (sign-up, sign-in, sign-out)
+- ✅ Tenant created on signup
+- ✅ User roles defined and enforced
+- ✅ Admin can invite team members
+
+---
+
+## Phase 2: Data Migration & Business Logic (Week 5)
+
+- [ ] 4.1 Port cost calculation service
+  - Copy CostCalculationService.ts to src/lib/services/
+  - Remove React dependencies
+  - Adapt for Svelte (pure TypeScript)
+  - Test calculations match existing app
+  - _Requirements: 7 (cost calculation)_
+
+- [ ] 4.2 Port route calculation service
+  - Copy RouteCalculatorService.ts to src/lib/services/
+  - Adapt Google Maps integration for Svelte
+  - Test route calculations
+  - _Requirements: 6 (quotation generation)_
+
+- [ ] 4.3 Port utility functions
+  - Copy unitConversion.ts (direct copy)
+  - Copy formatting.ts (direct copy)
+  - Copy validation.ts (direct copy)
+  - Test all utility functions
+  - _Requirements: 7, 8 (calculations and parameters)_
+
+- [ ] 4.4 Migrate vehicle and parameter data
+  - Create Convex mutation for seeding vehicles
+  - Create Convex mutation for seeding parameters
+  - Migrate data from JSON files to Convex
+  - Verify data integrity
+  - _Requirements: 4 (vehicle management), 8 (parameters)_
+
+**Phase 2 Deliverables**:
+- ✅ All business logic ported and tested
+- ✅ Sample vehicles in database
+- ✅ Sample parameters in database
+- ✅ Calculations produce same results as original app
+
+---
+
+## Phase 3: Client Management (Week 6)
+
+- [ ] 5.1 Build client CRUD screens
+  - Create client list page (/clients)
+  - Create client detail page (/clients/[id])
+  - Create new client page (/clients/new)
+  - Create edit client page (/clients/[id]/edit)
+  - _Requirements: 3 (client management)_
+
+- [ ] 5.2 Implement client features
+  - Client search with autocomplete
+  - Filter by type (individual/company)
+  - Filter by pricing level
+  - Client contact info management
+  - Tax ID (RTN) validation
+  - Notes and activity history
+  - Pagination for client list
+  - _Requirements: 3.6, 3.7, 3.8_
+
+- [ ] 5.3 Create client components
+  - ClientList component
+  - ClientCard component
+  - ClientForm component
+  - ClientSearch component
+  - _Requirements: 3 (client management)_
+
+**Phase 3 Deliverables**:
+- ✅ Complete client management system
+- ✅ Client data properly isolated by tenant
+- ✅ Client search and filtering working
+
+---
+
+## Phase 4: Quotation System (Weeks 7-8)
+
+### Week 7: Quotation Creation
+
+- [ ] 6.1 Build quotation wizard
+  - Create multi-step quotation wizard (/quotations/new)
+  - Step 1: Select client (with quick-create)
+  - Step 2: Enter route details (origin, destination, dates)
+  - Step 3: Select vehicle (filtered by capacity)
+  - Step 4: Configure options (fuel, meals, tolls, incentive)
+  - Step 5: Review costs and select markup
+  - Step 6: Preview and save
+  - _Requirements: 6 (quotation generation)_
+
+- [ ] 6.2 Integrate Google Maps
+  - Create RouteMap component
+  - Display route with markers
+  - Show distance and duration
+  - Real-time cost calculation
+  - _Requirements: 6.2, 6.3_
+
+- [ ] 6.3 Implement cost calculation UI
+  - Create CostBreakdown component
+  - Create PricingOptions component
+  - Display multiple pricing levels
+  - Auto-generate quotation number
+  - _Requirements: 6.4, 6.5, 7 (cost calculation)_
+
+### Week 8: Quotation Management
+
+- [ ] 6.4 Build quotation list and detail
+  - Create quotation list page (/quotations)
+  - Create quotation detail page (/quotations/[id])
+  - Implement status workflow (draft → sent → approved/rejected)
+  - Add filters (status, client, date range)
+  - _Requirements: 6.7, 6.8_
+
+- [ ] 6.5 Add quotation actions
+  - Duplicate quotation
+  - Edit draft quotations
+  - Quotation expiry handling
+  - Internal notes vs client-visible notes
+  - _Requirements: 6.9, 6.10, 6.11_
+
+**Phase 4 Deliverables**:
+- ✅ Complete quotation workflow
+- ✅ All quotations persisted to database
+- ✅ Status management working
+- ✅ Google Maps integration working
+
+---
+
+## Phase 5: PDF Generation & Email (Week 9)
+
+- [ ] 7.1 Implement PDF generation
+  - Design PDF template for quotations
+  - Implement Puppeteer PDF generation
+  - Upload PDFs to Convex storage
+  - Generate and preview PDF
+  - Download PDF functionality
+  - _Requirements: 9 (PDF generation)_
+
+- [ ] 7.2 Integrate email delivery
+  - Set up Resend email integration
+  - Create email templates (quotation sent, reminder)
+  - Send quotation email with PDF attachment
+  - Track email delivery status
+  - _Requirements: 10 (email integration)_
+
+**Phase 5 Deliverables**:
+- ✅ Professional PDF generation working
+- ✅ Email delivery working
+- ✅ PDFs stored in cloud storage
+
+---
+
+## Phase 6: Driver Management (Week 10)
+
+- [ ] 8.1 Build driver CRUD screens
+  - Create driver list page (/drivers)
+  - Create driver detail page (/drivers/[id])
+  - Create new driver page (/drivers/new)
+  - Create edit driver page (/drivers/[id]/edit)
+  - _Requirements: 5 (driver management)_
+
+- [ ] 8.2 Implement driver features
+  - License expiry tracking and alerts
+  - Driver availability status
+  - Emergency contact info
+  - Driver documents upload
+  - Driver schedule view
+  - _Requirements: 5.3, 5.4, 5.5, 5.6, 5.7_
+
+**Phase 6 Deliverables**:
+- ✅ Complete driver management system
+- ✅ License expiry alerts working
+
+---
+
+## Phase 7: Itinerary Management (Weeks 11-12)
+
+### Week 11: Itinerary Creation
+
+- [ ] 9.1 Build itinerary conversion
+  - Create "Convert to Itinerary" workflow from quotation
+  - Create itinerary detail page (/itineraries/[id])
+  - Assign driver and vehicle
+  - Set pickup/dropoff details
+  - Generate Google Maps route link
+  - _Requirements: 11 (itinerary management)_
+
+- [ ] 9.2 Implement itinerary status
+  - Status workflow (scheduled → in_progress → completed)
+  - Track start and completion times
+  - Handle cancellations
+  - _Requirements: 11.7_
+
+### Week 12: Itinerary Views
+
+- [ ] 9.3 Build calendar and schedule views
+  - Create itinerary list page (/itineraries)
+  - Create calendar view (/itineraries/calendar)
+  - Driver schedule view
+  - Vehicle availability calendar
+  - Prevent double-booking
+  - _Requirements: 11.8, 11.9, 11.10, 11.11_
+
+- [ ] 9.4 Add itinerary features
+  - Itinerary notifications
+  - Itinerary report/summary
+  - Route link generation
+  - _Requirements: 11.5, 11.6_
+
+**Phase 7 Deliverables**:
+- ✅ Quote → Itinerary conversion working
+- ✅ Driver/vehicle assignment
+- ✅ Calendar views
+- ✅ Google Maps route links
+
+---
+
+## Phase 8: Invoice System (Weeks 13-14)
+
+### Week 13: Invoice Generation
+
+- [ ] 10.1 Build invoice creation
+  - Create "Generate Invoice" workflow from itinerary
+  - Create invoice list page (/invoices)
+  - Create invoice detail page (/invoices/[id])
+  - Design invoice PDF template
+  - Auto-generate invoice number (INV-YYYY-####)
+  - _Requirements: 12 (invoice generation)_
+
+- [ ] 10.2 Implement invoice features
+  - Auto-calculate ISV (15% tax)
+  - Invoice PDF generation
+  - Invoice status management
+  - Additional charges and discounts
+  - _Requirements: 12.3, 12.6, 12.8_
+
+### Week 14: Payment Tracking
+
+- [ ] 10.3 Build payment recording
+  - Create payment recording interface
+  - Build payment history view
+  - Support multiple payment methods
+  - Support partial payments
+  - _Requirements: 13 (payment tracking)_
+
+- [ ] 10.4 Implement financial reports
+  - Payment status tracking (unpaid → paid → overdue)
+  - Overdue invoice flagging
+  - Receivables aging report
+  - Revenue reports
+  - _Requirements: 13.7, 13.8, 17 (financial reports)_
+
+**Phase 8 Deliverables**:
+- ✅ Automated invoice generation
+- ✅ Complete payment tracking
+- ✅ Financial reports
+
+---
+
+## Phase 9: Expense Advances (Week 15)
+
+- [ ] 11.1 Build expense advance system
+  - Create expense advance list (/expenses)
+  - Create advance request from itinerary
+  - Calculate suggested advance from costs
+  - Auto-generate advance number (ADV-YYYY-####)
+  - _Requirements: 14 (expense advances)_
+
+- [ ] 11.2 Implement approval workflow
+  - Request/approval workflow
+  - Mark as paid
+  - Receipt upload
+  - _Requirements: 14.3, 14.4, 14.5_
+
+- [ ] 11.3 Build settlement process
+  - Settlement screen (actual vs advanced)
+  - Refund/additional payment calculation
+  - Expense reports
+  - _Requirements: 14.6, 14.7, 14.8_
+
+**Phase 9 Deliverables**:
+- ✅ Complete expense advance lifecycle
+- ✅ Receipt management
+- ✅ Settlement workflow
+
+---
+
+## Phase 10: Dashboard & Analytics (Weeks 16-18)
+
+### Week 16: Dashboard
+
+- [ ] 12.1 Build main dashboard
+  - Create dashboard page (/)
+  - Display KPIs (quotations, conversion rate, revenue, receivables)
+  - Show upcoming itineraries
+  - Quick actions (new quotation, new client)
+  - Recent activity feed
+  - Alerts (license expiry, overdue invoices)
+  - _Requirements: 15 (dashboard & analytics)_
+
+### Week 17: Reports
+
+- [ ] 12.2 Build sales reports
+  - Pipeline (quotations by status)
+  - Conversion funnel
+  - Revenue by client
+  - Revenue by vehicle
+  - _Requirements: 16 (sales reports)_
+
+- [ ] 12.3 Build financial reports
+  - Revenue summary
+  - Receivables aging
+  - Monthly comparisons
+  - _Requirements: 17 (financial reports)_
+
+- [ ] 12.4 Build operational reports
+  - Driver utilization
+  - Vehicle utilization
+  - Route analysis
+  - _Requirements: 18 (operational reports)_
+
+### Week 18: Polish & Launch Prep
+
+- [ ] 12.5 Implement data export
+  - CSV export for all reports
+  - Data export for tenant
+  - _Requirements: 16.6, 17.6, 20.5_
+
+- [ ] 12.6 Performance optimization
+  - Optimize bundle size
+  - Implement lazy loading
+  - Add loading states
+  - Optimize database queries
+  - _Requirements: 19.9, 19.10_
+
+- [ ] 12.7 Final polish
+  - Error handling improvements
+  - Mobile responsiveness check
+  - Browser testing (Chrome, Firefox, Safari, Edge)
+  - Security review
+  - _Requirements: 19.4, 19.7, 20_
+
+- [ ] 12.8 Documentation and launch prep
+  - User documentation
+  - Admin documentation
+  - Terms of service
+  - Privacy policy
+  - Support email configuration
+  - _Requirements: 20.6_
+
+**Phase 10 Deliverables**:
+- ✅ Comprehensive dashboard
+- ✅ All reports functional
+- ✅ Production-ready application
+- ✅ Documentation complete
+
+---
+
+## Launch Checklist
+
+### Pre-Launch
+- [ ] All features tested end-to-end
+- [ ] Mobile responsive on all screens
+- [ ] Error tracking configured (Sentry)
+- [ ] Terms of service published
+- [ ] Privacy policy published
+- [ ] SSL certificate configured
+- [ ] Domain configured (routewise.app)
+- [ ] Email deliverability tested
+- [ ] Backup strategy implemented
+- [ ] Support email configured
+
+### Launch Day
+- [ ] Deploy to production
+- [ ] Monitor error logs
+- [ ] Test critical flows (quotation, invoice, payment)
+- [ ] Announce launch
+- [ ] Onboard first customers
+
+### Post-Launch (Week 19+)
+- [ ] Monitor usage patterns
+- [ ] Gather customer feedback
+- [ ] Fix bugs and issues
+- [ ] Plan next features (Phase 2 roadmap)
+
+---
+
+## Risk Mitigation
+
+### Technical Risks
+
+| Risk | Mitigation | Status |
+|------|------------|--------|
+| Svelte learning curve | 2 weeks dedicated training | Planned |
+| Convex document model limitations | Design schema carefully upfront | Planned |
+| PDF generation complexity | Use Puppeteer with tested templates | Planned |
+| Google Maps API costs | Implement aggressive caching | Planned |
+| WorkOS integration issues | Follow official documentation | Planned |
+
+### Business Risks
+
+| Risk | Mitigation | Status |
+|------|------------|--------|
+| Longer timeline than expected | 4-week buffer built into estimate | Planned |
+| Honduras hiring difficulty | Plan for remote training | Planned |
+| Competition | Focus on local market, Spanish language | Planned |
+
+---
+
+## Success Metrics
+
+### Development Phase
+- [ ] On-time delivery (within 18 weeks)
+- [ ] All 50+ screens built
+- [ ] Zero critical bugs at launch
+- [ ] <3s page load times
+- [ ] >90 Lighthouse score
+
+### Post-Launch (Year 1)
+- [ ] 33 paying customers
+- [ ] 120 total users
+- [ ] $7,080 MRR by Month 12
+- [ ] <1% monthly churn rate
+- [ ] >4.5 star user satisfaction
+
+---
+
+## Code Reuse from Existing App
+
+### What Can Be Reused (30-40%)
+- ✅ Business logic algorithms (cost calculation, route calculation)
+- ✅ Utility functions (unit conversion, formatting, validation)
+- ✅ Type definitions (with modifications for Convex)
+- ✅ Design system (Tailwind CSS v4, dark mode theme)
+
+### What Must Be Rebuilt (60-70%)
+- ❌ All UI components (React → Svelte)
+- ❌ Data layer (JSON/localStorage → Convex)
+- ❌ Authentication (none → WorkOS)
+- ❌ 50+ new CRUD screens for SaaS features
+- ❌ PDF generation (new feature)
+- ❌ Email integration (new feature)
+
+---
+
+## Resources
+
+### Documentation
+- [SvelteKit Docs](https://kit.svelte.dev/docs)
+- [Convex Docs](https://docs.convex.dev/)
+- [WorkOS Docs](https://workos.com/docs)
+- [Flowbite-svelte](https://flowbite-svelte.com/)
+- [Tailwind CSS 4](https://tailwindcss.com/docs/v4-beta)
+
+### Tutorials
+- [Svelte Tutorial](https://learn.svelte.dev/)
+- [SvelteKit + Convex Tutorial](https://docs.convex.dev/quickstart/sveltekit)
+- [WorkOS AuthKit Guide](https://workos.com/docs/user-management)
+
+---
+
+**Document Version**: 2.0
+**Last Updated**: November 24, 2025
+**Next Review**: Upon completion of Phase 0
