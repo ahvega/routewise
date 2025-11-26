@@ -168,6 +168,7 @@
 		<NavLi href="/itineraries">{$t('nav.itineraries')}</NavLi>
 		<NavLi href="/invoices">{$t('nav.invoices')}</NavLi>
 		<NavLi href="/expenses">{$t('nav.expenses')}</NavLi>
+		<NavLi href="/reports">{$t('nav.reports')}</NavLi>
 		<NavLi href="/clients">{$t('nav.clients')}</NavLi>
 		<NavLi href="/vehicles">{$t('nav.vehicles')}</NavLi>
 		<NavLi href="/drivers">{$t('nav.drivers')}</NavLi>

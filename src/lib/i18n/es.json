@@ -53,6 +53,7 @@
 		"itineraries": "Itinerarios",
 		"invoices": "Facturas",
 		"expenses": "Gastos",
+		"reports": "Reportes",
 		"vehicles": "Vehículos",
 		"drivers": "Conductores",
 		"clients": "Clientes",
@@ -718,5 +719,27 @@
 			"transfer": "Transferencia",
 			"check": "Cheque"
 		}
+	},
+	"reports": {
+		"title": "Reportes",
+		"subtitle": "Análisis e información del negocio",
+		"sales": "Ventas",
+		"financial": "Financiero",
+		"operational": "Operacional",
+		"salesPipeline": "Pipeline de Ventas",
+		"conversionRate": "Tasa de Conversión",
+		"pipelineValue": "Valor en Pipeline",
+		"approvedValue": "Valor Aprobado",
+		"revenueByClient": "Ingresos por Cliente",
+		"revenueByVehicle": "Ingresos por Vehículo",
+		"monthlyRevenue": "Ingresos Mensuales",
+		"receivablesAging": "Antigüedad de Cuentas por Cobrar",
+		"totalReceivables": "Total por Cobrar",
+		"totalOverdue": "Total Vencido",
+		"unpaidInvoices": "Facturas Sin Pagar",
+		"current": "Al Corriente",
+		"driverUtilization": "Utilización de Conductores",
+		"vehicleUtilization": "Utilización de Vehículos",
+		"routeAnalysis": "Rutas Populares"
 	}
 }
