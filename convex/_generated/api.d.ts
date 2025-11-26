@@ -11,6 +11,7 @@
 import type * as bootstrap from "../bootstrap.js";
 import type * as clients from "../clients.js";
 import type * as drivers from "../drivers.js";
+import type * as itineraries from "../itineraries.js";
 import type * as parameters from "../parameters.js";
 import type * as quotations from "../quotations.js";
 import type * as tenants from "../tenants.js";
@@ -27,6 +28,7 @@ declare const fullApi: ApiFromModules<{
   bootstrap: typeof bootstrap;
   clients: typeof clients;
   drivers: typeof drivers;
+  itineraries: typeof itineraries;
   parameters: typeof parameters;
   quotations: typeof quotations;
   tenants: typeof tenants;

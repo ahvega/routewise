@@ -22,7 +22,8 @@
 		TruckOutline,
 		UserOutline,
 		BarsOutline,
-		GlobeOutline
+		GlobeOutline,
+		CalendarMonthOutline
 	} from 'flowbite-svelte-icons';
 	import { t, locale, setLocale, locales } from '$lib/i18n';
 
@@ -90,6 +91,10 @@
 					<FileLinesOutline class="w-4 h-4 text-gray-500 dark:text-gray-400" />
 					<span>{$t('quotations.title')}</span>
 				</DropdownItem>
+				<DropdownItem href="/itineraries" class="flex items-center gap-3 !text-gray-900 dark:!text-white">
+					<CalendarMonthOutline class="w-4 h-4 text-blue-500 dark:text-blue-400" />
+					<span>{$t('itineraries.title')}</span>
+				</DropdownItem>
 			</Dropdown>
 		{/if}
 
@@ -151,6 +156,7 @@
 	<NavUl>
 		<NavLi href="/">{$t('nav.dashboard')}</NavLi>
 		<NavLi href="/quotations">{$t('nav.quotations')}</NavLi>
+		<NavLi href="/itineraries">{$t('nav.itineraries')}</NavLi>
 		<NavLi href="/clients">{$t('nav.clients')}</NavLi>
 		<NavLi href="/vehicles">{$t('nav.vehicles')}</NavLi>
 		<NavLi href="/drivers">{$t('nav.drivers')}</NavLi>

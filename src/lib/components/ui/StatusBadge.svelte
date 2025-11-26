@@ -24,7 +24,7 @@
 		InfoCircleSolid
 	} from 'flowbite-svelte-icons';
 
-	type StatusVariant = 'default' | 'quotation' | 'vehicle' | 'driver' | 'client' | 'pricing' | 'plan' | 'parameter';
+	type StatusVariant = 'default' | 'quotation' | 'vehicle' | 'driver' | 'client' | 'pricing' | 'plan' | 'parameter' | 'itinerary';
 
 	interface Props {
 		status: string;
@@ -80,6 +80,12 @@
 
 		// Parameters
 		year: { bg: 'bg-sky-100', text: 'text-sky-800', darkBg: 'dark:bg-sky-900/40', darkText: 'dark:text-sky-300' },
+
+		// Itinerary status
+		scheduled: { bg: 'bg-sky-100', text: 'text-sky-800', darkBg: 'dark:bg-sky-900/40', darkText: 'dark:text-sky-300' },
+		in_progress: { bg: 'bg-amber-100', text: 'text-amber-800', darkBg: 'dark:bg-amber-900/40', darkText: 'dark:text-amber-300' },
+		completed: { bg: 'bg-emerald-100', text: 'text-emerald-800', darkBg: 'dark:bg-emerald-900/40', darkText: 'dark:text-emerald-300' },
+		cancelled: { bg: 'bg-rose-100', text: 'text-rose-800', darkBg: 'dark:bg-rose-900/40', darkText: 'dark:text-rose-300' },
 	};
 
 	// Icon mapping for statuses
@@ -125,6 +131,12 @@
 
 		// Parameters
 		year: CalendarMonthSolid,
+
+		// Itinerary status
+		scheduled: CalendarMonthSolid,
+		in_progress: TruckSolid,
+		completed: CheckCircleSolid,
+		cancelled: CloseCircleSolid,
 	};
 
 	// Default fallback

@@ -195,4 +195,57 @@ export default defineSchema({
     .index("by_tenant", ["tenantId"])
     .index("by_tenant_status", ["tenantId", "status"])
     .index("by_client", ["clientId"]),
+
+  // Itineraries (Scheduled trips from approved quotations)
+  itineraries: defineTable({
+    tenantId: v.id("tenants"),
+    itineraryNumber: v.string(),
+    quotationId: v.optional(v.id("quotations")),
+    clientId: v.optional(v.id("clients")),
+    vehicleId: v.optional(v.id("vehicles")),
+    driverId: v.optional(v.id("drivers")),
+    createdBy: v.optional(v.id("users")),
+    // Trip details (copied from quotation or entered manually)
+    origin: v.string(),
+    destination: v.string(),
+    baseLocation: v.string(),
+    groupSize: v.number(),
+    totalDistance: v.number(),
+    totalTime: v.number(),
+    // Schedule
+    startDate: v.number(),
+    endDate: v.optional(v.number()),
+    estimatedDays: v.number(),
+    // Pickup/Dropoff details
+    pickupLocation: v.optional(v.string()),
+    pickupTime: v.optional(v.string()),
+    pickupNotes: v.optional(v.string()),
+    dropoffLocation: v.optional(v.string()),
+    dropoffTime: v.optional(v.string()),
+    dropoffNotes: v.optional(v.string()),
+    // Pricing (from quotation)
+    agreedPriceHnl: v.number(),
+    agreedPriceUsd: v.number(),
+    exchangeRateUsed: v.number(),
+    // Status
+    status: v.string(), // 'scheduled' | 'in_progress' | 'completed' | 'cancelled'
+    // Route link
+    routeLink: v.optional(v.string()),
+    // Notes
+    notes: v.optional(v.string()),
+    internalNotes: v.optional(v.string()),
+    // Timestamps
+    startedAt: v.optional(v.number()),
+    completedAt: v.optional(v.number()),
+    cancelledAt: v.optional(v.number()),
+    cancellationReason: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_tenant", ["tenantId"])
+    .index("by_tenant_status", ["tenantId", "status"])
+    .index("by_driver", ["driverId"])
+    .index("by_vehicle", ["vehicleId"])
+    .index("by_quotation", ["quotationId"])
+    .index("by_start_date", ["tenantId", "startDate"]),
 });

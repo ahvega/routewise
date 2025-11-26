@@ -5,10 +5,15 @@
 		Spinner,
 		Alert,
 		Badge,
-		Toast
+		Toast,
+		Modal,
+		Select,
+		Label,
+		Input
 	} from 'flowbite-svelte';
 	import {
 		ArrowLeftOutline,
+		ArrowRightOutline,
 		PenOutline,
 		TrashBinOutline,
 		PaperPlaneOutline,
@@ -51,10 +56,27 @@
 		() => (tenantStore.tenantId ? { tenantId: tenantStore.tenantId } : 'skip')
 	);
 
+	const driversQuery = useQuery(
+		api.drivers.list,
+		() => (tenantStore.tenantId ? { tenantId: tenantStore.tenantId } : 'skip')
+	);
+
+	// Check if already converted to itinerary
+	const existingItineraryQuery = useQuery(
+		api.itineraries.byQuotation,
+		() => quotationId ? { quotationId } : 'skip'
+	);
+
 	const quotation = $derived(quotationQuery.data);
 	const vehicles = $derived(vehiclesQuery.data || []);
 	const clients = $derived(clientsQuery.data || []);
+	const drivers = $derived(driversQuery.data || []);
+	const existingItinerary = $derived(existingItineraryQuery.data);
 	const isLoading = $derived(quotationQuery.isLoading);
+
+	// Active resources for assignment
+	const activeDrivers = $derived(drivers.filter(d => d.status === 'active'));
+	const activeVehicles = $derived(vehicles.filter(v => v.status === 'active'));
 
 	// Get vehicle and client details
 	const vehicle = $derived(
@@ -68,6 +90,13 @@
 	let showToast = $state(false);
 	let toastMessage = $state('');
 	let toastType = $state<'success' | 'error'>('success');
+
+	// Convert to itinerary modal state
+	let showConvertModal = $state(false);
+	let convertStartDate = $state('');
+	let convertDriverId = $state('');
+	let convertVehicleId = $state('');
+	let isConverting = $state(false);
 
 	function getClientName(client: any): string {
 		if (!client) return 'Walk-in';
@@ -149,6 +178,39 @@
 			showToastMessage($t('quotations.deleteFailed'), 'error');
 		}
 	}
+
+	function openConvertModal() {
+		// Set default start date to tomorrow
+		const tomorrow = new Date();
+		tomorrow.setDate(tomorrow.getDate() + 1);
+		convertStartDate = tomorrow.toISOString().split('T')[0];
+		convertDriverId = '';
+		convertVehicleId = quotation?.vehicleId || '';
+		showConvertModal = true;
+	}
+
+	async function convertToItinerary() {
+		if (!quotation || !convertStartDate) return;
+
+		isConverting = true;
+		try {
+			const startDateTimestamp = new Date(convertStartDate).getTime();
+			const itineraryId = await client.mutation(api.itineraries.createFromQuotation, {
+				quotationId: quotation._id,
+				startDate: startDateTimestamp,
+				driverId: convertDriverId ? (convertDriverId as Id<'drivers'>) : undefined,
+				vehicleId: convertVehicleId ? (convertVehicleId as Id<'vehicles'>) : undefined,
+			});
+			showConvertModal = false;
+			showToastMessage($t('itineraries.createSuccess'), 'success');
+			setTimeout(() => goto(`/itineraries/${itineraryId}`), 500);
+		} catch (error) {
+			console.error('Failed to convert to itinerary:', error);
+			showToastMessage($t('itineraries.saveFailed'), 'error');
+		} finally {
+			isConverting = false;
+		}
+	}
 </script>
 
 <div class="space-y-6">
@@ -184,6 +246,19 @@
 						<CloseCircleOutline class="w-4 h-4 mr-2" />
 						{$t('common.rejected')}
 					</Button>
+				{/if}
+				{#if quotation.status === 'approved'}
+					{#if existingItinerary}
+						<Button size="sm" color="light" href="/itineraries/{existingItinerary._id}">
+							<CalendarMonthOutline class="w-4 h-4 mr-2" />
+							{$t('itineraries.viewItinerary')}
+						</Button>
+					{:else}
+						<Button size="sm" color="green" onclick={openConvertModal}>
+							<ArrowRightOutline class="w-4 h-4 mr-2" />
+							{$t('itineraries.convertFromQuotation')}
+						</Button>
+					{/if}
 				{/if}
 				{#if quotation.status === 'draft'}
 					<Button size="sm" color="red" outline onclick={handleDelete}>
@@ -442,6 +517,60 @@
 		</div>
 	{/if}
 </div>
+
+<!-- Convert to Itinerary Modal -->
+<Modal bind:open={showConvertModal} title={$t('itineraries.convertFromQuotation')} size="md">
+	<div class="space-y-4">
+		<p class="text-gray-600 dark:text-gray-400">
+			{$t('itineraries.convert.subtitle')}
+		</p>
+
+		<div>
+			<Label for="start-date" class="mb-2">{$t('itineraries.details.startDate')} *</Label>
+			<Input
+				id="start-date"
+				type="date"
+				bind:value={convertStartDate}
+				required
+			/>
+		</div>
+
+		<div>
+			<Label for="driver" class="mb-2">{$t('itineraries.columns.driver')} ({$t('common.optional')})</Label>
+			<Select id="driver" bind:value={convertDriverId}>
+				<option value="">{$t('itineraries.selectDriver')}</option>
+				{#each activeDrivers as d}
+					<option value={d._id}>{d.firstName} {d.lastName}</option>
+				{/each}
+			</Select>
+		</div>
+
+		<div>
+			<Label for="vehicle" class="mb-2">{$t('itineraries.columns.vehicle')} ({$t('common.optional')})</Label>
+			<Select id="vehicle" bind:value={convertVehicleId}>
+				<option value="">{$t('itineraries.selectVehicle')}</option>
+				{#each activeVehicles as v}
+					<option value={v._id}>{v.name} ({v.passengerCapacity} {$t('vehicles.fields.passengers')})</option>
+				{/each}
+			</Select>
+		</div>
+	</div>
+	<svelte:fragment slot="footer">
+		<div class="flex justify-end gap-2">
+			<Button color="alternative" onclick={() => (showConvertModal = false)} disabled={isConverting}>
+				{$t('common.cancel')}
+			</Button>
+			<Button color="green" onclick={convertToItinerary} disabled={!convertStartDate || isConverting}>
+				{#if isConverting}
+					<Spinner size="4" class="mr-2" />
+				{:else}
+					<ArrowRightOutline class="w-4 h-4 mr-2" />
+				{/if}
+				{$t('itineraries.convertFromQuotation')}
+			</Button>
+		</div>
+	</svelte:fragment>
+</Modal>
 
 <!-- Toast notifications -->
 {#if showToast}
