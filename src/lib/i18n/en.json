@@ -41,12 +41,17 @@
 		"error": "Error",
 		"view": "View",
 		"change": "Change",
-		"days": "days"
+		"days": "days",
+		"information": "Information",
+		"notes": "Notes",
+		"back": "Back",
+		"saved": "Saved successfully"
 	},
 	"nav": {
 		"dashboard": "Dashboard",
 		"quotations": "Quotations",
 		"itineraries": "Itineraries",
+		"invoices": "Invoices",
 		"vehicles": "Vehicles",
 		"drivers": "Drivers",
 		"clients": "Clients",
@@ -531,6 +536,93 @@
 			"scheduleInfo": "Schedule Information",
 			"assignmentInfo": "Assignment (Optional)",
 			"pickupDropoff": "Pickup & Dropoff Details"
+		}
+	},
+	"invoices": {
+		"title": "Invoices",
+		"subtitle": "Manage billing and payments",
+		"invoice": "Invoice",
+		"noInvoices": "No invoices yet",
+		"noResults": "No invoices found matching your filters",
+		"empty": "No invoices yet",
+		"emptyHint": "Generate an invoice from a completed itinerary",
+		"notFound": "Invoice not found",
+		"created": "Invoice created successfully",
+		"createFailed": "Failed to create invoice",
+		"paymentRecorded": "Payment recorded successfully",
+		"paymentDeleted": "Payment deleted successfully",
+		"searchPlaceholder": "Search by invoice number, client...",
+		"filterByStatus": "Filter by status...",
+		"filterByPayment": "Filter by payment...",
+		"generateInvoice": "Generate Invoice",
+		"generateFromItinerary": "Generate an invoice from this completed itinerary",
+		"viewInvoice": "View Invoice",
+		"noInvoice": "No invoice generated yet",
+		"createdOn": "Created on",
+		"details": "Invoice Details",
+		"billTo": "Bill To",
+		"description": "Description",
+		"amount": "Amount",
+		"subtotal": "Subtotal",
+		"taxPercentage": "Tax Percentage",
+		"total": "Total",
+		"totalUsd": "Total (USD)",
+		"amountPaid": "Amount Paid",
+		"amountDue": "Amount Due",
+		"exchangeRate": "Exchange Rate",
+		"linkedItinerary": "Linked Itinerary",
+		"paymentHistory": "Payment History",
+		"noPayments": "No payments recorded",
+		"recordPayment": "Record Payment",
+		"paymentAmount": "Amount",
+		"paymentDate": "Payment Date",
+		"paymentMethod": "Payment Method",
+		"reference": "Reference Number",
+		"referencePlaceholder": "Transaction or check number",
+		"paymentTerms": "Payment Terms (days)",
+		"deletePayment": "Delete Payment",
+		"deletePaymentConfirm": "Are you sure you want to delete this payment? This will update the invoice balance.",
+		"statuses": {
+			"draft": "Draft",
+			"sent": "Sent",
+			"paid": "Paid",
+			"cancelled": "Cancelled",
+			"void": "Void"
+		},
+		"paymentStatuses": {
+			"unpaid": "Unpaid",
+			"partial": "Partial",
+			"paid": "Paid",
+			"overdue": "Overdue"
+		},
+		"paymentMethods": {
+			"cash": "Cash",
+			"transfer": "Bank Transfer",
+			"card": "Credit/Debit Card",
+			"check": "Check"
+		},
+		"columns": {
+			"number": "Invoice #",
+			"client": "Client",
+			"date": "Invoice Date",
+			"dueDate": "Due Date",
+			"total": "Total",
+			"balance": "Balance",
+			"status": "Status",
+			"payment": "Payment"
+		},
+		"stats": {
+			"total": "Total Invoices",
+			"unpaid": "Unpaid",
+			"overdue": "Overdue",
+			"receivables": "Receivables"
+		},
+		"actions": {
+			"send": "Send Invoice",
+			"markSent": "Mark as Sent",
+			"recordPayment": "Record Payment",
+			"addPayment": "Add Payment",
+			"cancel": "Cancel Invoice"
 		}
 	}
 }

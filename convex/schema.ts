@@ -248,4 +248,71 @@ export default defineSchema({
     .index("by_vehicle", ["vehicleId"])
     .index("by_quotation", ["quotationId"])
     .index("by_start_date", ["tenantId", "startDate"]),
+
+  // Invoices
+  invoices: defineTable({
+    tenantId: v.id("tenants"),
+    invoiceNumber: v.string(),
+    itineraryId: v.optional(v.id("itineraries")),
+    clientId: v.optional(v.id("clients")),
+    createdBy: v.optional(v.id("users")),
+    // Invoice details
+    invoiceDate: v.number(),
+    dueDate: v.number(),
+    // Line items (services rendered)
+    description: v.string(), // Trip description
+    subtotalHnl: v.number(),
+    // Tax (ISV 15% in Honduras)
+    taxPercentage: v.number(),
+    taxAmountHnl: v.number(),
+    // Totals
+    totalHnl: v.number(),
+    totalUsd: v.optional(v.number()),
+    exchangeRateUsed: v.number(),
+    // Payment tracking
+    amountPaid: v.number(),
+    amountDue: v.number(),
+    paymentStatus: v.string(), // 'unpaid' | 'partial' | 'paid' | 'overdue'
+    // Additional charges/discounts
+    additionalCharges: v.optional(v.array(v.object({
+      description: v.string(),
+      amount: v.number(),
+    }))),
+    discounts: v.optional(v.array(v.object({
+      description: v.string(),
+      amount: v.number(),
+    }))),
+    // PDF
+    pdfUrl: v.optional(v.string()),
+    pdfGeneratedAt: v.optional(v.number()),
+    // Status
+    status: v.string(), // 'draft' | 'sent' | 'paid' | 'cancelled' | 'void'
+    notes: v.optional(v.string()),
+    // Timestamps
+    sentAt: v.optional(v.number()),
+    paidAt: v.optional(v.number()),
+    cancelledAt: v.optional(v.number()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_tenant", ["tenantId"])
+    .index("by_tenant_status", ["tenantId", "status"])
+    .index("by_tenant_payment_status", ["tenantId", "paymentStatus"])
+    .index("by_itinerary", ["itineraryId"])
+    .index("by_client", ["clientId"]),
+
+  // Invoice Payments (for tracking partial payments)
+  invoicePayments: defineTable({
+    tenantId: v.id("tenants"),
+    invoiceId: v.id("invoices"),
+    paymentDate: v.number(),
+    amount: v.number(),
+    paymentMethod: v.optional(v.string()), // 'cash' | 'transfer' | 'card' | 'check'
+    referenceNumber: v.optional(v.string()),
+    notes: v.optional(v.string()),
+    recordedBy: v.optional(v.id("users")),
+    createdAt: v.number(),
+  })
+    .index("by_invoice", ["invoiceId"])
+    .index("by_tenant", ["tenantId"]),
 });

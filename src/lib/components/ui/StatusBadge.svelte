@@ -21,10 +21,12 @@
 		CogSolid,
 		HomeSolid,
 		TruckSolid,
-		InfoCircleSolid
+		InfoCircleSolid,
+		CashSolid,
+		BanSolid
 	} from 'flowbite-svelte-icons';
 
-	type StatusVariant = 'default' | 'quotation' | 'vehicle' | 'driver' | 'client' | 'pricing' | 'plan' | 'parameter' | 'itinerary';
+	type StatusVariant = 'default' | 'quotation' | 'vehicle' | 'driver' | 'client' | 'pricing' | 'plan' | 'parameter' | 'itinerary' | 'invoice' | 'payment';
 
 	interface Props {
 		status: string;
@@ -86,6 +88,15 @@
 		in_progress: { bg: 'bg-amber-100', text: 'text-amber-800', darkBg: 'dark:bg-amber-900/40', darkText: 'dark:text-amber-300' },
 		completed: { bg: 'bg-emerald-100', text: 'text-emerald-800', darkBg: 'dark:bg-emerald-900/40', darkText: 'dark:text-emerald-300' },
 		cancelled: { bg: 'bg-rose-100', text: 'text-rose-800', darkBg: 'dark:bg-rose-900/40', darkText: 'dark:text-rose-300' },
+
+		// Invoice status
+		void: { bg: 'bg-slate-100', text: 'text-slate-700', darkBg: 'dark:bg-slate-800/60', darkText: 'dark:text-slate-300' },
+
+		// Payment status
+		unpaid: { bg: 'bg-rose-100', text: 'text-rose-800', darkBg: 'dark:bg-rose-900/40', darkText: 'dark:text-rose-300' },
+		partial: { bg: 'bg-amber-100', text: 'text-amber-800', darkBg: 'dark:bg-amber-900/40', darkText: 'dark:text-amber-300' },
+		paid: { bg: 'bg-emerald-100', text: 'text-emerald-800', darkBg: 'dark:bg-emerald-900/40', darkText: 'dark:text-emerald-300' },
+		overdue: { bg: 'bg-red-100', text: 'text-red-800', darkBg: 'dark:bg-red-900/40', darkText: 'dark:text-red-300' },
 	};
 
 	// Icon mapping for statuses
@@ -137,6 +148,15 @@
 		in_progress: TruckSolid,
 		completed: CheckCircleSolid,
 		cancelled: CloseCircleSolid,
+
+		// Invoice status
+		void: BanSolid,
+
+		// Payment status
+		unpaid: ClockSolid,
+		partial: CashSolid,
+		paid: CheckCircleSolid,
+		overdue: ExclamationCircleSolid,
 	};
 
 	// Default fallback

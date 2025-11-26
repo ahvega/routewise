@@ -7,7 +7,9 @@
 		Badge,
 		Toast,
 		Select,
-		Modal
+		Modal,
+		Label,
+		Input
 	} from 'flowbite-svelte';
 	import {
 		ArrowLeftOutline,
@@ -19,7 +21,9 @@
 		UserOutline,
 		CalendarMonthOutline,
 		ClockOutline,
-		LinkOutline
+		LinkOutline,
+		FileLinesOutline,
+		CashOutline
 	} from 'flowbite-svelte-icons';
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
@@ -57,7 +61,14 @@
 		() => (tenantStore.tenantId ? { tenantId: tenantStore.tenantId } : 'skip')
 	);
 
+	// Query existing invoice for this itinerary
+	const existingInvoiceQuery = useQuery(
+		api.invoices.getByItinerary,
+		() => itineraryId ? { itineraryId } : 'skip'
+	);
+
 	const itinerary = $derived(itineraryQuery.data);
+	const existingInvoice = $derived(existingInvoiceQuery.data);
 	const vehicles = $derived(vehiclesQuery.data || []);
 	const clients = $derived(clientsQuery.data || []);
 	const drivers = $derived(driversQuery.data || []);
@@ -79,6 +90,11 @@
 	let showAssignVehicleModal = $state(false);
 	let selectedDriverId = $state('');
 	let selectedVehicleId = $state('');
+
+	// Invoice generation modal state
+	let showInvoiceModal = $state(false);
+	let invoiceTaxPercentage = $state(15); // ISV default in Honduras
+	let invoicePaymentTerms = $state(30); // Default 30 days
 
 	// Toast state
 	let showToast = $state(false);
@@ -206,6 +222,24 @@
 		}
 	}
 
+	async function generateInvoice() {
+		if (!itinerary) return;
+
+		try {
+			const invoiceId = await client.mutation(api.invoices.createFromItinerary, {
+				itineraryId: itinerary._id,
+				taxPercentage: invoiceTaxPercentage,
+				paymentTermsDays: invoicePaymentTerms
+			});
+			showInvoiceModal = false;
+			showToastMessage($t('invoices.created'), 'success');
+			setTimeout(() => goto(`/invoices/${invoiceId}`), 500);
+		} catch (error) {
+			console.error('Failed to create invoice:', error);
+			showToastMessage($t('invoices.createFailed'), 'error');
+		}
+	}
+
 	// Get active drivers and vehicles for selection
 	const activeDrivers = $derived(drivers.filter(d => d.status === 'active'));
 	const activeVehicles = $derived(vehicles.filter(v => v.status === 'active'));
@@ -248,6 +282,19 @@
 						<CloseCircleOutline class="w-4 h-4 mr-2" />
 						{$t('common.cancel')}
 					</Button>
+				{/if}
+				{#if itinerary.status === 'completed'}
+					{#if existingInvoice}
+						<Button size="sm" color="light" href="/invoices/{existingInvoice._id}">
+							<FileLinesOutline class="w-4 h-4 mr-2" />
+							{$t('invoices.viewInvoice')}
+						</Button>
+					{:else}
+						<Button size="sm" color="blue" onclick={() => (showInvoiceModal = true)}>
+							<CashOutline class="w-4 h-4 mr-2" />
+							{$t('invoices.generateInvoice')}
+						</Button>
+					{/if}
 				{/if}
 			</div>
 		{/if}
@@ -489,6 +536,31 @@
 						</Button>
 					</Card>
 				{/if}
+
+				<!-- Invoice -->
+				{#if itinerary.status === 'completed'}
+					<Card class="max-w-none !p-6">
+						<div class="flex items-center gap-2 mb-3">
+							<FileLinesOutline class="w-5 h-5 text-gray-500" />
+							<h3 class="text-lg font-semibold text-gray-900 dark:text-white">{$t('invoices.invoice')}</h3>
+						</div>
+						{#if existingInvoice}
+							<div class="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg mb-3">
+								<p class="font-medium text-gray-900 dark:text-white">{existingInvoice.invoiceNumber}</p>
+								<p class="text-sm text-gray-500 dark:text-gray-400">{formatCurrency(existingInvoice.totalHnl)}</p>
+							</div>
+							<Button href="/invoices/{existingInvoice._id}" size="sm" color="light" class="w-full">
+								{$t('invoices.viewInvoice')}
+							</Button>
+						{:else}
+							<p class="text-sm text-gray-500 dark:text-gray-400 mb-3">{$t('invoices.noInvoice')}</p>
+							<Button size="sm" color="blue" class="w-full" onclick={() => (showInvoiceModal = true)}>
+								<CashOutline class="w-4 h-4 mr-2" />
+								{$t('invoices.generateInvoice')}
+							</Button>
+						{/if}
+					</Card>
+				{/if}
 			</div>
 		</div>
 	{/if}
@@ -533,6 +605,53 @@
 			</Button>
 			<Button color="primary" onclick={assignVehicle} disabled={!selectedVehicleId}>
 				{$t('itineraries.assignVehicle')}
+			</Button>
+		</div>
+	</svelte:fragment>
+</Modal>
+
+<!-- Generate Invoice Modal -->
+<Modal bind:open={showInvoiceModal} title={$t('invoices.generateInvoice')} size="sm">
+	<div class="space-y-4">
+		<div>
+			<p class="text-sm text-gray-500 dark:text-gray-400 mb-4">
+				{$t('invoices.generateFromItinerary')}
+			</p>
+			<div class="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg mb-4">
+				<p class="text-sm text-gray-500 dark:text-gray-400">{$t('invoices.subtotal')}</p>
+				<p class="text-2xl font-bold text-gray-900 dark:text-white">{formatCurrency(itinerary?.agreedPriceHnl || 0)}</p>
+			</div>
+		</div>
+		<div>
+			<Label for="taxPercentage">{$t('invoices.taxPercentage')} (ISV)</Label>
+			<Input
+				id="taxPercentage"
+				type="number"
+				step="0.1"
+				min="0"
+				max="100"
+				bind:value={invoiceTaxPercentage}
+			/>
+		</div>
+		<div>
+			<Label for="paymentTerms">{$t('invoices.paymentTerms')}</Label>
+			<Input
+				id="paymentTerms"
+				type="number"
+				min="0"
+				bind:value={invoicePaymentTerms}
+			/>
+			<p class="text-xs text-gray-500 dark:text-gray-400 mt-1">{$t('common.days')}</p>
+		</div>
+	</div>
+	<svelte:fragment slot="footer">
+		<div class="flex justify-end gap-2">
+			<Button color="alternative" onclick={() => (showInvoiceModal = false)}>
+				{$t('common.cancel')}
+			</Button>
+			<Button color="blue" onclick={generateInvoice}>
+				<FileLinesOutline class="w-4 h-4 mr-2" />
+				{$t('invoices.generateInvoice')}
 			</Button>
 		</div>
 	</svelte:fragment>

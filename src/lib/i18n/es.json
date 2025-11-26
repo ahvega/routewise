@@ -41,12 +41,17 @@
 		"error": "Error",
 		"view": "Ver",
 		"change": "Cambiar",
-		"days": "días"
+		"days": "días",
+		"information": "Información",
+		"notes": "Notas",
+		"back": "Volver",
+		"saved": "Guardado exitosamente"
 	},
 	"nav": {
 		"dashboard": "Panel",
 		"quotations": "Cotizaciones",
 		"itineraries": "Itinerarios",
+		"invoices": "Facturas",
 		"vehicles": "Vehículos",
 		"drivers": "Conductores",
 		"clients": "Clientes",
@@ -531,6 +536,93 @@
 			"scheduleInfo": "Información de Programación",
 			"assignmentInfo": "Asignación (Opcional)",
 			"pickupDropoff": "Detalles de Recogida y Entrega"
+		}
+	},
+	"invoices": {
+		"title": "Facturas",
+		"subtitle": "Gestiona facturación y pagos",
+		"invoice": "Factura",
+		"noInvoices": "No hay facturas aún",
+		"noResults": "No se encontraron facturas con los filtros aplicados",
+		"empty": "No hay facturas aún",
+		"emptyHint": "Genera una factura desde un itinerario completado",
+		"notFound": "Factura no encontrada",
+		"created": "Factura creada exitosamente",
+		"createFailed": "Error al crear la factura",
+		"paymentRecorded": "Pago registrado exitosamente",
+		"paymentDeleted": "Pago eliminado exitosamente",
+		"searchPlaceholder": "Buscar por número de factura, cliente...",
+		"filterByStatus": "Filtrar por estado...",
+		"filterByPayment": "Filtrar por pago...",
+		"generateInvoice": "Generar Factura",
+		"generateFromItinerary": "Genera una factura desde este itinerario completado",
+		"viewInvoice": "Ver Factura",
+		"noInvoice": "Sin factura generada aún",
+		"createdOn": "Creada el",
+		"details": "Detalles de Factura",
+		"billTo": "Facturar A",
+		"description": "Descripción",
+		"amount": "Monto",
+		"subtotal": "Subtotal",
+		"taxPercentage": "Porcentaje de Impuesto",
+		"total": "Total",
+		"totalUsd": "Total (USD)",
+		"amountPaid": "Monto Pagado",
+		"amountDue": "Saldo Pendiente",
+		"exchangeRate": "Tasa de Cambio",
+		"linkedItinerary": "Itinerario Vinculado",
+		"paymentHistory": "Historial de Pagos",
+		"noPayments": "Sin pagos registrados",
+		"recordPayment": "Registrar Pago",
+		"paymentAmount": "Monto",
+		"paymentDate": "Fecha de Pago",
+		"paymentMethod": "Método de Pago",
+		"reference": "Número de Referencia",
+		"referencePlaceholder": "Número de transacción o cheque",
+		"paymentTerms": "Plazo de Pago (días)",
+		"deletePayment": "Eliminar Pago",
+		"deletePaymentConfirm": "¿Estás seguro de que deseas eliminar este pago? Esto actualizará el saldo de la factura.",
+		"statuses": {
+			"draft": "Borrador",
+			"sent": "Enviada",
+			"paid": "Pagada",
+			"cancelled": "Cancelada",
+			"void": "Anulada"
+		},
+		"paymentStatuses": {
+			"unpaid": "Sin Pagar",
+			"partial": "Parcial",
+			"paid": "Pagada",
+			"overdue": "Vencida"
+		},
+		"paymentMethods": {
+			"cash": "Efectivo",
+			"transfer": "Transferencia Bancaria",
+			"card": "Tarjeta de Crédito/Débito",
+			"check": "Cheque"
+		},
+		"columns": {
+			"number": "Factura #",
+			"client": "Cliente",
+			"date": "Fecha de Factura",
+			"dueDate": "Fecha de Vencimiento",
+			"total": "Total",
+			"balance": "Saldo",
+			"status": "Estado",
+			"payment": "Pago"
+		},
+		"stats": {
+			"total": "Total Facturas",
+			"unpaid": "Sin Pagar",
+			"overdue": "Vencidas",
+			"receivables": "Por Cobrar"
+		},
+		"actions": {
+			"send": "Enviar Factura",
+			"markSent": "Marcar como Enviada",
+			"recordPayment": "Registrar Pago",
+			"addPayment": "Agregar Pago",
+			"cancel": "Cancelar Factura"
 		}
 	}
 }
