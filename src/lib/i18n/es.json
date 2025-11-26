@@ -378,12 +378,42 @@
 			}
 		}
 	},
+	"landing": {
+		"pretitle": "Plataforma de Cotización de Transporte",
+		"title": "Optimiza las Operaciones de tu Flota",
+		"subtitle": "Cotizaciones profesionales en minutos, no horas",
+		"description": "RouteWise ayuda a empresas de turismo y operadores de flotas a calcular costos precisos de viaje, generar cotizaciones profesionales y administrar toda su flota desde una sola plataforma.",
+		"features": {
+			"routes": "Cálculo de rutas con Google Maps",
+			"pricing": "Opciones de precios multinivel",
+			"currency": "Soporte de doble moneda (HNL/USD)",
+			"fleet": "Gestión completa de flota"
+		},
+		"closingMessage": "Únete a las empresas de transporte que ya usan RouteWise para ahorrar tiempo y aumentar ganancias.",
+		"getStarted": "Comenzar",
+		"learnMore": "Saber Más",
+		"alreadyHaveAccount": "¿Ya tienes una cuenta?",
+		"signIn": "Iniciar sesión"
+	},
+	"session": {
+		"timeoutWarning": "Sesión Por Expirar",
+		"timeoutMessage": "Tu sesión expirará en {minutes} minuto(s) por inactividad.",
+		"timeoutCountdown": "Serás desconectado en {seconds} segundos.",
+		"stayLoggedIn": "Mantener Sesión",
+		"logoutNow": "Cerrar Sesión Ahora",
+		"sessionExpired": "Sesión Expirada",
+		"sessionExpiredMessage": "Tu sesión ha expirado. Por favor inicia sesión nuevamente.",
+		"redirecting": "Redirigiendo al inicio de sesión..."
+	},
 	"auth": {
 		"login": "Iniciar Sesión",
 		"logout": "Cerrar Sesión",
+		"signup": "Registrarse",
 		"welcome": "Bienvenido",
 		"loggingIn": "Iniciando sesión...",
-		"loggingOut": "Cerrando sesión..."
+		"loggingOut": "Cerrando sesión...",
+		"createAccount": "Crear Cuenta",
+		"orContinueWith": "O continuar con"
 	},
 	"errors": {
 		"generic": "Ocurrió un error inesperado",

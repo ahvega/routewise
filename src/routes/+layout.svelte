@@ -2,7 +2,7 @@
 	import '../app.css';
 	import { setupConvex } from 'convex-svelte';
 	import { PUBLIC_CONVEX_URL } from '$env/static/public';
-	import { Navbar, TenantProvider } from '$lib/components';
+	import { Navbar, TenantProvider, HeroLanding, SessionTimeout } from '$lib/components';
 	import { initI18n } from '$lib/i18n';
 	import { isLoading } from 'svelte-i18n';
 
@@ -15,13 +15,20 @@
 
 	// Initialize i18n
 	initI18n();
+
+	// Check if user is authenticated
+	const isAuthenticated = $derived(!!data.user);
 </script>
 
 {#if $isLoading}
 	<div class="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
 		<div class="text-gray-500 dark:text-gray-400">Loading...</div>
 	</div>
+{:else if !isAuthenticated}
+	<!-- Non-authenticated users see the landing page -->
+	<HeroLanding />
 {:else}
+	<!-- Authenticated users see the main application -->
 	<TenantProvider user={data.user}>
 		{#snippet children()}
 			<div class="min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -30,6 +37,8 @@
 					{@render children()}
 				</main>
 			</div>
+			<!-- Session timeout warning for authenticated users -->
+			<SessionTimeout />
 		{/snippet}
 	</TenantProvider>
 {/if}

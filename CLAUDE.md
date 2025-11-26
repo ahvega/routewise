@@ -64,7 +64,9 @@ npm run dev        # Start dev server (localhost:5173)
 npm run build      # Production build
 npm run preview    # Preview production build
 npm run check      # TypeScript and Svelte checks
-npm run lint       # ESLint
+npm run test       # Run tests in watch mode
+npm run test:run   # Run tests once
+npm run quality    # Run type checks + tests (use before commits)
 npx convex dev     # Start Convex development server
 ```
 
@@ -238,6 +240,74 @@ Do NOT modify legacy code - it's for reference only.
 - **Imports**: Use `$lib` alias for library imports
 - **Components**: Prefer Flowbite-svelte over custom components
 - **Commits**: Follow Conventional Commits (`feat:`, `fix:`, `refactor:`)
+
+## Test-Driven Development (TDD) Practice
+
+After completing a major feature, follow this TDD workflow:
+
+### 1. Write Tests
+Create tests in `src/tests/` mirroring the source structure:
+```
+src/tests/
+├── setup.ts           # Test setup and mocks
+├── components/        # Component tests
+│   ├── HeroLanding.test.ts
+│   └── SessionTimeout.test.ts
+└── services/          # Service tests
+```
+
+### 2. Test File Structure
+```typescript
+import { describe, it, expect, vi } from 'vitest';
+import { render, screen } from '@testing-library/svelte';
+import MyComponent from '$lib/components/MyComponent.svelte';
+
+describe('MyComponent', () => {
+  it('renders correctly', () => {
+    render(MyComponent);
+    expect(screen.getByText('Expected Text')).toBeInTheDocument();
+  });
+});
+```
+
+### 3. Quality Assurance Checklist
+Before committing major features:
+1. **Type Check**: `npm run check` - Ensure no TypeScript errors
+2. **Run Tests**: `npm run test:run` - All tests must pass
+3. **Quick Check**: `npm run quality` - Combined type + test check
+4. **Manual Test**: Verify feature works in browser
+
+### 4. Commit Workflow
+```bash
+# 1. Run quality checks
+npm run quality
+
+# 2. Stage changes
+git add -A
+
+# 3. Commit with conventional commit message
+git commit -m "feat(feature-name): description of changes"
+```
+
+### 5. Testing Libraries
+- **vitest**: Test runner (compatible with Vite)
+- **@testing-library/svelte**: Component testing
+- **@testing-library/jest-dom**: DOM matchers
+
+### 6. Mocking Patterns
+Mock SvelteKit modules in `src/tests/setup.ts`:
+```typescript
+// Mock $app/navigation
+vi.mock('$app/navigation', () => ({
+  goto: vi.fn(),
+  invalidate: vi.fn()
+}));
+
+// Mock svelte-i18n
+vi.mock('svelte-i18n', () => ({
+  t: { subscribe: (fn) => { fn((key) => key); return () => {}; } }
+}));
+```
 
 ## Common Tasks
 

@@ -378,12 +378,42 @@
 			}
 		}
 	},
+	"landing": {
+		"pretitle": "Transportation Quotation Platform",
+		"title": "Streamline Your Fleet Operations",
+		"subtitle": "Professional quotations in minutes, not hours",
+		"description": "RouteWise helps tour companies and fleet operators calculate accurate trip costs, generate professional quotations, and manage their entire fleet from one powerful platform.",
+		"features": {
+			"routes": "Google Maps route calculation",
+			"pricing": "Multi-tier pricing options",
+			"currency": "Dual currency support (HNL/USD)",
+			"fleet": "Complete fleet management"
+		},
+		"closingMessage": "Join transportation companies already using RouteWise to save time and increase profits.",
+		"getStarted": "Get Started",
+		"learnMore": "Learn More",
+		"alreadyHaveAccount": "Already have an account?",
+		"signIn": "Sign in"
+	},
+	"session": {
+		"timeoutWarning": "Session Expiring Soon",
+		"timeoutMessage": "Your session will expire in {minutes} minute(s) due to inactivity.",
+		"timeoutCountdown": "You will be logged out in {seconds} seconds.",
+		"stayLoggedIn": "Stay Logged In",
+		"logoutNow": "Log Out Now",
+		"sessionExpired": "Session Expired",
+		"sessionExpiredMessage": "Your session has expired. Please log in again.",
+		"redirecting": "Redirecting to login..."
+	},
 	"auth": {
 		"login": "Log In",
 		"logout": "Log Out",
+		"signup": "Sign Up",
 		"welcome": "Welcome",
 		"loggingIn": "Logging in...",
-		"loggingOut": "Logging out..."
+		"loggingOut": "Logging out...",
+		"createAccount": "Create Account",
+		"orContinueWith": "Or continue with"
 	},
 	"errors": {
 		"generic": "An unexpected error occurred",
