@@ -52,22 +52,26 @@ RouteWise is a comprehensive fleet management and quotation system designed spec
 ### Installation
 
 1. **Clone the repository**
+
    ```bash
    git clone https://github.com/ahvega/routewise.git
    cd routewise
    ```
 
 2. **Install dependencies**
+
    ```bash
    npm install
    ```
 
 3. **Configure environment variables**
+
    ```bash
    cp .env.example .env
    ```
 
    Edit `.env` with your credentials:
+
    ```env
    # Required
    PUBLIC_CONVEX_URL=https://your-project.convex.cloud
@@ -80,11 +84,13 @@ RouteWise is a comprehensive fleet management and quotation system designed spec
    ```
 
 4. **Start the development server**
+
    ```bash
    npm run dev
    ```
 
 5. **Start Convex (in a separate terminal)**
+
    ```bash
    npx convex dev
    ```
@@ -95,7 +101,7 @@ RouteWise is a comprehensive fleet management and quotation system designed spec
 
 ## Project Structure
 
-```
+```bash
 routewise/
 ├── src/
 │   ├── lib/
@@ -208,9 +214,7 @@ This project follows [Conventional Commits](https://www.conventionalcommits.org/
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## Author
-
-**Adalberto H. Vega**
+## Author: **Adalberto H. Vega**
 
 - GitHub: [@ahvega](https://github.com/ahvega)
 
