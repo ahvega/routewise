@@ -1,0 +1,469 @@
+<script lang="ts">
+	import {
+		Button,
+		Card,
+		TableBodyCell,
+		Modal,
+		Label,
+		Input,
+		Select,
+		Textarea,
+		Spinner,
+		Toast
+	} from 'flowbite-svelte';
+	import {
+		PlusOutline,
+		PenOutline,
+		TrashBinOutline,
+		CheckCircleOutline,
+		CloseCircleOutline,
+		BuildingOutline,
+		UserOutline
+	} from 'flowbite-svelte-icons';
+	import { useQuery, useConvexClient } from 'convex-svelte';
+	import { api } from '$convex/_generated/api';
+	import { tenantStore } from '$lib/stores';
+	import { StatusBadge, DataTable, type Column } from '$lib/components/ui';
+	import type { Id } from '$convex/_generated/dataModel';
+	import { t } from '$lib/i18n';
+
+	const client = useConvexClient();
+
+	// Query clients when tenant is available
+	const clientsQuery = useQuery(
+		api.clients.list,
+		() => (tenantStore.tenantId ? { tenantId: tenantStore.tenantId } : 'skip')
+	);
+
+	// Modal state
+	let showModal = $state(false);
+	let isEditing = $state(false);
+	let editingId = $state<Id<'clients'> | null>(null);
+
+	// Form state
+	let formData = $state({
+		type: 'company' as 'company' | 'individual',
+		companyName: '',
+		firstName: '',
+		lastName: '',
+		email: '',
+		phone: '',
+		address: '',
+		city: '',
+		country: 'HN',
+		taxId: '',
+		pricingLevel: 'standard' as 'standard' | 'preferred' | 'vip',
+		discountPercentage: 0,
+		creditLimit: 5000,
+		paymentTerms: 0,
+		notes: '',
+		status: 'active'
+	});
+
+	// Toast state
+	let showToast = $state(false);
+	let toastMessage = $state('');
+	let toastType = $state<'success' | 'error'>('success');
+
+	// Loading state
+	let isSaving = $state(false);
+
+	// Table columns configuration (reactive for i18n)
+	const columns = $derived<Column<any>[]>([
+		{
+			key: 'name',
+			label: $t('clients.columns.client'),
+			sortable: true,
+			filterable: true,
+			filterPlaceholder: $t('clients.filters.searchPlaceholder'),
+			getValue: (c) => c.companyName || `${c.firstName} ${c.lastName}`
+		},
+		{
+			key: 'email',
+			label: $t('clients.columns.contact'),
+			sortable: true,
+			filterable: true,
+			filterPlaceholder: $t('clients.filters.searchPlaceholder')
+		},
+		{
+			key: 'type',
+			label: $t('clients.columns.type'),
+			sortable: true,
+			filterOptions: ['company', 'individual'],
+			filterPlaceholder: $t('clients.filters.typePlaceholder')
+		},
+		{
+			key: 'pricingLevel',
+			label: $t('clients.columns.pricing') || 'Pricing',
+			sortable: true,
+			filterOptions: ['standard', 'preferred', 'vip']
+		},
+		{
+			key: 'creditLimit',
+			label: $t('clients.columns.credit') || 'Credit',
+			sortable: true
+		},
+		{
+			key: 'status',
+			label: $t('clients.columns.status'),
+			sortable: true,
+			filterOptions: ['active', 'inactive'],
+			filterPlaceholder: $t('clients.filters.statusPlaceholder')
+		},
+		{
+			key: 'actions',
+			label: $t('common.actions'),
+			sortable: false
+		}
+	]);
+
+	function openCreateModal() {
+		isEditing = false;
+		editingId = null;
+		formData = {
+			type: 'company',
+			companyName: '',
+			firstName: '',
+			lastName: '',
+			email: '',
+			phone: '',
+			address: '',
+			city: '',
+			country: 'HN',
+			taxId: '',
+			pricingLevel: 'standard',
+			discountPercentage: 0,
+			creditLimit: 5000,
+			paymentTerms: 0,
+			notes: '',
+			status: 'active'
+		};
+		showModal = true;
+	}
+
+	function openEditModal(clientData: any) {
+		isEditing = true;
+		editingId = clientData._id;
+		formData = {
+			type: clientData.type,
+			companyName: clientData.companyName || '',
+			firstName: clientData.firstName || '',
+			lastName: clientData.lastName || '',
+			email: clientData.email || '',
+			phone: clientData.phone || '',
+			address: clientData.address || '',
+			city: clientData.city || '',
+			country: clientData.country,
+			taxId: clientData.taxId || '',
+			pricingLevel: clientData.pricingLevel,
+			discountPercentage: clientData.discountPercentage,
+			creditLimit: clientData.creditLimit,
+			paymentTerms: clientData.paymentTerms,
+			notes: clientData.notes || '',
+			status: clientData.status
+		};
+		showModal = true;
+	}
+
+	async function handleSubmit() {
+		if (!tenantStore.tenantId) return;
+
+		isSaving = true;
+		try {
+			const payload = {
+				...formData,
+				companyName: formData.companyName || undefined,
+				firstName: formData.firstName || undefined,
+				lastName: formData.lastName || undefined,
+				email: formData.email || undefined,
+				phone: formData.phone || undefined,
+				address: formData.address || undefined,
+				city: formData.city || undefined,
+				taxId: formData.taxId || undefined,
+				notes: formData.notes || undefined
+			};
+
+			if (isEditing && editingId) {
+				await client.mutation(api.clients.update, {
+					id: editingId,
+					...payload
+				});
+				showToastMessage($t('clients.updateSuccess'), 'success');
+			} else {
+				await client.mutation(api.clients.create, {
+					tenantId: tenantStore.tenantId,
+					...payload
+				});
+				showToastMessage($t('clients.createSuccess'), 'success');
+			}
+			showModal = false;
+		} catch (error) {
+			console.error('Failed to save client:', error);
+			showToastMessage($t('clients.saveFailed'), 'error');
+		} finally {
+			isSaving = false;
+		}
+	}
+
+	async function handleDelete(id: Id<'clients'>) {
+		if (!confirm($t('clients.deleteConfirm'))) return;
+
+		try {
+			await client.mutation(api.clients.remove, { id });
+			showToastMessage($t('clients.deleteSuccess'), 'success');
+		} catch (error) {
+			console.error('Failed to delete client:', error);
+			showToastMessage($t('clients.deleteFailed'), 'error');
+		}
+	}
+
+	function showToastMessage(message: string, type: 'success' | 'error') {
+		toastMessage = message;
+		toastType = type;
+		showToast = true;
+		setTimeout(() => (showToast = false), 3000);
+	}
+
+	function getClientName(clientData: any): string {
+		if (clientData.type === 'company') {
+			return clientData.companyName || 'Unnamed Company';
+		}
+		return [clientData.firstName, clientData.lastName].filter(Boolean).join(' ') || 'Unnamed Client';
+	}
+
+	const clients = $derived(clientsQuery.data || []);
+	const isLoading = $derived(clientsQuery.isLoading);
+</script>
+
+<div class="space-y-6">
+	<div class="flex justify-between items-center">
+		<div>
+			<h1 class="text-3xl font-bold text-gray-900 dark:text-white">{$t('clients.title')}</h1>
+			<p class="text-gray-600 dark:text-gray-400 mt-1">
+				{$t('clients.subtitle', { values: { count: clients.length } })}
+			</p>
+		</div>
+		<Button onclick={openCreateModal}>
+			<PlusOutline class="w-4 h-4 mr-2" />
+			{$t('clients.addClient')}
+		</Button>
+	</div>
+
+	<Card class="max-w-none !p-6">
+		{#if isLoading}
+			<div class="flex justify-center py-12">
+				<Spinner size="8" />
+			</div>
+		{:else if clients.length === 0}
+			<div class="text-center py-12">
+				<p class="text-gray-500 dark:text-gray-400 mb-4">
+					{$t('clients.noClients')}
+				</p>
+				<Button onclick={openCreateModal}>
+					<PlusOutline class="w-4 h-4 mr-2" />
+					{$t('clients.addClient')}
+				</Button>
+			</div>
+		{:else}
+			<DataTable data={clients} {columns}>
+				{#snippet row(clientData)}
+					<TableBodyCell>
+						<div class="flex items-center gap-3">
+							<div class="p-2 rounded-full bg-gray-100 dark:bg-gray-700">
+								{#if clientData.type === 'company'}
+									<BuildingOutline class="w-5 h-5 text-gray-500 dark:text-gray-400" />
+								{:else}
+									<UserOutline class="w-5 h-5 text-gray-500 dark:text-gray-400" />
+								{/if}
+							</div>
+							<div>
+								<div class="font-medium text-gray-900 dark:text-white">
+									{getClientName(clientData)}
+								</div>
+								<div class="text-sm text-gray-500 dark:text-gray-400">
+									{clientData.city || clientData.country}
+								</div>
+							</div>
+						</div>
+					</TableBodyCell>
+					<TableBodyCell>
+						<div class="text-sm">
+							{#if clientData.email}
+								<div class="text-gray-900 dark:text-white">{clientData.email}</div>
+							{/if}
+							{#if clientData.phone}
+								<div class="text-gray-500 dark:text-gray-400">{clientData.phone}</div>
+							{/if}
+						</div>
+					</TableBodyCell>
+					<TableBodyCell>
+						<StatusBadge status={clientData.type} />
+					</TableBodyCell>
+					<TableBodyCell>
+						<StatusBadge status={clientData.pricingLevel} variant="pricing" />
+						{#if clientData.discountPercentage > 0}
+							<div class="text-xs text-gray-500 mt-1">
+								{clientData.discountPercentage}% discount
+							</div>
+						{/if}
+					</TableBodyCell>
+					<TableBodyCell>
+						<div class="text-sm">
+							<div class="text-gray-900 dark:text-white">
+								L {clientData.creditLimit.toLocaleString()}
+							</div>
+							<div class="text-gray-500 dark:text-gray-400">
+								{clientData.paymentTerms > 0 ? `${clientData.paymentTerms} days` : 'Immediate'}
+							</div>
+						</div>
+					</TableBodyCell>
+					<TableBodyCell>
+						<StatusBadge status={clientData.status} />
+					</TableBodyCell>
+					<TableBodyCell>
+						<div class="flex gap-2">
+							<Button size="xs" color="light" onclick={() => openEditModal(clientData)}>
+								<PenOutline class="w-4 h-4" />
+							</Button>
+							<Button size="xs" color="red" outline onclick={() => handleDelete(clientData._id)}>
+								<TrashBinOutline class="w-4 h-4" />
+							</Button>
+						</div>
+					</TableBodyCell>
+				{/snippet}
+			</DataTable>
+		{/if}
+	</Card>
+</div>
+
+<!-- Create/Edit Modal -->
+<Modal bind:open={showModal} size="lg" title={isEditing ? $t('clients.editClient') : $t('clients.addClient')}>
+	<form onsubmit={(e) => { e.preventDefault(); handleSubmit(); }} class="space-y-4">
+		<div>
+			<Label for="type">Client Type *</Label>
+			<Select id="type" bind:value={formData.type}>
+				<option value="company">Company</option>
+				<option value="individual">Individual</option>
+			</Select>
+		</div>
+
+		{#if formData.type === 'company'}
+			<div>
+				<Label for="companyName">Company Name *</Label>
+				<Input id="companyName" bind:value={formData.companyName} required placeholder="e.g., Honduras Tours S.A." />
+			</div>
+		{:else}
+			<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+				<div>
+					<Label for="firstName">First Name *</Label>
+					<Input id="firstName" bind:value={formData.firstName} required placeholder="e.g., Carlos" />
+				</div>
+				<div>
+					<Label for="lastName">Last Name *</Label>
+					<Input id="lastName" bind:value={formData.lastName} required placeholder="e.g., Martinez" />
+				</div>
+			</div>
+		{/if}
+
+		<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+			<div>
+				<Label for="email">Email</Label>
+				<Input id="email" type="email" bind:value={formData.email} placeholder="email@example.com" />
+			</div>
+			<div>
+				<Label for="phone">Phone</Label>
+				<Input id="phone" bind:value={formData.phone} placeholder="+504 1234-5678" />
+			</div>
+		</div>
+
+		<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+			<div>
+				<Label for="city">City</Label>
+				<Input id="city" bind:value={formData.city} placeholder="e.g., Tegucigalpa" />
+			</div>
+			<div>
+				<Label for="country">Country *</Label>
+				<Select id="country" bind:value={formData.country}>
+					<option value="HN">Honduras</option>
+					<option value="GT">Guatemala</option>
+					<option value="SV">El Salvador</option>
+					<option value="NI">Nicaragua</option>
+					<option value="US">United States</option>
+				</Select>
+			</div>
+		</div>
+
+		<div>
+			<Label for="address">Address</Label>
+			<Input id="address" bind:value={formData.address} placeholder="Street address" />
+		</div>
+
+		<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+			<div>
+				<Label for="pricingLevel">Pricing Level</Label>
+				<Select id="pricingLevel" bind:value={formData.pricingLevel}>
+					<option value="standard">Standard</option>
+					<option value="preferred">Preferred</option>
+					<option value="vip">VIP</option>
+				</Select>
+			</div>
+			<div>
+				<Label for="discountPercentage">Discount %</Label>
+				<Input id="discountPercentage" type="number" bind:value={formData.discountPercentage} min={0} max={50} />
+			</div>
+			<div>
+				<Label for="taxId">Tax ID (RTN)</Label>
+				<Input id="taxId" bind:value={formData.taxId} placeholder="e.g., 0801-1234-56789" />
+			</div>
+		</div>
+
+		<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+			<div>
+				<Label for="creditLimit">Credit Limit (HNL)</Label>
+				<Input id="creditLimit" type="number" bind:value={formData.creditLimit} min={0} />
+			</div>
+			<div>
+				<Label for="paymentTerms">Payment Terms (days)</Label>
+				<Input id="paymentTerms" type="number" bind:value={formData.paymentTerms} min={0} />
+			</div>
+			<div>
+				<Label for="status">Status</Label>
+				<Select id="status" bind:value={formData.status}>
+					<option value="active">Active</option>
+					<option value="inactive">Inactive</option>
+				</Select>
+			</div>
+		</div>
+
+		<div>
+			<Label for="notes">Notes</Label>
+			<Textarea id="notes" bind:value={formData.notes} rows={3} placeholder="Additional notes about this client..." />
+		</div>
+	</form>
+
+	{#snippet footer()}
+		<div class="flex justify-end gap-2">
+			<Button color="alternative" onclick={() => (showModal = false)}>{$t('common.cancel')}</Button>
+			<Button onclick={handleSubmit} disabled={isSaving}>
+				{#if isSaving}
+					<Spinner size="4" class="mr-2" />
+				{/if}
+				{isEditing ? $t('common.update') : $t('common.create')}
+			</Button>
+		</div>
+	{/snippet}
+</Modal>
+
+<!-- Toast notifications -->
+{#if showToast}
+	<Toast class="fixed bottom-4 right-4" color={toastType === 'success' ? 'green' : 'red'}>
+		<svelte:fragment slot="icon">
+			{#if toastType === 'success'}
+				<CheckCircleOutline class="w-5 h-5" />
+			{:else}
+				<CloseCircleOutline class="w-5 h-5" />
+			{/if}
+		</svelte:fragment>
+		{toastMessage}
+	</Toast>
+{/if}
