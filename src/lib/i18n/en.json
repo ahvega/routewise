@@ -38,7 +38,10 @@
 		"currencySymbol": "L",
 		"dateFormat": "MM/dd/yyyy",
 		"success": "Success",
-		"error": "Error"
+		"error": "Error",
+		"view": "View",
+		"change": "Change",
+		"days": "days"
 	},
 	"nav": {
 		"dashboard": "Dashboard",
@@ -68,11 +71,14 @@
 		"newQuotation": "New Quotation",
 		"viewAll": "View All",
 		"quotations": "Quotations",
+		"itineraries": "Itineraries",
 		"clients": "Clients",
 		"vehicles": "Vehicles",
 		"drivers": "Drivers",
 		"pending": "pending",
 		"approved": "approved",
+		"scheduled": "scheduled",
+		"inProgress": "in progress",
 		"activeClients": "active clients",
 		"available": "available",
 		"active": "active",

@@ -36,14 +36,19 @@
 		api.quotations.list,
 		() => (tenantStore.tenantId ? { tenantId: tenantStore.tenantId } : 'skip')
 	);
+	const itinerariesQuery = useQuery(
+		api.itineraries.list,
+		() => (tenantStore.tenantId ? { tenantId: tenantStore.tenantId } : 'skip')
+	);
 
 	const vehicles = $derived(vehiclesQuery.data || []);
 	const clients = $derived(clientsQuery.data || []);
 	const drivers = $derived(driversQuery.data || []);
 	const quotations = $derived(quotationsQuery.data || []);
+	const itineraries = $derived(itinerariesQuery.data || []);
 
 	const isLoading = $derived(
-		vehiclesQuery.isLoading || clientsQuery.isLoading || driversQuery.isLoading || quotationsQuery.isLoading
+		vehiclesQuery.isLoading || clientsQuery.isLoading || driversQuery.isLoading || quotationsQuery.isLoading || itinerariesQuery.isLoading
 	);
 
 	// Computed stats
@@ -56,6 +61,8 @@
 	);
 	const pendingQuotations = $derived(quotations.filter((q) => q.status === 'draft').length);
 	const approvedQuotations = $derived(quotations.filter((q) => q.status === 'approved').length);
+	const scheduledItineraries = $derived(itineraries.filter((i) => i.status === 'scheduled').length);
+	const inProgressItineraries = $derived(itineraries.filter((i) => i.status === 'in_progress').length);
 
 	// Calculate total revenue from approved quotations
 	const totalRevenue = $derived(
@@ -108,7 +115,7 @@
 		</div>
 	{:else}
 		<!-- Stats Grid -->
-		<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+		<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
 			<!-- Quotations Card -->
 			<Card class="max-w-none !p-5">
 				<div class="flex items-center justify-between">
@@ -123,6 +130,30 @@
 				<div class="mt-2 text-sm text-gray-500 dark:text-gray-400">
 					{pendingQuotations} {$t('dashboard.pending')}, {approvedQuotations} {$t('dashboard.approved')}
 				</div>
+				<Button href="/quotations" size="xs" color="light" class="w-full mt-3">
+					{$t('common.view')}
+					<ArrowRightOutline class="w-3 h-3 ml-1" />
+				</Button>
+			</Card>
+
+			<!-- Itineraries Card -->
+			<Card class="max-w-none !p-5">
+				<div class="flex items-center justify-between">
+					<div>
+						<p class="text-sm font-medium text-gray-500 dark:text-gray-400">{$t('dashboard.itineraries')}</p>
+						<p class="text-2xl font-bold text-gray-900 dark:text-white">{itineraries.length}</p>
+					</div>
+					<div class="p-3 bg-cyan-100 dark:bg-cyan-900/30 rounded-full">
+						<CalendarMonthOutline class="w-6 h-6 text-cyan-600 dark:text-cyan-400" />
+					</div>
+				</div>
+				<div class="mt-2 text-sm text-gray-500 dark:text-gray-400">
+					{scheduledItineraries} {$t('dashboard.scheduled')}, {inProgressItineraries} {$t('dashboard.inProgress')}
+				</div>
+				<Button href="/itineraries" size="xs" color="light" class="w-full mt-3">
+					{$t('common.view')}
+					<ArrowRightOutline class="w-3 h-3 ml-1" />
+				</Button>
 			</Card>
 
 			<!-- Clients Card -->
@@ -139,6 +170,10 @@
 				<div class="mt-2 text-sm text-gray-500 dark:text-gray-400">
 					{clients.filter((c) => c.status === 'active').length} {$t('dashboard.activeClients')}
 				</div>
+				<Button href="/clients" size="xs" color="light" class="w-full mt-3">
+					{$t('common.view')}
+					<ArrowRightOutline class="w-3 h-3 ml-1" />
+				</Button>
 			</Card>
 
 			<!-- Vehicles Card -->
@@ -155,6 +190,10 @@
 				<div class="mt-2 text-sm text-gray-500 dark:text-gray-400">
 					{activeVehicles} {$t('dashboard.available')}
 				</div>
+				<Button href="/vehicles" size="xs" color="light" class="w-full mt-3">
+					{$t('common.view')}
+					<ArrowRightOutline class="w-3 h-3 ml-1" />
+				</Button>
 			</Card>
 
 			<!-- Drivers Card -->
@@ -171,6 +210,10 @@
 				<div class="mt-2 text-sm text-gray-500 dark:text-gray-400">
 					{activeDrivers} {$t('dashboard.active')}
 				</div>
+				<Button href="/drivers" size="xs" color="light" class="w-full mt-3">
+					{$t('common.view')}
+					<ArrowRightOutline class="w-3 h-3 ml-1" />
+				</Button>
 			</Card>
 		</div>
 
