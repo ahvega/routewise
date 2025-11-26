@@ -1,0 +1,458 @@
+<script lang="ts">
+	import {
+		Card,
+		Button,
+		Spinner,
+		Alert,
+		Badge,
+		Toast
+	} from 'flowbite-svelte';
+	import {
+		ArrowLeftOutline,
+		PenOutline,
+		TrashBinOutline,
+		PaperPlaneOutline,
+		CheckCircleOutline,
+		CloseCircleOutline,
+		MapPinOutline,
+		TruckOutline,
+		UserOutline,
+		CalendarMonthOutline,
+		ClockOutline
+	} from 'flowbite-svelte-icons';
+	import { page } from '$app/stores';
+	import { goto } from '$app/navigation';
+	import { useQuery, useConvexClient } from 'convex-svelte';
+	import { api } from '$convex/_generated/api';
+	import { tenantStore } from '$lib/stores';
+	import { StatusBadge } from '$lib/components/ui';
+	import { t } from '$lib/i18n';
+	import type { Id } from '$convex/_generated/dataModel';
+
+	const client = useConvexClient();
+
+	// Get quotation ID from URL
+	const quotationId = $derived($page.params.id as Id<'quotations'>);
+
+	// Query quotation
+	const quotationQuery = useQuery(
+		api.quotations.get,
+		() => quotationId ? { id: quotationId } : 'skip'
+	);
+
+	// Query related data
+	const vehiclesQuery = useQuery(
+		api.vehicles.list,
+		() => (tenantStore.tenantId ? { tenantId: tenantStore.tenantId } : 'skip')
+	);
+
+	const clientsQuery = useQuery(
+		api.clients.list,
+		() => (tenantStore.tenantId ? { tenantId: tenantStore.tenantId } : 'skip')
+	);
+
+	const quotation = $derived(quotationQuery.data);
+	const vehicles = $derived(vehiclesQuery.data || []);
+	const clients = $derived(clientsQuery.data || []);
+	const isLoading = $derived(quotationQuery.isLoading);
+
+	// Get vehicle and client details
+	const vehicle = $derived(
+		quotation?.vehicleId ? vehicles.find(v => v._id === quotation.vehicleId) : null
+	);
+	const clientData = $derived(
+		quotation?.clientId ? clients.find(c => c._id === quotation.clientId) : null
+	);
+
+	// Toast state
+	let showToast = $state(false);
+	let toastMessage = $state('');
+	let toastType = $state<'success' | 'error'>('success');
+
+	function getClientName(client: any): string {
+		if (!client) return 'Walk-in';
+		if (client.type === 'company') {
+			return client.companyName || 'Unnamed Company';
+		}
+		return [client.firstName, client.lastName].filter(Boolean).join(' ') || 'Unnamed';
+	}
+
+	function formatCurrency(value: number): string {
+		return new Intl.NumberFormat('es-HN', {
+			style: 'currency',
+			currency: 'HNL',
+			minimumFractionDigits: 0
+		}).format(value);
+	}
+
+	function formatDate(timestamp: number): string {
+		return new Date(timestamp).toLocaleDateString('es-HN', {
+			year: 'numeric',
+			month: 'long',
+			day: 'numeric'
+		});
+	}
+
+	function formatDateTime(timestamp: number): string {
+		return new Date(timestamp).toLocaleString('es-HN', {
+			year: 'numeric',
+			month: 'short',
+			day: 'numeric',
+			hour: '2-digit',
+			minute: '2-digit'
+		});
+	}
+
+	function formatDistance(km: number): string {
+		return `${km.toFixed(1)} km`;
+	}
+
+	function formatDuration(minutes: number): string {
+		const hours = Math.floor(minutes / 60);
+		const mins = Math.round(minutes % 60);
+		if (hours === 0) return `${mins} min`;
+		return `${hours}h ${mins}m`;
+	}
+
+	function showToastMessage(message: string, type: 'success' | 'error') {
+		toastMessage = message;
+		toastType = type;
+		showToast = true;
+		setTimeout(() => (showToast = false), 3000);
+	}
+
+	async function updateStatus(status: string) {
+		if (!quotation) return;
+
+		try {
+			await client.mutation(api.quotations.updateStatus, {
+				id: quotation._id,
+				status
+			});
+			showToastMessage($t('quotations.updateSuccess'), 'success');
+		} catch (error) {
+			console.error('Failed to update status:', error);
+			showToastMessage($t('quotations.saveFailed'), 'error');
+		}
+	}
+
+	async function handleDelete() {
+		if (!quotation) return;
+		if (!confirm($t('quotations.deleteConfirm'))) return;
+
+		try {
+			await client.mutation(api.quotations.remove, { id: quotation._id });
+			showToastMessage($t('quotations.deleteSuccess'), 'success');
+			setTimeout(() => goto('/quotations'), 500);
+		} catch (error) {
+			console.error('Failed to delete quotation:', error);
+			showToastMessage($t('quotations.deleteFailed'), 'error');
+		}
+	}
+</script>
+
+<div class="space-y-6">
+	<!-- Header -->
+	<div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+		<div class="flex items-center gap-4">
+			<Button href="/quotations" color="alternative" size="sm">
+				<ArrowLeftOutline class="w-4 h-4 mr-2" />
+				{$t('quotations.title')}
+			</Button>
+			{#if quotation}
+				<div>
+					<h1 class="text-2xl font-bold text-gray-900 dark:text-white">{quotation.quotationNumber}</h1>
+					<p class="text-gray-600 dark:text-gray-400">{formatDate(quotation.createdAt)}</p>
+				</div>
+			{/if}
+		</div>
+		{#if quotation}
+			<div class="flex items-center gap-2">
+				<StatusBadge status={quotation.status} variant="quotation" />
+				{#if quotation.status === 'draft'}
+					<Button size="sm" onclick={() => updateStatus('sent')}>
+						<PaperPlaneOutline class="w-4 h-4 mr-2" />
+						{$t('common.sent')}
+					</Button>
+				{/if}
+				{#if quotation.status === 'sent'}
+					<Button size="sm" color="green" onclick={() => updateStatus('approved')}>
+						<CheckCircleOutline class="w-4 h-4 mr-2" />
+						{$t('common.accepted')}
+					</Button>
+					<Button size="sm" color="red" onclick={() => updateStatus('rejected')}>
+						<CloseCircleOutline class="w-4 h-4 mr-2" />
+						{$t('common.rejected')}
+					</Button>
+				{/if}
+				{#if quotation.status === 'draft'}
+					<Button size="sm" color="red" outline onclick={handleDelete}>
+						<TrashBinOutline class="w-4 h-4 mr-2" />
+						{$t('common.delete')}
+					</Button>
+				{/if}
+			</div>
+		{/if}
+	</div>
+
+	{#if isLoading}
+		<div class="flex justify-center py-12">
+			<Spinner size="8" />
+		</div>
+	{:else if !quotation}
+		<Alert color="red">
+			{$t('errors.notFound')}
+		</Alert>
+	{:else}
+		<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+			<!-- Left Column: Details -->
+			<div class="lg:col-span-2 space-y-6">
+				<!-- Route Information -->
+				<Card class="max-w-none !p-6">
+					<div class="flex items-center gap-2 mb-4">
+						<MapPinOutline class="w-5 h-5 text-gray-500" />
+						<h3 class="text-lg font-semibold text-gray-900 dark:text-white">{$t('quotations.new.routeInfo')}</h3>
+					</div>
+
+					<div class="space-y-4">
+						<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+							<div class="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+								<p class="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">{$t('quotations.new.origin')}</p>
+								<p class="font-medium text-gray-900 dark:text-white">{quotation.origin}</p>
+							</div>
+							<div class="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+								<p class="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">{$t('quotations.new.destination')}</p>
+								<p class="font-medium text-gray-900 dark:text-white">{quotation.destination}</p>
+							</div>
+						</div>
+
+						<div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+							<div class="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg text-center">
+								<p class="text-xs text-blue-600 dark:text-blue-400">{$t('quotations.new.totalDistance')}</p>
+								<p class="text-lg font-bold text-blue-700 dark:text-blue-300">{formatDistance(quotation.totalDistance)}</p>
+							</div>
+							<div class="p-3 bg-purple-50 dark:bg-purple-900/20 rounded-lg text-center">
+								<p class="text-xs text-purple-600 dark:text-purple-400">{$t('quotations.new.estimatedTime')}</p>
+								<p class="text-lg font-bold text-purple-700 dark:text-purple-300">{formatDuration(quotation.totalTime)}</p>
+							</div>
+							<div class="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg text-center">
+								<p class="text-xs text-green-600 dark:text-green-400">{$t('quotations.new.days')}</p>
+								<p class="text-lg font-bold text-green-700 dark:text-green-300">{quotation.estimatedDays}</p>
+							</div>
+							<div class="p-3 bg-orange-50 dark:bg-orange-900/20 rounded-lg text-center">
+								<p class="text-xs text-orange-600 dark:text-orange-400">{$t('quotations.new.passengers')}</p>
+								<p class="text-lg font-bold text-orange-700 dark:text-orange-300">{quotation.groupSize}</p>
+							</div>
+						</div>
+					</div>
+				</Card>
+
+				<!-- Cost Breakdown -->
+				<Card class="max-w-none !p-6">
+					<h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">{$t('quotations.new.costEstimate')}</h3>
+
+					<div class="space-y-3">
+						{#if quotation.includeFuel}
+							<div class="flex justify-between py-2 border-b border-gray-100 dark:border-gray-700">
+								<span class="text-gray-600 dark:text-gray-400">{$t('quotations.new.fuelCost')}</span>
+								<span class="font-medium text-gray-900 dark:text-white">{formatCurrency(quotation.fuelCost)}</span>
+							</div>
+						{/if}
+						{#if quotation.includeMeals}
+							<div class="flex justify-between py-2 border-b border-gray-100 dark:border-gray-700">
+								<span class="text-gray-600 dark:text-gray-400">{$t('quotations.new.mealsCost')}</span>
+								<span class="font-medium text-gray-900 dark:text-white">{formatCurrency(quotation.driverMealsCost)}</span>
+							</div>
+							{#if quotation.driverLodgingCost > 0}
+								<div class="flex justify-between py-2 border-b border-gray-100 dark:border-gray-700">
+									<span class="text-gray-600 dark:text-gray-400">{$t('settings.fields.hotelCost')}</span>
+									<span class="font-medium text-gray-900 dark:text-white">{formatCurrency(quotation.driverLodgingCost)}</span>
+								</div>
+							{/if}
+						{/if}
+						{#if quotation.includeDriverIncentive && quotation.driverIncentiveCost > 0}
+							<div class="flex justify-between py-2 border-b border-gray-100 dark:border-gray-700">
+								<span class="text-gray-600 dark:text-gray-400">{$t('settings.fields.driverIncentive')}</span>
+								<span class="font-medium text-gray-900 dark:text-white">{formatCurrency(quotation.driverIncentiveCost)}</span>
+							</div>
+						{/if}
+						<div class="flex justify-between py-2 border-b border-gray-100 dark:border-gray-700">
+							<span class="text-gray-600 dark:text-gray-400">{$t('quotations.new.vehicleCost')} (km)</span>
+							<span class="font-medium text-gray-900 dark:text-white">{formatCurrency(quotation.vehicleDistanceCost)}</span>
+						</div>
+						<div class="flex justify-between py-2 border-b border-gray-100 dark:border-gray-700">
+							<span class="text-gray-600 dark:text-gray-400">{$t('quotations.new.vehicleCost')} ({$t('units.days')})</span>
+							<span class="font-medium text-gray-900 dark:text-white">{formatCurrency(quotation.vehicleDailyCost)}</span>
+						</div>
+						{#if quotation.tollCost > 0}
+							<div class="flex justify-between py-2 border-b border-gray-100 dark:border-gray-700">
+								<span class="text-gray-600 dark:text-gray-400">{$t('quotations.new.tollCost')}</span>
+								<span class="font-medium text-gray-900 dark:text-white">{formatCurrency(quotation.tollCost)}</span>
+							</div>
+						{/if}
+
+						<div class="flex justify-between py-3 border-t-2 border-gray-200 dark:border-gray-600">
+							<span class="font-semibold text-gray-700 dark:text-gray-300">{$t('quotations.new.subtotal')}</span>
+							<span class="font-semibold text-gray-900 dark:text-white">{formatCurrency(quotation.totalCost)}</span>
+						</div>
+
+						<div class="flex justify-between py-2">
+							<span class="text-gray-600 dark:text-gray-400">{$t('quotations.new.margin')} ({quotation.selectedMarkupPercentage}%)</span>
+							<span class="font-medium text-gray-900 dark:text-white">
+								+{formatCurrency(quotation.salePriceHnl - quotation.totalCost)}
+							</span>
+						</div>
+					</div>
+				</Card>
+
+				<!-- Notes -->
+				{#if quotation.notes}
+					<Card class="max-w-none !p-6">
+						<h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">{$t('clients.fields.notes')}</h3>
+						<p class="text-gray-600 dark:text-gray-400 whitespace-pre-wrap">{quotation.notes}</p>
+					</Card>
+				{/if}
+			</div>
+
+			<!-- Right Column: Summary -->
+			<div class="space-y-6">
+				<!-- Final Price -->
+				<Card class="max-w-none !p-6 bg-primary-50 dark:bg-primary-900/20 border-primary-200 dark:border-primary-800">
+					<h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">{$t('quotations.new.total')}</h3>
+					<div class="text-center">
+						<p class="text-4xl font-bold text-primary-600 dark:text-primary-400">{formatCurrency(quotation.salePriceHnl)}</p>
+						<p class="text-lg text-gray-600 dark:text-gray-400 mt-1">${quotation.salePriceUsd.toFixed(2)} USD</p>
+						<p class="text-xs text-gray-500 dark:text-gray-500 mt-2">
+							{$t('settings.fields.exchangeRate')}: L{quotation.exchangeRateUsed.toFixed(2)}
+						</p>
+					</div>
+				</Card>
+
+				<!-- Vehicle Info -->
+				{#if vehicle}
+					<Card class="max-w-none !p-6">
+						<div class="flex items-center gap-2 mb-3">
+							<TruckOutline class="w-5 h-5 text-gray-500" />
+							<h3 class="text-lg font-semibold text-gray-900 dark:text-white">{$t('quotations.new.vehicleSelection')}</h3>
+						</div>
+						<div class="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+							<p class="font-medium text-gray-900 dark:text-white">{vehicle.name}</p>
+							{#if vehicle.make || vehicle.model}
+								<p class="text-sm text-gray-500 dark:text-gray-400">
+									{[vehicle.make, vehicle.model, vehicle.year].filter(Boolean).join(' ')}
+								</p>
+							{/if}
+							<p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
+								{vehicle.passengerCapacity} {$t('vehicles.fields.passengers')}
+							</p>
+						</div>
+					</Card>
+				{/if}
+
+				<!-- Client Info -->
+				<Card class="max-w-none !p-6">
+					<div class="flex items-center gap-2 mb-3">
+						<UserOutline class="w-5 h-5 text-gray-500" />
+						<h3 class="text-lg font-semibold text-gray-900 dark:text-white">{$t('quotations.new.clientSelection')}</h3>
+					</div>
+					{#if clientData}
+						<div class="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+							<p class="font-medium text-gray-900 dark:text-white">{getClientName(clientData)}</p>
+							{#if clientData.email}
+								<p class="text-sm text-gray-500 dark:text-gray-400">{clientData.email}</p>
+							{/if}
+							{#if clientData.phone}
+								<p class="text-sm text-gray-500 dark:text-gray-400">{clientData.phone}</p>
+							{/if}
+						</div>
+					{:else}
+						<p class="text-gray-500 dark:text-gray-400">Walk-in</p>
+					{/if}
+				</Card>
+
+				<!-- Dates -->
+				<Card class="max-w-none !p-6">
+					<div class="flex items-center gap-2 mb-3">
+						<CalendarMonthOutline class="w-5 h-5 text-gray-500" />
+						<h3 class="text-lg font-semibold text-gray-900 dark:text-white">{$t('quotations.columns.date')}</h3>
+					</div>
+					<div class="space-y-2 text-sm">
+						<div class="flex justify-between">
+							<span class="text-gray-600 dark:text-gray-400">{$t('common.create')}</span>
+							<span class="text-gray-900 dark:text-white">{formatDateTime(quotation.createdAt)}</span>
+						</div>
+						{#if quotation.validUntil}
+							<div class="flex justify-between">
+								<span class="text-gray-600 dark:text-gray-400">{$t('common.expired')}</span>
+								<span class="text-gray-900 dark:text-white">{formatDate(quotation.validUntil)}</span>
+							</div>
+						{/if}
+						{#if quotation.sentAt}
+							<div class="flex justify-between">
+								<span class="text-gray-600 dark:text-gray-400">{$t('common.sent')}</span>
+								<span class="text-gray-900 dark:text-white">{formatDateTime(quotation.sentAt)}</span>
+							</div>
+						{/if}
+						{#if quotation.approvedAt}
+							<div class="flex justify-between">
+								<span class="text-gray-600 dark:text-gray-400">{$t('common.accepted')}</span>
+								<span class="text-gray-900 dark:text-white">{formatDateTime(quotation.approvedAt)}</span>
+							</div>
+						{/if}
+						{#if quotation.rejectedAt}
+							<div class="flex justify-between">
+								<span class="text-gray-600 dark:text-gray-400">{$t('common.rejected')}</span>
+								<span class="text-gray-900 dark:text-white">{formatDateTime(quotation.rejectedAt)}</span>
+							</div>
+						{/if}
+					</div>
+				</Card>
+
+				<!-- Included Options -->
+				<Card class="max-w-none !p-6">
+					<h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-3">{$t('quotations.new.pricingOptions')}</h3>
+					<div class="space-y-2">
+						<div class="flex items-center justify-between">
+							<span class="text-gray-600 dark:text-gray-400">{$t('quotations.new.fuelCost')}</span>
+							<Badge color={quotation.includeFuel ? 'green' : 'gray'}>
+								{quotation.includeFuel ? $t('common.yes') : $t('common.no')}
+							</Badge>
+						</div>
+						<div class="flex items-center justify-between">
+							<span class="text-gray-600 dark:text-gray-400">{$t('quotations.new.mealsCost')}</span>
+							<Badge color={quotation.includeMeals ? 'green' : 'gray'}>
+								{quotation.includeMeals ? $t('common.yes') : $t('common.no')}
+							</Badge>
+						</div>
+						<div class="flex items-center justify-between">
+							<span class="text-gray-600 dark:text-gray-400">{$t('quotations.new.tollCost')}</span>
+							<Badge color={quotation.includeTolls ? 'green' : 'gray'}>
+								{quotation.includeTolls ? $t('common.yes') : $t('common.no')}
+							</Badge>
+						</div>
+						<div class="flex items-center justify-between">
+							<span class="text-gray-600 dark:text-gray-400">{$t('quotations.new.driverCost')}</span>
+							<Badge color={quotation.includeDriverIncentive ? 'green' : 'gray'}>
+								{quotation.includeDriverIncentive ? $t('common.yes') : $t('common.no')}
+							</Badge>
+						</div>
+					</div>
+				</Card>
+			</div>
+		</div>
+	{/if}
+</div>
+
+<!-- Toast notifications -->
+{#if showToast}
+	<Toast class="fixed bottom-4 right-4" color={toastType === 'success' ? 'green' : 'red'}>
+		<svelte:fragment slot="icon">
+			{#if toastType === 'success'}
+				<CheckCircleOutline class="w-5 h-5" />
+			{:else}
+				<CloseCircleOutline class="w-5 h-5" />
+			{/if}
+		</svelte:fragment>
+		{toastMessage}
+	</Toast>
+{/if}

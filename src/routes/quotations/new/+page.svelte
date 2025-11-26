@@ -7,7 +7,8 @@
 		Toggle,
 		Spinner,
 		Alert,
-		Helper
+		Select,
+		Toast
 	} from 'flowbite-svelte';
 	import {
 		ArrowLeftOutline,
@@ -15,15 +16,18 @@
 		UserGroupOutline,
 		CheckCircleSolid,
 		MapPinOutline,
-		ClockOutline,
 		ExclamationCircleOutline,
-		RefreshOutline
+		RefreshOutline,
+		UserOutline,
+		CheckCircleOutline,
+		CloseCircleOutline
 	} from 'flowbite-svelte-icons';
-	import { useQuery } from 'convex-svelte';
+	import { useQuery, useConvexClient } from 'convex-svelte';
 	import { api } from '$convex/_generated/api';
 	import { tenantStore } from '$lib/stores';
 	import { StatusBadge } from '$lib/components/ui';
 	import { onMount } from 'svelte';
+	import { goto } from '$app/navigation';
 	import {
 		routeCalculationService,
 		formatDuration,
@@ -31,12 +35,20 @@
 		type RouteResult
 	} from '$lib/services';
 	import { t } from '$lib/i18n';
+	import type { Id } from '$convex/_generated/dataModel';
 
 	let { data } = $props();
 
-	// Query vehicles and parameters from Convex
+	const client = useConvexClient();
+
+	// Query vehicles, clients, and parameters from Convex
 	const vehiclesQuery = useQuery(
 		api.vehicles.list,
+		() => (tenantStore.tenantId ? { tenantId: tenantStore.tenantId } : 'skip')
+	);
+
+	const clientsQuery = useQuery(
+		api.clients.list,
 		() => (tenantStore.tenantId ? { tenantId: tenantStore.tenantId } : 'skip')
 	);
 
@@ -46,9 +58,23 @@
 	);
 
 	const vehicles = $derived(vehiclesQuery.data || []);
+	const clients = $derived(clientsQuery.data || []);
 	const activeVehicles = $derived(vehicles.filter((v) => v.status === 'active'));
+	const activeClients = $derived(clients.filter((c) => c.status === 'active'));
 	const isLoadingVehicles = $derived(vehiclesQuery.isLoading);
+	const isLoadingClients = $derived(clientsQuery.isLoading);
 	const parameters = $derived(parametersQuery.data);
+
+	// Markup options
+	const markupOptions = [10, 15, 20, 25, 30];
+
+	// Toast state
+	let showToast = $state(false);
+	let toastMessage = $state('');
+	let toastType = $state<'success' | 'error'>('success');
+
+	// Saving state
+	let isSaving = $state(false);
 
 	// Google Maps state
 	let mapsLoaded = $state(false);
@@ -60,12 +86,30 @@
 	let groupSize = $state(1);
 	let estimatedDays = $state(1);
 	let selectedVehicleId = $state<string | null>(null);
+	let selectedClientId = $state<string>('');
+	let selectedMarkup = $state(20); // Default 20% markup
+	let notes = $state('');
 
 	// Cost options
 	let includeFuel = $state(true);
 	let includeMeals = $state(true);
 	let includeTolls = $state(true);
 	let includeDriverIncentive = $state(true);
+
+	// Get client display name
+	function getClientName(clientData: any): string {
+		if (!clientData) return '';
+		if (clientData.type === 'company') {
+			return clientData.companyName || 'Unnamed Company';
+		}
+		return [clientData.firstName, clientData.lastName].filter(Boolean).join(' ') || 'Unnamed';
+	}
+
+	// Get selected client's discount
+	const selectedClient = $derived(
+		selectedClientId ? clients.find((c) => c._id === selectedClientId) : null
+	);
+	const clientDiscount = $derived(selectedClient?.discountPercentage || 0);
 
 	// Route calculation state
 	let routeResult = $state<RouteResult | null>(null);
@@ -206,19 +250,31 @@
 		// Driver costs
 		const mealCost = days * parameters.mealCostPerDay;
 		const lodgingCost = days > 1 ? (days - 1) * parameters.hotelCostPerNight : 0;
-		const incentiveCost = includeDriverIncentive ? days * parameters.driverIncentivePerDay : 0;
+		const incentiveCost = days * parameters.driverIncentivePerDay;
 
 		// Vehicle costs
 		const vehicleDistanceCost = distance * selectedVehicle.costPerDistance;
 		const vehicleDailyCost = days * selectedVehicle.costPerDay;
 
-		// Total cost
-		const total =
+		// Total base cost (all items calculated regardless of toggles)
+		const baseCost =
 			(includeFuel ? fuelCost : 0) +
 			(includeMeals ? mealCost + lodgingCost : 0) +
 			(includeDriverIncentive ? incentiveCost : 0) +
 			vehicleDistanceCost +
 			vehicleDailyCost;
+
+		// Apply markup
+		const markupMultiplier = 1 + (selectedMarkup / 100);
+		const priceBeforeDiscount = baseCost * markupMultiplier;
+
+		// Apply client discount
+		const discountAmount = priceBeforeDiscount * (clientDiscount / 100);
+		const finalPriceHnl = priceBeforeDiscount - discountAmount;
+
+		// Calculate USD price
+		const exchangeRate = parameters.exchangeRate || 24.5;
+		const finalPriceUsd = finalPriceHnl / exchangeRate;
 
 		return {
 			fuel: Math.round(fuelCost),
@@ -227,13 +283,108 @@
 			incentive: Math.round(incentiveCost),
 			vehicleDistance: Math.round(vehicleDistanceCost),
 			vehicleDaily: Math.round(vehicleDailyCost),
-			total: Math.round(total)
+			baseCost: Math.round(baseCost),
+			markup: selectedMarkup,
+			priceBeforeDiscount: Math.round(priceBeforeDiscount),
+			discount: clientDiscount,
+			discountAmount: Math.round(discountAmount),
+			finalPriceHnl: Math.round(finalPriceHnl),
+			finalPriceUsd: Math.round(finalPriceUsd * 100) / 100,
+			exchangeRate
 		};
 	});
 
-	const canCalculateQuotation = $derived(
-		origin && destination && selectedVehicleId && routeResult && !isCalculatingRoute
+	// Generate all pricing options for display
+	const pricingOptions = $derived(() => {
+		if (!routeResult || !selectedVehicle || !parameters) return [];
+
+		const costs = estimatedCosts();
+		if (!costs) return [];
+
+		return markupOptions.map(markup => {
+			const markupMultiplier = 1 + (markup / 100);
+			const priceBeforeDiscount = costs.baseCost * markupMultiplier;
+			const discountAmount = priceBeforeDiscount * (clientDiscount / 100);
+			const finalPriceHnl = priceBeforeDiscount - discountAmount;
+			const finalPriceUsd = finalPriceHnl / costs.exchangeRate;
+
+			return {
+				markup,
+				priceHnl: Math.round(finalPriceHnl),
+				priceUsd: Math.round(finalPriceUsd * 100) / 100,
+				selected: markup === selectedMarkup
+			};
+		});
+	});
+
+	const canSaveQuotation = $derived(
+		origin && destination && selectedVehicleId && routeResult && !isCalculatingRoute && !isSaving
 	);
+
+	function showToastMessage(message: string, type: 'success' | 'error') {
+		toastMessage = message;
+		toastType = type;
+		showToast = true;
+		setTimeout(() => (showToast = false), 3000);
+	}
+
+	async function saveQuotation(asDraft: boolean = false) {
+		if (!canSaveQuotation || !tenantStore.tenantId || !selectedVehicle || !parameters || !routeResult) return;
+
+		const costs = estimatedCosts();
+		if (!costs) return;
+
+		isSaving = true;
+
+		try {
+			const quotationData = {
+				tenantId: tenantStore.tenantId as Id<'tenants'>,
+				clientId: selectedClientId ? (selectedClientId as Id<'clients'>) : undefined,
+				vehicleId: selectedVehicleId as Id<'vehicles'>,
+				origin,
+				destination,
+				baseLocation: vehicleBaseLocation || origin,
+				groupSize,
+				extraMileage: 0,
+				estimatedDays,
+				totalDistance: routeResult.totalDistance,
+				totalTime: routeResult.totalTime,
+				fuelCost: costs.fuel,
+				refuelingCost: 0,
+				driverMealsCost: costs.meals,
+				driverLodgingCost: costs.lodging,
+				driverIncentiveCost: costs.incentive,
+				vehicleDistanceCost: costs.vehicleDistance,
+				vehicleDailyCost: costs.vehicleDaily,
+				tollCost: 0, // TODO: Implement toll calculation
+				totalCost: costs.baseCost,
+				selectedMarkupPercentage: selectedMarkup,
+				salePriceHnl: costs.finalPriceHnl,
+				salePriceUsd: costs.finalPriceUsd,
+				exchangeRateUsed: costs.exchangeRate,
+				includeFuel,
+				includeMeals,
+				includeTolls,
+				includeDriverIncentive,
+				status: asDraft ? 'draft' : 'draft',
+				validUntil: Date.now() + (30 * 24 * 60 * 60 * 1000), // 30 days validity
+				notes: notes || undefined
+			};
+
+			const quotationId = await client.mutation(api.quotations.create, quotationData);
+			showToastMessage($t('quotations.createSuccess'), 'success');
+
+			// Navigate to quotation detail page
+			setTimeout(() => {
+				goto(`/quotations/${quotationId}`);
+			}, 500);
+		} catch (error) {
+			console.error('Failed to save quotation:', error);
+			showToastMessage($t('quotations.saveFailed'), 'error');
+		} finally {
+			isSaving = false;
+		}
+	}
 </script>
 
 <div class="space-y-6">
@@ -317,6 +468,60 @@
 						</Alert>
 					{/if}
 				</div>
+			</Card>
+
+			<!-- Client Selection -->
+			<Card class="max-w-none !p-6">
+				<h5 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">{$t('quotations.new.clientSelection')}</h5>
+
+				{#if isLoadingClients}
+					<div class="flex justify-center py-4">
+						<Spinner size="6" />
+					</div>
+				{:else if activeClients.length === 0}
+					<div class="text-center py-6">
+						<UserOutline class="w-10 h-10 mx-auto text-gray-400 mb-2" />
+						<p class="text-sm text-gray-500 dark:text-gray-400 mb-2">{$t('quotations.new.noClientsAvailable')}</p>
+						<Button href="/clients" size="sm" color="alternative">
+							{$t('dashboard.manageClients')}
+						</Button>
+					</div>
+				{:else}
+					<div class="space-y-3">
+						<Select
+							bind:value={selectedClientId}
+							placeholder={$t('quotations.new.selectClientPlaceholder')}
+							class="w-full"
+						>
+							<option value="">{$t('quotations.new.selectClientPlaceholder')}</option>
+							{#each activeClients as clientItem}
+								<option value={clientItem._id}>
+									{getClientName(clientItem)}
+									{#if clientItem.discountPercentage > 0}
+										({clientItem.discountPercentage}% discount)
+									{/if}
+								</option>
+							{/each}
+						</Select>
+
+						{#if selectedClient}
+							<div class="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+								<div class="flex items-center gap-2">
+									<UserOutline class="w-4 h-4 text-gray-500" />
+									<span class="font-medium text-gray-900 dark:text-white">{getClientName(selectedClient)}</span>
+									{#if selectedClient.discountPercentage > 0}
+										<StatusBadge status="{selectedClient.discountPercentage}% off" variant="pricing" />
+									{/if}
+								</div>
+								{#if selectedClient.email || selectedClient.phone}
+									<div class="text-sm text-gray-500 dark:text-gray-400 mt-1">
+										{selectedClient.email || ''} {selectedClient.email && selectedClient.phone ? '•' : ''} {selectedClient.phone || ''}
+									</div>
+								{/if}
+							</div>
+						{/if}
+					</div>
+				{/if}
 			</Card>
 
 			<Card class="max-w-none !p-6">
@@ -577,9 +782,51 @@
 								<span class="text-gray-900 dark:text-white">{formatCurrency(costs.vehicleDaily)}</span>
 							</div>
 
-							<div class="flex justify-between font-bold text-lg pt-2 border-t border-gray-200 dark:border-gray-700">
-								<span class="text-gray-900 dark:text-white">{$t('quotations.new.total')}</span>
-								<span class="text-primary-600 dark:text-primary-400">{formatCurrency(costs.total)}</span>
+							<div class="flex justify-between font-semibold pt-2 border-t border-gray-200 dark:border-gray-700">
+								<span class="text-gray-700 dark:text-gray-300">{$t('quotations.new.subtotal')}</span>
+								<span class="text-gray-900 dark:text-white">{formatCurrency(costs.baseCost)}</span>
+							</div>
+						</div>
+
+						<!-- Pricing Options -->
+						<div class="pt-3 border-t border-gray-200 dark:border-gray-700">
+							<p class="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">{$t('quotations.new.margin')}</p>
+							<div class="grid grid-cols-5 gap-2">
+								{#each pricingOptions() as option}
+									<button
+										type="button"
+										onclick={() => selectedMarkup = option.markup}
+										class="p-2 rounded-lg border-2 text-center transition-all
+											{option.selected
+											? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20'
+											: 'border-gray-200 dark:border-gray-700 hover:border-gray-300'}"
+									>
+										<p class="text-sm font-bold text-gray-900 dark:text-white">{option.markup}%</p>
+										<p class="text-xs text-gray-500 dark:text-gray-400">{formatCurrency(option.priceHnl)}</p>
+									</button>
+								{/each}
+							</div>
+						</div>
+
+						<!-- Client discount -->
+						{#if clientDiscount > 0}
+							<div class="flex justify-between text-sm text-green-600 dark:text-green-400">
+								<span>{$t('clients.fields.discount')} ({clientDiscount}%)</span>
+								<span>-{formatCurrency(costs.discountAmount)}</span>
+							</div>
+						{/if}
+
+						<!-- Final Price -->
+						<div class="p-4 bg-primary-50 dark:bg-primary-900/20 rounded-lg border border-primary-200 dark:border-primary-800">
+							<div class="flex justify-between items-center">
+								<div>
+									<p class="text-sm text-gray-600 dark:text-gray-400">{$t('quotations.new.total')} ({selectedMarkup}% {$t('quotations.new.margin').toLowerCase()})</p>
+									<p class="text-2xl font-bold text-primary-600 dark:text-primary-400">{formatCurrency(costs.finalPriceHnl)}</p>
+								</div>
+								<div class="text-right">
+									<p class="text-xs text-gray-500 dark:text-gray-400">USD</p>
+									<p class="text-lg font-semibold text-gray-900 dark:text-white">${costs.finalPriceUsd.toFixed(2)}</p>
+								</div>
 							</div>
 						</div>
 					</div>
@@ -589,14 +836,26 @@
 					<p class="text-gray-500 dark:text-gray-400 mb-4">{$t('quotations.new.selectVehicle')}</p>
 				{/if}
 
-				<div class="pt-4 border-t border-gray-200 dark:border-gray-700">
+				<div class="pt-4 border-t border-gray-200 dark:border-gray-700 space-y-3">
 					<Button
 						class="w-full"
-						disabled={!canCalculateQuotation}
+						onclick={() => saveQuotation(false)}
+						disabled={!canSaveQuotation}
 					>
+						{#if isSaving}
+							<Spinner size="4" class="mr-2" />
+						{/if}
 						{$t('quotations.new.generateQuotation')}
 					</Button>
-					{#if !canCalculateQuotation}
+					<Button
+						class="w-full"
+						color="alternative"
+						onclick={() => saveQuotation(true)}
+						disabled={!canSaveQuotation}
+					>
+						{$t('quotations.new.saveDraft')}
+					</Button>
+					{#if !canSaveQuotation && !isSaving}
 						<p class="text-xs text-gray-500 dark:text-gray-400 mt-2 text-center">
 							{#if !origin || !destination}
 								{$t('quotations.new.origin')} / {$t('quotations.new.destination')}
@@ -612,3 +871,17 @@
 		</div>
 	</div>
 </div>
+
+<!-- Toast notifications -->
+{#if showToast}
+	<Toast class="fixed bottom-4 right-4" color={toastType === 'success' ? 'green' : 'red'}>
+		<svelte:fragment slot="icon">
+			{#if toastType === 'success'}
+				<CheckCircleOutline class="w-5 h-5" />
+			{:else}
+				<CloseCircleOutline class="w-5 h-5" />
+			{/if}
+		</svelte:fragment>
+		{toastMessage}
+	</Toast>
+{/if}
