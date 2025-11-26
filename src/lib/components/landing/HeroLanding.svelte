@@ -11,7 +11,8 @@
 	]);
 </script>
 
-<div class="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex items-center">
+<div class="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex flex-col">
+	<div class="flex-1 flex items-center">
 	<div class="container mx-auto px-4 py-16">
 		<div class="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
 			<!-- Left Column: Info -->
@@ -100,4 +101,22 @@
 			</div>
 		</div>
 	</div>
+	</div>
+
+	<!-- Footer -->
+	<footer class="py-6 border-t border-gray-800">
+		<div class="container mx-auto px-4">
+			<div class="flex flex-col sm:flex-row justify-between items-center gap-4 text-sm text-gray-500">
+				<p>&copy; {new Date().getFullYear()} RouteWise. All rights reserved.</p>
+				<div class="flex items-center gap-6">
+					<a href="/legal/terms" class="hover:text-gray-300 transition-colors">
+						Terms of Service
+					</a>
+					<a href="/legal/privacy" class="hover:text-gray-300 transition-colors">
+						Privacy Policy
+					</a>
+				</div>
+			</div>
+		</div>
+	</footer>
 </div>

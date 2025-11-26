@@ -12,3 +12,6 @@ export * from './session';
 
 // UI components
 export * from './ui';
+
+// Onboarding components
+export * from './onboarding';

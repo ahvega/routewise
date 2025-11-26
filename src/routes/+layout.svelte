@@ -2,7 +2,7 @@
 	import '../app.css';
 	import { setupConvex } from 'convex-svelte';
 	import { PUBLIC_CONVEX_URL } from '$env/static/public';
-	import { Navbar, TenantProvider, HeroLanding, SessionTimeout } from '$lib/components';
+	import { Navbar, TenantProvider, HeroLanding, SessionTimeout, OnboardingWizard } from '$lib/components';
 	import { initI18n } from '$lib/i18n';
 	import { isLoading } from 'svelte-i18n';
 
@@ -18,6 +18,7 @@
 
 	// Check if user is authenticated
 	const isAuthenticated = $derived(!!data.user);
+	const userName = $derived(data.user?.firstName || data.user?.email?.split('@')[0] || 'there');
 </script>
 
 {#if $isLoading}
@@ -39,6 +40,8 @@
 			</div>
 			<!-- Session timeout warning for authenticated users -->
 			<SessionTimeout />
+			<!-- Onboarding wizard for new users -->
+			<OnboardingWizard {userName} />
 		{/snippet}
 	</TenantProvider>
 {/if}
