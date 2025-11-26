@@ -122,6 +122,141 @@
 		days61_90: '61-90 Days',
 		over90: '90+ Days',
 	};
+
+	// CSV Export functions
+	function downloadCSV(data: Record<string, unknown>[], filename: string, headers: string[]) {
+		const csvContent = [
+			headers.join(','),
+			...data.map(row =>
+				headers.map(header => {
+					const value = row[header];
+					// Escape quotes and wrap in quotes if contains comma
+					const stringValue = String(value ?? '');
+					if (stringValue.includes(',') || stringValue.includes('"') || stringValue.includes('\n')) {
+						return `"${stringValue.replace(/"/g, '""')}"`;
+					}
+					return stringValue;
+				}).join(',')
+			)
+		].join('\n');
+
+		const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+		const link = document.createElement('a');
+		link.href = URL.createObjectURL(blob);
+		link.download = `${filename}_${new Date().toISOString().split('T')[0]}.csv`;
+		link.click();
+		URL.revokeObjectURL(link.href);
+	}
+
+	function exportRevenueByClient() {
+		if (!revenueByClient.length) return;
+		downloadCSV(
+			revenueByClient.map(c => ({
+				clientName: c.clientName,
+				quotations: c.quotations,
+				approved: c.approved,
+				revenue: c.revenue
+			})),
+			'revenue_by_client',
+			['clientName', 'quotations', 'approved', 'revenue']
+		);
+	}
+
+	function exportRevenueByVehicle() {
+		if (!revenueByVehicle.length) return;
+		downloadCSV(
+			revenueByVehicle.map(v => ({
+				vehicleName: v.vehicleName,
+				quotations: v.quotations,
+				approved: v.approved,
+				revenue: v.revenue
+			})),
+			'revenue_by_vehicle',
+			['vehicleName', 'quotations', 'approved', 'revenue']
+		);
+	}
+
+	function exportMonthlyRevenue() {
+		if (!monthlyRevenue.length) return;
+		downloadCSV(
+			monthlyRevenue.map(m => ({
+				month: `${m.month} ${m.year}`,
+				quotationsCreated: m.quotationsCreated,
+				quotationsApproved: m.quotationsApproved,
+				quotationValue: m.quotationValue,
+				invoiced: m.invoiced,
+				collected: m.collected
+			})),
+			'monthly_revenue',
+			['month', 'quotationsCreated', 'quotationsApproved', 'quotationValue', 'invoiced', 'collected']
+		);
+	}
+
+	function exportReceivables() {
+		if (!receivables?.invoices.length) return;
+		downloadCSV(
+			receivables.invoices.map(inv => ({
+				invoiceNumber: inv.invoiceNumber,
+				clientName: inv.clientName,
+				amount: inv.amount,
+				dueDate: formatDate(inv.dueDate),
+				daysOverdue: inv.daysOverdue,
+				bucket: agingLabels[inv.bucket] || inv.bucket
+			})),
+			'receivables_aging',
+			['invoiceNumber', 'clientName', 'amount', 'dueDate', 'daysOverdue', 'bucket']
+		);
+	}
+
+	function exportDriverUtilization() {
+		if (!driverUtil?.drivers.length) return;
+		downloadCSV(
+			driverUtil.drivers.map(d => ({
+				driverName: d.driverName,
+				status: d.status,
+				completed: d.completed,
+				inProgress: d.inProgress,
+				scheduled: d.scheduled,
+				tripDays: d.tripDays,
+				utilizationRate: `${d.utilizationRate.toFixed(1)}%`
+			})),
+			'driver_utilization',
+			['driverName', 'status', 'completed', 'inProgress', 'scheduled', 'tripDays', 'utilizationRate']
+		);
+	}
+
+	function exportVehicleUtilization() {
+		if (!vehicleUtil?.vehicles.length) return;
+		downloadCSV(
+			vehicleUtil.vehicles.map(v => ({
+				vehicleName: v.vehicleName,
+				vehicleType: v.vehicleType,
+				status: v.status,
+				completed: v.completed,
+				totalDistance: v.totalDistance,
+				utilizationRate: `${v.utilizationRate.toFixed(1)}%`
+			})),
+			'vehicle_utilization',
+			['vehicleName', 'vehicleType', 'status', 'completed', 'totalDistance', 'utilizationRate']
+		);
+	}
+
+	function exportRouteAnalysis() {
+		if (!routeAnalysis?.routes.length) return;
+		downloadCSV(
+			routeAnalysis.routes.map(r => ({
+				origin: r.origin,
+				destination: r.destination,
+				count: r.count,
+				approved: r.approved,
+				totalValue: r.totalValue,
+				avgDistance: r.avgDistance,
+				conversionRate: `${r.conversionRate.toFixed(1)}%`
+			})),
+			'route_analysis',
+			['origin', 'destination', 'count', 'approved', 'totalValue', 'avgDistance', 'conversionRate']
+		);
+	}
 </script>
 
 <svelte:head>
@@ -204,9 +339,17 @@
 
 					<!-- Revenue by Client -->
 					<Card class="max-w-none !p-6">
-						<h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-							{$t('reports.revenueByClient') || 'Revenue by Client'}
-						</h3>
+						<div class="flex items-center justify-between mb-4">
+							<h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+								{$t('reports.revenueByClient') || 'Revenue by Client'}
+							</h3>
+							{#if revenueByClient.length > 0}
+								<Button size="xs" color="light" onclick={exportRevenueByClient}>
+									<DownloadOutline class="w-3 h-3 mr-1" />
+									CSV
+								</Button>
+							{/if}
+						</div>
 						{#if revenueByClient.length > 0}
 							{@const maxRevenue = Math.max(...revenueByClient.map(c => c.revenue))}
 							<div class="space-y-3">
@@ -238,9 +381,17 @@
 
 					<!-- Revenue by Vehicle -->
 					<Card class="max-w-none !p-6">
-						<h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-							{$t('reports.revenueByVehicle') || 'Revenue by Vehicle'}
-						</h3>
+						<div class="flex items-center justify-between mb-4">
+							<h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+								{$t('reports.revenueByVehicle') || 'Revenue by Vehicle'}
+							</h3>
+							{#if revenueByVehicle.length > 0}
+								<Button size="xs" color="light" onclick={exportRevenueByVehicle}>
+									<DownloadOutline class="w-3 h-3 mr-1" />
+									CSV
+								</Button>
+							{/if}
+						</div>
 						{#if revenueByVehicle.length > 0}
 							{@const maxRevenue = Math.max(...revenueByVehicle.map(v => v.revenue))}
 							<div class="space-y-3">
@@ -277,9 +428,17 @@
 				<div class="space-y-6 pt-4">
 					<!-- Monthly Revenue -->
 					<Card class="max-w-none !p-6">
-						<h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-							{$t('reports.monthlyRevenue') || 'Monthly Revenue'}
-						</h3>
+						<div class="flex items-center justify-between mb-4">
+							<h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+								{$t('reports.monthlyRevenue') || 'Monthly Revenue'}
+							</h3>
+							{#if monthlyRevenue.length > 0}
+								<Button size="xs" color="light" onclick={exportMonthlyRevenue}>
+									<DownloadOutline class="w-3 h-3 mr-1" />
+									CSV
+								</Button>
+							{/if}
+						</div>
 						{#if monthlyRevenue.length > 0}
 							{@const maxValue = Math.max(...monthlyRevenue.map(m => Math.max(m.quotationValue, m.invoiced, m.collected)))}
 							<div class="overflow-x-auto">
@@ -353,9 +512,17 @@
 					<!-- Receivables Aging -->
 					{#if receivables}
 						<Card class="max-w-none !p-6">
-							<h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-								{$t('reports.receivablesAging') || 'Receivables Aging'}
-							</h3>
+							<div class="flex items-center justify-between mb-4">
+								<h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+									{$t('reports.receivablesAging') || 'Receivables Aging'}
+								</h3>
+								{#if receivables.invoices.length > 0}
+									<Button size="xs" color="light" onclick={exportReceivables}>
+										<DownloadOutline class="w-3 h-3 mr-1" />
+										CSV
+									</Button>
+								{/if}
+							</div>
 
 							<!-- Summary cards -->
 							<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
@@ -446,9 +613,17 @@
 					<!-- Driver Utilization -->
 					{#if driverUtil}
 						<Card class="max-w-none !p-6">
-							<h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-								{$t('reports.driverUtilization') || 'Driver Utilization'} (30 days)
-							</h3>
+							<div class="flex items-center justify-between mb-4">
+								<h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+									{$t('reports.driverUtilization') || 'Driver Utilization'} (30 days)
+								</h3>
+								{#if driverUtil.drivers.length > 0}
+									<Button size="xs" color="light" onclick={exportDriverUtilization}>
+										<DownloadOutline class="w-3 h-3 mr-1" />
+										CSV
+									</Button>
+								{/if}
+							</div>
 
 							<!-- Summary -->
 							<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
@@ -511,9 +686,17 @@
 					<!-- Vehicle Utilization -->
 					{#if vehicleUtil}
 						<Card class="max-w-none !p-6">
-							<h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-								{$t('reports.vehicleUtilization') || 'Vehicle Utilization'} (30 days)
-							</h3>
+							<div class="flex items-center justify-between mb-4">
+								<h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+									{$t('reports.vehicleUtilization') || 'Vehicle Utilization'} (30 days)
+								</h3>
+								{#if vehicleUtil.vehicles.length > 0}
+									<Button size="xs" color="light" onclick={exportVehicleUtilization}>
+										<DownloadOutline class="w-3 h-3 mr-1" />
+										CSV
+									</Button>
+								{/if}
+							</div>
 
 							<!-- Summary -->
 							<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
@@ -574,9 +757,17 @@
 					<!-- Route Analysis -->
 					{#if routeAnalysis}
 						<Card class="max-w-none !p-6">
-							<h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-								{$t('reports.routeAnalysis') || 'Popular Routes'}
-							</h3>
+							<div class="flex items-center justify-between mb-4">
+								<h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+									{$t('reports.routeAnalysis') || 'Popular Routes'}
+								</h3>
+								{#if routeAnalysis.routes.length > 0}
+									<Button size="xs" color="light" onclick={exportRouteAnalysis}>
+										<DownloadOutline class="w-3 h-3 mr-1" />
+										CSV
+									</Button>
+								{/if}
+							</div>
 
 							<!-- Summary -->
 							<div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
