@@ -123,3 +123,15 @@ legacy/.old/
 
 # Windows special files
 nul
+
+# legacy / old artifacts and potential secrets
+legacy/
+.old/
+*.old.html
+*.backup.html
+
+# Environment / secrets
+.env
+.env.*
+*.env.local
+

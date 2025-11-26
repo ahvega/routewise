@@ -52,6 +52,7 @@
 		"quotations": "Cotizaciones",
 		"itineraries": "Itinerarios",
 		"invoices": "Facturas",
+		"expenses": "Gastos",
 		"vehicles": "Vehículos",
 		"drivers": "Conductores",
 		"clients": "Clientes",
@@ -623,6 +624,92 @@
 			"recordPayment": "Registrar Pago",
 			"addPayment": "Agregar Pago",
 			"cancel": "Cancelar Factura"
+		}
+	},
+	"expenses": {
+		"title": "Anticipos de Gastos",
+		"subtitle": "Gestiona anticipos de viaje para conductores",
+		"advance": "Anticipo de Gastos",
+		"noAdvances": "Sin anticipos aún",
+		"noAdvancesHint": "Crea un anticipo desde un itinerario",
+		"viewAdvance": "Ver Anticipo",
+		"createAdvance": "Crear Anticipo",
+		"createAdvanceHint": "Define los gastos estimados del viaje para generar un anticipo para el conductor",
+		"advanceCreated": "Anticipo creado exitosamente",
+		"createFailed": "Error al crear el anticipo",
+		"noAdvance": "Sin anticipo creado",
+		"totalAdvance": "Total del Anticipo",
+		"filterByStatus": "Filtrar por estado...",
+		"searchPlaceholder": "Buscar anticipos...",
+		"fields": {
+			"purpose": "Propósito",
+			"fuel": "Combustible",
+			"meals": "Viáticos",
+			"lodging": "Hospedaje",
+			"tolls": "Peajes",
+			"other": "Otros",
+			"notes": "Notas",
+			"internalNotes": "Notas Internas",
+			"disbursementMethod": "Método de Desembolso",
+			"disbursementReference": "Referencia de Desembolso",
+			"settlementNotes": "Notas de Liquidación",
+			"cancellationReason": "Razón de Cancelación"
+		},
+		"status": {
+			"pending": "Pendiente",
+			"approved": "Aprobado",
+			"disbursed": "Desembolsado",
+			"settled": "Liquidado",
+			"cancelled": "Cancelado"
+		},
+		"stats": {
+			"pending": "Pendientes",
+			"disbursed": "Desembolsados",
+			"settled": "Liquidados",
+			"outstanding": "Pendiente de Liquidar"
+		},
+		"columns": {
+			"number": "Anticipo #",
+			"itinerary": "Itinerario",
+			"driver": "Conductor",
+			"amount": "Monto",
+			"status": "Estado",
+			"date": "Fecha"
+		},
+		"actions": {
+			"approve": "Aprobar",
+			"disburse": "Desembolsar",
+			"settle": "Liquidar",
+			"cancel": "Cancelar",
+			"settleBalance": "Liquidar Saldo"
+		},
+		"sections": {
+			"details": "Detalles del Anticipo",
+			"estimatedExpenses": "Gastos Estimados",
+			"actualExpenses": "Gastos Reales",
+			"settlement": "Liquidación",
+			"timeline": "Línea de Tiempo"
+		},
+		"settlement": {
+			"title": "Liquidar Anticipo",
+			"hint": "Registra los gastos reales del viaje para calcular el saldo",
+			"receiptsCount": "Cantidad de Recibos",
+			"actualExpenses": "Gastos Reales",
+			"balancePositive": "El conductor debe devolver",
+			"balanceNegative": "La empresa debe reembolsar",
+			"balanceZero": "Sin saldo pendiente"
+		},
+		"timeline": {
+			"created": "Anticipo Creado",
+			"approved": "Anticipo Aprobado",
+			"disbursed": "Dinero Entregado",
+			"settled": "Gastos Liquidados",
+			"cancelled": "Anticipo Cancelado"
+		},
+		"disburseMethods": {
+			"cash": "Efectivo",
+			"transfer": "Transferencia",
+			"check": "Cheque"
 		}
 	}
 }

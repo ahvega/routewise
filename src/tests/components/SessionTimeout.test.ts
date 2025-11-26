@@ -21,8 +21,10 @@ vi.mock('$lib/i18n', () => ({
 	}
 }));
 
-// Mock goto
-const mockGoto = vi.fn();
+// Mock goto - use vi.hoisted to ensure mockGoto is defined before vi.mock
+const { mockGoto } = vi.hoisted(() => ({
+	mockGoto: vi.fn()
+}));
 vi.mock('$app/navigation', () => ({
 	goto: mockGoto
 }));

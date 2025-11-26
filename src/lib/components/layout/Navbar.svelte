@@ -100,6 +100,10 @@
 					<CashOutline class="w-4 h-4 text-emerald-500 dark:text-emerald-400" />
 					<span>{$t('invoices.title')}</span>
 				</DropdownItem>
+				<DropdownItem href="/expenses" class="flex items-center gap-3 !text-gray-900 dark:!text-white">
+					<CashOutline class="w-4 h-4 text-amber-500 dark:text-amber-400" />
+					<span>{$t('expenses.title')}</span>
+				</DropdownItem>
 			</Dropdown>
 		{/if}
 
@@ -163,6 +167,7 @@
 		<NavLi href="/quotations">{$t('nav.quotations')}</NavLi>
 		<NavLi href="/itineraries">{$t('nav.itineraries')}</NavLi>
 		<NavLi href="/invoices">{$t('nav.invoices')}</NavLi>
+		<NavLi href="/expenses">{$t('nav.expenses')}</NavLi>
 		<NavLi href="/clients">{$t('nav.clients')}</NavLi>
 		<NavLi href="/vehicles">{$t('nav.vehicles')}</NavLi>
 		<NavLi href="/drivers">{$t('nav.drivers')}</NavLi>

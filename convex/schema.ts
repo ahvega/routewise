@@ -315,4 +315,56 @@ export default defineSchema({
   })
     .index("by_invoice", ["invoiceId"])
     .index("by_tenant", ["tenantId"]),
+
+  // Expense Advances (money given to drivers for trip expenses)
+  expenseAdvances: defineTable({
+    tenantId: v.id("tenants"),
+    advanceNumber: v.string(),
+    itineraryId: v.id("itineraries"),
+    driverId: v.optional(v.id("drivers")),
+    createdBy: v.optional(v.id("users")),
+    // Advance details
+    amountHnl: v.number(),
+    amountUsd: v.optional(v.number()),
+    exchangeRateUsed: v.number(),
+    purpose: v.string(),
+    // Expense breakdown (suggested amounts)
+    estimatedFuel: v.optional(v.number()),
+    estimatedMeals: v.optional(v.number()),
+    estimatedLodging: v.optional(v.number()),
+    estimatedTolls: v.optional(v.number()),
+    estimatedOther: v.optional(v.number()),
+    // Status workflow: pending → approved → disbursed → settled
+    status: v.string(), // 'pending' | 'approved' | 'disbursed' | 'settled' | 'cancelled'
+    approvedBy: v.optional(v.id("users")),
+    approvedAt: v.optional(v.number()),
+    disbursedAt: v.optional(v.number()),
+    disbursementMethod: v.optional(v.string()), // 'cash' | 'transfer'
+    disbursementReference: v.optional(v.string()),
+    // Settlement (after trip completion)
+    actualExpenses: v.optional(v.number()),
+    actualFuel: v.optional(v.number()),
+    actualMeals: v.optional(v.number()),
+    actualLodging: v.optional(v.number()),
+    actualTolls: v.optional(v.number()),
+    actualOther: v.optional(v.number()),
+    receiptsCount: v.optional(v.number()),
+    // Balance calculation
+    balanceAmount: v.optional(v.number()), // positive = driver owes, negative = company owes
+    balanceSettled: v.optional(v.boolean()),
+    settlementNotes: v.optional(v.string()),
+    settledAt: v.optional(v.number()),
+    settledBy: v.optional(v.id("users")),
+    // General
+    notes: v.optional(v.string()),
+    internalNotes: v.optional(v.string()),
+    cancelledAt: v.optional(v.number()),
+    cancellationReason: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_tenant", ["tenantId"])
+    .index("by_tenant_status", ["tenantId", "status"])
+    .index("by_itinerary", ["itineraryId"])
+    .index("by_driver", ["driverId"]),
 });

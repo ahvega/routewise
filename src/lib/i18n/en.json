@@ -52,6 +52,7 @@
 		"quotations": "Quotations",
 		"itineraries": "Itineraries",
 		"invoices": "Invoices",
+		"expenses": "Expenses",
 		"vehicles": "Vehicles",
 		"drivers": "Drivers",
 		"clients": "Clients",
@@ -623,6 +624,92 @@
 			"recordPayment": "Record Payment",
 			"addPayment": "Add Payment",
 			"cancel": "Cancel Invoice"
+		}
+	},
+	"expenses": {
+		"title": "Expense Advances",
+		"subtitle": "Manage trip expense advances for drivers",
+		"advance": "Expense Advance",
+		"noAdvances": "No advances yet",
+		"noAdvancesHint": "Create an advance from an itinerary",
+		"viewAdvance": "View Advance",
+		"createAdvance": "Create Advance",
+		"createAdvanceHint": "Define estimated trip expenses to generate an advance for the driver",
+		"advanceCreated": "Advance created successfully",
+		"createFailed": "Failed to create advance",
+		"noAdvance": "No advance created",
+		"totalAdvance": "Total Advance",
+		"filterByStatus": "Filter by status...",
+		"searchPlaceholder": "Search advances...",
+		"fields": {
+			"purpose": "Purpose",
+			"fuel": "Fuel",
+			"meals": "Meals",
+			"lodging": "Lodging",
+			"tolls": "Tolls",
+			"other": "Other",
+			"notes": "Notes",
+			"internalNotes": "Internal Notes",
+			"disbursementMethod": "Disbursement Method",
+			"disbursementReference": "Disbursement Reference",
+			"settlementNotes": "Settlement Notes",
+			"cancellationReason": "Cancellation Reason"
+		},
+		"status": {
+			"pending": "Pending",
+			"approved": "Approved",
+			"disbursed": "Disbursed",
+			"settled": "Settled",
+			"cancelled": "Cancelled"
+		},
+		"stats": {
+			"pending": "Pending",
+			"disbursed": "Disbursed",
+			"settled": "Settled",
+			"outstanding": "Outstanding"
+		},
+		"columns": {
+			"number": "Advance #",
+			"itinerary": "Itinerary",
+			"driver": "Driver",
+			"amount": "Amount",
+			"status": "Status",
+			"date": "Date"
+		},
+		"actions": {
+			"approve": "Approve",
+			"disburse": "Disburse",
+			"settle": "Settle",
+			"cancel": "Cancel",
+			"settleBalance": "Settle Balance"
+		},
+		"sections": {
+			"details": "Advance Details",
+			"estimatedExpenses": "Estimated Expenses",
+			"actualExpenses": "Actual Expenses",
+			"settlement": "Settlement",
+			"timeline": "Timeline"
+		},
+		"settlement": {
+			"title": "Settle Advance",
+			"hint": "Record actual trip expenses to calculate the balance",
+			"receiptsCount": "Number of Receipts",
+			"actualExpenses": "Actual Expenses",
+			"balancePositive": "Driver owes company",
+			"balanceNegative": "Company owes driver",
+			"balanceZero": "No outstanding balance"
+		},
+		"timeline": {
+			"created": "Advance Created",
+			"approved": "Advance Approved",
+			"disbursed": "Money Disbursed",
+			"settled": "Expenses Settled",
+			"cancelled": "Advance Cancelled"
+		},
+		"disburseMethods": {
+			"cash": "Cash",
+			"transfer": "Bank Transfer",
+			"check": "Check"
 		}
 	}
 }

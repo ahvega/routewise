@@ -67,8 +67,22 @@
 		() => itineraryId ? { itineraryId } : 'skip'
 	);
 
+	// Query existing expense advance for this itinerary
+	const existingAdvanceQuery = useQuery(
+		api.expenseAdvances.getByItinerary,
+		() => itineraryId ? { itineraryId } : 'skip'
+	);
+
+	// Query suggested advance amounts
+	const suggestedAdvanceQuery = useQuery(
+		api.expenseAdvances.calculateSuggestedAdvance,
+		() => itineraryId ? { itineraryId } : 'skip'
+	);
+
 	const itinerary = $derived(itineraryQuery.data);
 	const existingInvoice = $derived(existingInvoiceQuery.data);
+	const existingAdvance = $derived(existingAdvanceQuery.data);
+	const suggestedAdvance = $derived(suggestedAdvanceQuery.data);
 	const vehicles = $derived(vehiclesQuery.data || []);
 	const clients = $derived(clientsQuery.data || []);
 	const drivers = $derived(driversQuery.data || []);
@@ -96,6 +110,15 @@
 	let invoiceTaxPercentage = $state(15); // ISV default in Honduras
 	let invoicePaymentTerms = $state(30); // Default 30 days
 
+	// Expense advance modal state
+	let showAdvanceModal = $state(false);
+	let advanceFuel = $state(0);
+	let advanceMeals = $state(0);
+	let advanceLodging = $state(0);
+	let advanceTolls = $state(0);
+	let advanceOther = $state(0);
+	let advancePurpose = $state('');
+
 	// Toast state
 	let showToast = $state(false);
 	let toastMessage = $state('');
@@ -106,6 +129,24 @@
 		if (itinerary) {
 			selectedDriverId = itinerary.driverId || '';
 			selectedVehicleId = itinerary.vehicleId || '';
+		}
+	});
+
+	// Initialize advance values when suggested advance loads
+	$effect(() => {
+		if (suggestedAdvance) {
+			advanceFuel = suggestedAdvance.estimatedFuel;
+			advanceMeals = suggestedAdvance.estimatedMeals;
+			advanceLodging = suggestedAdvance.estimatedLodging;
+			advanceTolls = suggestedAdvance.estimatedTolls;
+			advanceOther = suggestedAdvance.estimatedOther;
+		}
+	});
+
+	// Initialize purpose when itinerary loads
+	$effect(() => {
+		if (itinerary && !advancePurpose) {
+			advancePurpose = `Gastos de viaje: ${itinerary.origin} → ${itinerary.destination}`;
 		}
 	});
 
@@ -243,6 +284,32 @@
 	// Get active drivers and vehicles for selection
 	const activeDrivers = $derived(drivers.filter(d => d.status === 'active'));
 	const activeVehicles = $derived(vehicles.filter(v => v.status === 'active'));
+
+	// Calculated total advance amount
+	const totalAdvanceAmount = $derived(advanceFuel + advanceMeals + advanceLodging + advanceTolls + advanceOther);
+
+	async function createAdvance() {
+		if (!itinerary) return;
+
+		try {
+			const advanceId = await client.mutation(api.expenseAdvances.createFromItinerary, {
+				itineraryId: itinerary._id,
+				amountHnl: totalAdvanceAmount,
+				estimatedFuel: advanceFuel,
+				estimatedMeals: advanceMeals,
+				estimatedLodging: advanceLodging,
+				estimatedTolls: advanceTolls,
+				estimatedOther: advanceOther,
+				purpose: advancePurpose
+			});
+			showAdvanceModal = false;
+			showToastMessage($t('expenses.advanceCreated'), 'success');
+			setTimeout(() => goto(`/expenses/${advanceId}`), 500);
+		} catch (error) {
+			console.error('Failed to create expense advance:', error);
+			showToastMessage($t('expenses.createFailed'), 'error');
+		}
+	}
 </script>
 
 <div class="space-y-6">
@@ -561,6 +628,34 @@
 						{/if}
 					</Card>
 				{/if}
+
+				<!-- Expense Advance -->
+				{#if itinerary.status !== 'cancelled'}
+					<Card class="max-w-none !p-6">
+						<div class="flex items-center gap-2 mb-3">
+							<CashOutline class="w-5 h-5 text-gray-500" />
+							<h3 class="text-lg font-semibold text-gray-900 dark:text-white">{$t('expenses.advance')}</h3>
+						</div>
+						{#if existingAdvance}
+							<div class="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg mb-3">
+								<div class="flex items-center justify-between mb-1">
+									<p class="font-medium text-gray-900 dark:text-white">{existingAdvance.advanceNumber}</p>
+									<StatusBadge status={existingAdvance.status} variant="advance" size="sm" />
+								</div>
+								<p class="text-sm text-gray-500 dark:text-gray-400">{formatCurrency(existingAdvance.amountHnl)}</p>
+							</div>
+							<Button href="/expenses/{existingAdvance._id}" size="sm" color="light" class="w-full">
+								{$t('expenses.viewAdvance')}
+							</Button>
+						{:else}
+							<p class="text-sm text-gray-500 dark:text-gray-400 mb-3">{$t('expenses.noAdvance')}</p>
+							<Button size="sm" color="yellow" class="w-full" onclick={() => (showAdvanceModal = true)}>
+								<CashOutline class="w-4 h-4 mr-2" />
+								{$t('expenses.createAdvance')}
+							</Button>
+						{/if}
+					</Card>
+				{/if}
 			</div>
 		</div>
 	{/if}
@@ -652,6 +747,93 @@
 			<Button color="blue" onclick={generateInvoice}>
 				<FileLinesOutline class="w-4 h-4 mr-2" />
 				{$t('invoices.generateInvoice')}
+			</Button>
+		</div>
+	</svelte:fragment>
+</Modal>
+
+<!-- Create Expense Advance Modal -->
+<Modal bind:open={showAdvanceModal} title={$t('expenses.createAdvance')} size="md">
+	<div class="space-y-4">
+		<p class="text-sm text-gray-500 dark:text-gray-400">
+			{$t('expenses.createAdvanceHint')}
+		</p>
+
+		<div>
+			<Label for="advancePurpose">{$t('expenses.fields.purpose')}</Label>
+			<Input
+				id="advancePurpose"
+				type="text"
+				bind:value={advancePurpose}
+			/>
+		</div>
+
+		<div class="grid grid-cols-2 gap-4">
+			<div>
+				<Label for="advanceFuel">{$t('expenses.fields.fuel')}</Label>
+				<Input
+					id="advanceFuel"
+					type="number"
+					step="0.01"
+					min="0"
+					bind:value={advanceFuel}
+				/>
+			</div>
+			<div>
+				<Label for="advanceMeals">{$t('expenses.fields.meals')}</Label>
+				<Input
+					id="advanceMeals"
+					type="number"
+					step="0.01"
+					min="0"
+					bind:value={advanceMeals}
+				/>
+			</div>
+			<div>
+				<Label for="advanceLodging">{$t('expenses.fields.lodging')}</Label>
+				<Input
+					id="advanceLodging"
+					type="number"
+					step="0.01"
+					min="0"
+					bind:value={advanceLodging}
+				/>
+			</div>
+			<div>
+				<Label for="advanceTolls">{$t('expenses.fields.tolls')}</Label>
+				<Input
+					id="advanceTolls"
+					type="number"
+					step="0.01"
+					min="0"
+					bind:value={advanceTolls}
+				/>
+			</div>
+			<div class="col-span-2">
+				<Label for="advanceOther">{$t('expenses.fields.other')}</Label>
+				<Input
+					id="advanceOther"
+					type="number"
+					step="0.01"
+					min="0"
+					bind:value={advanceOther}
+				/>
+			</div>
+		</div>
+
+		<div class="p-4 bg-amber-50 dark:bg-amber-900/20 rounded-lg">
+			<p class="text-sm text-amber-600 dark:text-amber-400">{$t('expenses.totalAdvance')}</p>
+			<p class="text-2xl font-bold text-amber-700 dark:text-amber-300">{formatCurrency(totalAdvanceAmount)}</p>
+		</div>
+	</div>
+	<svelte:fragment slot="footer">
+		<div class="flex justify-end gap-2">
+			<Button color="alternative" onclick={() => (showAdvanceModal = false)}>
+				{$t('common.cancel')}
+			</Button>
+			<Button color="yellow" onclick={createAdvance} disabled={totalAdvanceAmount <= 0}>
+				<CashOutline class="w-4 h-4 mr-2" />
+				{$t('expenses.createAdvance')}
 			</Button>
 		</div>
 	</svelte:fragment>
