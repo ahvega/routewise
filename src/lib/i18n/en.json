@@ -96,7 +96,14 @@
 		"createNewQuotation": "Create New Quotation",
 		"manageClients": "Manage Clients",
 		"viewFleet": "View Fleet",
-		"systemParameters": "System Parameters"
+		"systemParameters": "System Parameters",
+		"totalReceivables": "Total Receivables",
+		"outstandingAdvances": "Outstanding Advances",
+		"recentActivity": "Recent Activity",
+		"alerts": "Alerts",
+		"upcomingTrips": "Upcoming Trips",
+		"noUpcomingTrips": "No upcoming trips scheduled",
+		"justNow": "Just now"
 	},
 	"vehicles": {
 		"title": "Vehicles",

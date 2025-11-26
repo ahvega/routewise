@@ -96,7 +96,14 @@
 		"createNewQuotation": "Crear Nueva Cotización",
 		"manageClients": "Administrar Clientes",
 		"viewFleet": "Ver Flota",
-		"systemParameters": "Parámetros del Sistema"
+		"systemParameters": "Parámetros del Sistema",
+		"totalReceivables": "Cuentas por Cobrar",
+		"outstandingAdvances": "Anticipos Pendientes",
+		"recentActivity": "Actividad Reciente",
+		"alerts": "Alertas",
+		"upcomingTrips": "Próximos Viajes",
+		"noUpcomingTrips": "No hay viajes programados",
+		"justNow": "Ahora mismo"
 	},
 	"vehicles": {
 		"title": "Vehículos",

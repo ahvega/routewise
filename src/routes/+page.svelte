@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Button, Card, Spinner } from 'flowbite-svelte';
+	import { Button, Card, Spinner, Alert } from 'flowbite-svelte';
 	import {
 		FileLinesOutline,
 		UsersOutline,
@@ -9,7 +9,11 @@
 		ArrowRightOutline,
 		ChartPieOutline,
 		CalendarMonthOutline,
-		DollarOutline
+		CashOutline,
+		ExclamationCircleOutline,
+		ClockOutline,
+		CheckCircleOutline,
+		InfoCircleOutline
 	} from 'flowbite-svelte-icons';
 	import { useQuery } from 'convex-svelte';
 	import { api } from '$convex/_generated/api';
@@ -19,57 +23,35 @@
 
 	let { data } = $props();
 
-	// Query all stats when tenant is available
-	const vehiclesQuery = useQuery(
-		api.vehicles.list,
+	// Use the new dashboard queries
+	const statsQuery = useQuery(
+		api.dashboard.getStats,
 		() => (tenantStore.tenantId ? { tenantId: tenantStore.tenantId } : 'skip')
 	);
-	const clientsQuery = useQuery(
-		api.clients.list,
+	const alertsQuery = useQuery(
+		api.dashboard.getAlerts,
 		() => (tenantStore.tenantId ? { tenantId: tenantStore.tenantId } : 'skip')
 	);
-	const driversQuery = useQuery(
-		api.drivers.list,
-		() => (tenantStore.tenantId ? { tenantId: tenantStore.tenantId } : 'skip')
+	const activityQuery = useQuery(
+		api.dashboard.getRecentActivity,
+		() => (tenantStore.tenantId ? { tenantId: tenantStore.tenantId, limit: 10 } : 'skip')
 	);
-	const quotationsQuery = useQuery(
-		api.quotations.list,
-		() => (tenantStore.tenantId ? { tenantId: tenantStore.tenantId } : 'skip')
-	);
-	const itinerariesQuery = useQuery(
-		api.itineraries.list,
-		() => (tenantStore.tenantId ? { tenantId: tenantStore.tenantId } : 'skip')
+	const upcomingQuery = useQuery(
+		api.dashboard.getUpcomingItineraries,
+		() => (tenantStore.tenantId ? { tenantId: tenantStore.tenantId, limit: 5 } : 'skip')
 	);
 
-	const vehicles = $derived(vehiclesQuery.data || []);
-	const clients = $derived(clientsQuery.data || []);
-	const drivers = $derived(driversQuery.data || []);
-	const quotations = $derived(quotationsQuery.data || []);
-	const itineraries = $derived(itinerariesQuery.data || []);
+	const stats = $derived(statsQuery.data);
+	const alerts = $derived(alertsQuery.data || []);
+	const activities = $derived(activityQuery.data || []);
+	const upcomingItineraries = $derived(upcomingQuery.data || []);
 
-	const isLoading = $derived(
-		vehiclesQuery.isLoading || clientsQuery.isLoading || driversQuery.isLoading || quotationsQuery.isLoading || itinerariesQuery.isLoading
-	);
+	const isLoading = $derived(statsQuery.isLoading);
 
-	// Computed stats
-	const activeVehicles = $derived(vehicles.filter((v) => v.status === 'active').length);
-	const activeDrivers = $derived(drivers.filter((d) => d.status === 'active').length);
-	const recentQuotations = $derived(
-		quotations
-			.filter((q) => q.createdAt > Date.now() - 30 * 24 * 60 * 60 * 1000)
-			.length
-	);
-	const pendingQuotations = $derived(quotations.filter((q) => q.status === 'draft').length);
-	const approvedQuotations = $derived(quotations.filter((q) => q.status === 'approved').length);
-	const scheduledItineraries = $derived(itineraries.filter((i) => i.status === 'scheduled').length);
-	const inProgressItineraries = $derived(itineraries.filter((i) => i.status === 'in_progress').length);
-
-	// Calculate total revenue from approved quotations
-	const totalRevenue = $derived(
-		quotations
-			.filter((q) => q.status === 'approved')
-			.reduce((sum, q) => sum + q.salePriceHnl, 0)
-	);
+	// Danger alerts (license expired, overdue invoices)
+	const dangerAlerts = $derived(alerts.filter((a) => a.type === 'danger'));
+	const warningAlerts = $derived(alerts.filter((a) => a.type === 'warning'));
+	const infoAlerts = $derived(alerts.filter((a) => a.type === 'info'));
 
 	function formatCurrency(value: number): string {
 		return new Intl.NumberFormat('es-HN', {
@@ -78,6 +60,29 @@
 			minimumFractionDigits: 0,
 			maximumFractionDigits: 0
 		}).format(value);
+	}
+
+	function formatDate(timestamp: number): string {
+		return new Intl.DateTimeFormat('es-HN', {
+			month: 'short',
+			day: 'numeric',
+			hour: '2-digit',
+			minute: '2-digit'
+		}).format(new Date(timestamp));
+	}
+
+	function formatRelativeTime(timestamp: number): string {
+		const now = Date.now();
+		const diff = now - timestamp;
+		const minutes = Math.floor(diff / 60000);
+		const hours = Math.floor(diff / 3600000);
+		const days = Math.floor(diff / 86400000);
+
+		if (minutes < 1) return $t('dashboard.justNow') || 'Just now';
+		if (minutes < 60) return `${minutes}m ago`;
+		if (hours < 24) return `${hours}h ago`;
+		if (days < 7) return `${days}d ago`;
+		return formatDate(timestamp);
 	}
 
 	const greeting = $derived(() => {
@@ -90,9 +95,17 @@
 	const userName = $derived(
 		data.user?.firstName || data.user?.email?.split('@')[0] || 'there'
 	);
+
+	// Activity type icons and colors
+	const activityConfig: Record<string, { icon: typeof FileLinesOutline; color: string }> = {
+		quotation: { icon: FileLinesOutline, color: 'text-blue-500' },
+		itinerary: { icon: CalendarMonthOutline, color: 'text-cyan-500' },
+		invoice: { icon: CashOutline, color: 'text-emerald-500' },
+		advance: { icon: CashOutline, color: 'text-amber-500' }
+	};
 </script>
 
-<div class="space-y-8">
+<div class="space-y-6">
 	<!-- Welcome Header -->
 	<div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
 		<div>
@@ -109,222 +122,374 @@
 		</Button>
 	</div>
 
+	<!-- Critical Alerts -->
+	{#if dangerAlerts.length > 0}
+		<div class="space-y-2">
+			{#each dangerAlerts.slice(0, 3) as alert}
+				<Alert color="red" class="!bg-red-50 dark:!bg-red-900/20">
+					<ExclamationCircleOutline slot="icon" class="w-5 h-5" />
+					<span class="font-medium">{alert.title}:</span>
+					{alert.message}
+				</Alert>
+			{/each}
+		</div>
+	{/if}
+
 	{#if isLoading}
 		<div class="flex justify-center py-12">
 			<Spinner size="8" />
 		</div>
-	{:else}
-		<!-- Stats Grid -->
-		<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
-			<!-- Quotations Card -->
-			<Card class="max-w-none !p-5">
-				<div class="flex items-center justify-between">
-					<div>
-						<p class="text-sm font-medium text-gray-500 dark:text-gray-400">{$t('dashboard.quotations')}</p>
-						<p class="text-2xl font-bold text-gray-900 dark:text-white">{quotations.length}</p>
+	{:else if stats}
+		<!-- Main Stats Grid -->
+		<div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+			<!-- Quotations -->
+			<Card class="max-w-none !p-4">
+				<div class="flex items-center justify-between mb-2">
+					<div class="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
+						<FileLinesOutline class="w-5 h-5 text-blue-600 dark:text-blue-400" />
 					</div>
-					<div class="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-full">
-						<FileLinesOutline class="w-6 h-6 text-blue-600 dark:text-blue-400" />
-					</div>
+					<span class="text-xs text-emerald-600 dark:text-emerald-400 font-medium">
+						{stats.quotations.conversionRate.toFixed(0)}%
+					</span>
 				</div>
-				<div class="mt-2 text-sm text-gray-500 dark:text-gray-400">
-					{pendingQuotations} {$t('dashboard.pending')}, {approvedQuotations} {$t('dashboard.approved')}
+				<p class="text-2xl font-bold text-gray-900 dark:text-white">{stats.quotations.total}</p>
+				<p class="text-xs text-gray-500 dark:text-gray-400">{$t('dashboard.quotations')}</p>
+				<div class="mt-2 flex gap-2 text-xs">
+					<span class="text-amber-600 dark:text-amber-400">{stats.quotations.draft} draft</span>
+					<span class="text-emerald-600 dark:text-emerald-400">{stats.quotations.approved} approved</span>
 				</div>
-				<Button href="/quotations" size="xs" color="light" class="w-full mt-3">
-					{$t('common.view')}
-					<ArrowRightOutline class="w-3 h-3 ml-1" />
-				</Button>
 			</Card>
 
-			<!-- Itineraries Card -->
-			<Card class="max-w-none !p-5">
-				<div class="flex items-center justify-between">
-					<div>
-						<p class="text-sm font-medium text-gray-500 dark:text-gray-400">{$t('dashboard.itineraries')}</p>
-						<p class="text-2xl font-bold text-gray-900 dark:text-white">{itineraries.length}</p>
+			<!-- Itineraries -->
+			<Card class="max-w-none !p-4">
+				<div class="flex items-center justify-between mb-2">
+					<div class="p-2 bg-cyan-100 dark:bg-cyan-900/30 rounded-lg">
+						<CalendarMonthOutline class="w-5 h-5 text-cyan-600 dark:text-cyan-400" />
 					</div>
-					<div class="p-3 bg-cyan-100 dark:bg-cyan-900/30 rounded-full">
-						<CalendarMonthOutline class="w-6 h-6 text-cyan-600 dark:text-cyan-400" />
-					</div>
+					<span class="text-xs text-amber-600 dark:text-amber-400 font-medium">
+						{stats.itineraries.inProgress} active
+					</span>
 				</div>
-				<div class="mt-2 text-sm text-gray-500 dark:text-gray-400">
-					{scheduledItineraries} {$t('dashboard.scheduled')}, {inProgressItineraries} {$t('dashboard.inProgress')}
+				<p class="text-2xl font-bold text-gray-900 dark:text-white">{stats.itineraries.total}</p>
+				<p class="text-xs text-gray-500 dark:text-gray-400">{$t('dashboard.itineraries')}</p>
+				<div class="mt-2 flex gap-2 text-xs">
+					<span class="text-sky-600 dark:text-sky-400">{stats.itineraries.scheduled} scheduled</span>
+					<span class="text-emerald-600 dark:text-emerald-400">{stats.itineraries.completed} done</span>
 				</div>
-				<Button href="/itineraries" size="xs" color="light" class="w-full mt-3">
-					{$t('common.view')}
-					<ArrowRightOutline class="w-3 h-3 ml-1" />
-				</Button>
 			</Card>
 
-			<!-- Clients Card -->
-			<Card class="max-w-none !p-5">
-				<div class="flex items-center justify-between">
-					<div>
-						<p class="text-sm font-medium text-gray-500 dark:text-gray-400">{$t('dashboard.clients')}</p>
-						<p class="text-2xl font-bold text-gray-900 dark:text-white">{clients.length}</p>
+			<!-- Invoices -->
+			<Card class="max-w-none !p-4">
+				<div class="flex items-center justify-between mb-2">
+					<div class="p-2 bg-emerald-100 dark:bg-emerald-900/30 rounded-lg">
+						<CashOutline class="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
 					</div>
-					<div class="p-3 bg-green-100 dark:bg-green-900/30 rounded-full">
-						<UsersOutline class="w-6 h-6 text-green-600 dark:text-green-400" />
-					</div>
+					{#if stats.invoices.overdue > 0}
+						<span class="text-xs text-red-600 dark:text-red-400 font-medium">
+							{stats.invoices.overdue} overdue
+						</span>
+					{/if}
 				</div>
-				<div class="mt-2 text-sm text-gray-500 dark:text-gray-400">
-					{clients.filter((c) => c.status === 'active').length} {$t('dashboard.activeClients')}
+				<p class="text-2xl font-bold text-gray-900 dark:text-white">{stats.invoices.total}</p>
+				<p class="text-xs text-gray-500 dark:text-gray-400">{$t('invoices.title')}</p>
+				<div class="mt-2 flex gap-2 text-xs">
+					<span class="text-rose-600 dark:text-rose-400">{stats.invoices.unpaid} unpaid</span>
+					<span class="text-emerald-600 dark:text-emerald-400">{stats.invoices.paid} paid</span>
 				</div>
-				<Button href="/clients" size="xs" color="light" class="w-full mt-3">
-					{$t('common.view')}
-					<ArrowRightOutline class="w-3 h-3 ml-1" />
-				</Button>
 			</Card>
 
-			<!-- Vehicles Card -->
-			<Card class="max-w-none !p-5">
-				<div class="flex items-center justify-between">
-					<div>
-						<p class="text-sm font-medium text-gray-500 dark:text-gray-400">{$t('dashboard.vehicles')}</p>
-						<p class="text-2xl font-bold text-gray-900 dark:text-white">{vehicles.length}</p>
+			<!-- Expenses -->
+			<Card class="max-w-none !p-4">
+				<div class="flex items-center justify-between mb-2">
+					<div class="p-2 bg-amber-100 dark:bg-amber-900/30 rounded-lg">
+						<CashOutline class="w-5 h-5 text-amber-600 dark:text-amber-400" />
 					</div>
-					<div class="p-3 bg-purple-100 dark:bg-purple-900/30 rounded-full">
-						<TruckOutline class="w-6 h-6 text-purple-600 dark:text-purple-400" />
-					</div>
+					{#if stats.advances.pending > 0}
+						<span class="text-xs text-amber-600 dark:text-amber-400 font-medium">
+							{stats.advances.pending} pending
+						</span>
+					{/if}
 				</div>
-				<div class="mt-2 text-sm text-gray-500 dark:text-gray-400">
-					{activeVehicles} {$t('dashboard.available')}
+				<p class="text-2xl font-bold text-gray-900 dark:text-white">{stats.advances.total}</p>
+				<p class="text-xs text-gray-500 dark:text-gray-400">{$t('expenses.title')}</p>
+				<div class="mt-2 flex gap-2 text-xs">
+					<span class="text-sky-600 dark:text-sky-400">{stats.advances.disbursed} disbursed</span>
+					<span class="text-emerald-600 dark:text-emerald-400">{stats.advances.settled} settled</span>
 				</div>
-				<Button href="/vehicles" size="xs" color="light" class="w-full mt-3">
-					{$t('common.view')}
-					<ArrowRightOutline class="w-3 h-3 ml-1" />
-				</Button>
 			</Card>
 
-			<!-- Drivers Card -->
-			<Card class="max-w-none !p-5">
-				<div class="flex items-center justify-between">
-					<div>
-						<p class="text-sm font-medium text-gray-500 dark:text-gray-400">{$t('dashboard.drivers')}</p>
-						<p class="text-2xl font-bold text-gray-900 dark:text-white">{drivers.length}</p>
-					</div>
-					<div class="p-3 bg-orange-100 dark:bg-orange-900/30 rounded-full">
-						<UserOutline class="w-6 h-6 text-orange-600 dark:text-orange-400" />
+			<!-- Vehicles -->
+			<Card class="max-w-none !p-4">
+				<div class="flex items-center justify-between mb-2">
+					<div class="p-2 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
+						<TruckOutline class="w-5 h-5 text-purple-600 dark:text-purple-400" />
 					</div>
 				</div>
-				<div class="mt-2 text-sm text-gray-500 dark:text-gray-400">
-					{activeDrivers} {$t('dashboard.active')}
+				<p class="text-2xl font-bold text-gray-900 dark:text-white">{stats.resources.vehicles.total}</p>
+				<p class="text-xs text-gray-500 dark:text-gray-400">{$t('dashboard.vehicles')}</p>
+				<div class="mt-2 flex gap-2 text-xs">
+					<span class="text-emerald-600 dark:text-emerald-400">{stats.resources.vehicles.active} active</span>
+					{#if stats.resources.vehicles.maintenance > 0}
+						<span class="text-amber-600 dark:text-amber-400">{stats.resources.vehicles.maintenance} maint.</span>
+					{/if}
 				</div>
-				<Button href="/drivers" size="xs" color="light" class="w-full mt-3">
-					{$t('common.view')}
-					<ArrowRightOutline class="w-3 h-3 ml-1" />
-				</Button>
+			</Card>
+
+			<!-- Drivers -->
+			<Card class="max-w-none !p-4">
+				<div class="flex items-center justify-between mb-2">
+					<div class="p-2 bg-orange-100 dark:bg-orange-900/30 rounded-lg">
+						<UserOutline class="w-5 h-5 text-orange-600 dark:text-orange-400" />
+					</div>
+				</div>
+				<p class="text-2xl font-bold text-gray-900 dark:text-white">{stats.resources.drivers.total}</p>
+				<p class="text-xs text-gray-500 dark:text-gray-400">{$t('dashboard.drivers')}</p>
+				<div class="mt-2 flex gap-2 text-xs">
+					<span class="text-emerald-600 dark:text-emerald-400">{stats.resources.drivers.active} active</span>
+					{#if stats.resources.drivers.onLeave > 0}
+						<span class="text-violet-600 dark:text-violet-400">{stats.resources.drivers.onLeave} on leave</span>
+					{/if}
+				</div>
 			</Card>
 		</div>
 
-		<!-- Revenue & Activity Section -->
-		<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-			<!-- Revenue Overview -->
-			<Card class="max-w-none !p-6">
-				<div class="flex items-center gap-2 mb-4">
-					<DollarOutline class="w-5 h-5 text-gray-500 dark:text-gray-400" />
-					<h3 class="text-lg font-semibold text-gray-900 dark:text-white">{$t('dashboard.revenueOverview')}</h3>
-				</div>
-				<div class="space-y-4">
-					<div class="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
-						<p class="text-sm text-gray-500 dark:text-gray-400">{$t('dashboard.approvedQuotationsValue')}</p>
-						<p class="text-3xl font-bold text-green-600 dark:text-green-400">
-							{formatCurrency(totalRevenue)}
+		<!-- Financial Summary Row -->
+		<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+			<!-- Approved Revenue -->
+			<Card class="max-w-none !p-5 bg-gradient-to-br from-emerald-50 to-emerald-100 dark:from-emerald-900/20 dark:to-emerald-900/10">
+				<div class="flex items-center gap-3">
+					<div class="p-3 bg-emerald-200 dark:bg-emerald-800 rounded-full">
+						<CheckCircleOutline class="w-6 h-6 text-emerald-700 dark:text-emerald-300" />
+					</div>
+					<div>
+						<p class="text-sm text-emerald-700 dark:text-emerald-400">{$t('dashboard.approvedQuotationsValue')}</p>
+						<p class="text-2xl font-bold text-emerald-800 dark:text-emerald-200">
+							{formatCurrency(stats.quotations.approvedValue)}
 						</p>
 					</div>
-					<div class="grid grid-cols-2 gap-4">
-						<div class="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-							<p class="text-sm text-gray-500 dark:text-gray-400">{$t('dashboard.last30Days')}</p>
-							<p class="text-xl font-semibold text-gray-900 dark:text-white">{recentQuotations} {$t('dashboard.quotes')}</p>
-						</div>
-						<div class="p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg">
-							<p class="text-sm text-gray-500 dark:text-gray-400">{$t('common.pending')}</p>
-							<p class="text-xl font-semibold text-gray-900 dark:text-white">{pendingQuotations} {$t('dashboard.drafts')}</p>
-						</div>
+				</div>
+			</Card>
+
+			<!-- Receivables -->
+			<Card class="max-w-none !p-5 bg-gradient-to-br from-amber-50 to-amber-100 dark:from-amber-900/20 dark:to-amber-900/10">
+				<div class="flex items-center gap-3">
+					<div class="p-3 bg-amber-200 dark:bg-amber-800 rounded-full">
+						<ClockOutline class="w-6 h-6 text-amber-700 dark:text-amber-300" />
+					</div>
+					<div>
+						<p class="text-sm text-amber-700 dark:text-amber-400">{$t('dashboard.totalReceivables') || 'Total Receivables'}</p>
+						<p class="text-2xl font-bold text-amber-800 dark:text-amber-200">
+							{formatCurrency(stats.invoices.totalReceivables)}
+						</p>
 					</div>
 				</div>
 			</Card>
 
-			<!-- Quick Actions -->
-			<Card class="max-w-none !p-6">
-				<div class="flex items-center gap-2 mb-4">
-					<ChartPieOutline class="w-5 h-5 text-gray-500 dark:text-gray-400" />
-					<h3 class="text-lg font-semibold text-gray-900 dark:text-white">{$t('dashboard.quickActions')}</h3>
-				</div>
-				<div class="space-y-3">
-					<a
-						href="/quotations/new"
-						class="flex items-center justify-between p-4 bg-primary-50 dark:bg-primary-900/20 rounded-lg hover:bg-primary-100 dark:hover:bg-primary-900/30 transition-colors"
-					>
-						<div class="flex items-center gap-3">
-							<FileLinesOutline class="w-5 h-5 text-primary-600 dark:text-primary-400" />
-							<span class="font-medium text-gray-900 dark:text-white">{$t('dashboard.createNewQuotation')}</span>
-						</div>
-						<ArrowRightOutline class="w-4 h-4 text-gray-400" />
-					</a>
-					<a
-						href="/clients"
-						class="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-					>
-						<div class="flex items-center gap-3">
-							<UsersOutline class="w-5 h-5 text-gray-600 dark:text-gray-400" />
-							<span class="font-medium text-gray-900 dark:text-white">{$t('dashboard.manageClients')}</span>
-						</div>
-						<ArrowRightOutline class="w-4 h-4 text-gray-400" />
-					</a>
-					<a
-						href="/vehicles"
-						class="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-					>
-						<div class="flex items-center gap-3">
-							<TruckOutline class="w-5 h-5 text-gray-600 dark:text-gray-400" />
-							<span class="font-medium text-gray-900 dark:text-white">{$t('dashboard.viewFleet')}</span>
-						</div>
-						<ArrowRightOutline class="w-4 h-4 text-gray-400" />
-					</a>
-					<a
-						href="/settings"
-						class="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-					>
-						<div class="flex items-center gap-3">
-							<CalendarMonthOutline class="w-5 h-5 text-gray-600 dark:text-gray-400" />
-							<span class="font-medium text-gray-900 dark:text-white">{$t('dashboard.systemParameters')}</span>
-						</div>
-						<ArrowRightOutline class="w-4 h-4 text-gray-400" />
-					</a>
+			<!-- Outstanding Advances -->
+			<Card class="max-w-none !p-5 bg-gradient-to-br from-sky-50 to-sky-100 dark:from-sky-900/20 dark:to-sky-900/10">
+				<div class="flex items-center gap-3">
+					<div class="p-3 bg-sky-200 dark:bg-sky-800 rounded-full">
+						<CashOutline class="w-6 h-6 text-sky-700 dark:text-sky-300" />
+					</div>
+					<div>
+						<p class="text-sm text-sky-700 dark:text-sky-400">{$t('dashboard.outstandingAdvances') || 'Outstanding Advances'}</p>
+						<p class="text-2xl font-bold text-sky-800 dark:text-sky-200">
+							{formatCurrency(stats.advances.outstandingAmount)}
+						</p>
+					</div>
 				</div>
 			</Card>
 		</div>
 
-		<!-- Recent Quotations -->
-		{#if quotations.length > 0}
-			<Card class="max-w-none !p-6">
-				<div class="flex items-center justify-between mb-4">
-					<h3 class="text-lg font-semibold text-gray-900 dark:text-white">{$t('dashboard.recentQuotations')}</h3>
-					<Button href="/quotations" size="xs" color="light">
-						{$t('dashboard.viewAll')}
-						<ArrowRightOutline class="w-3 h-3 ml-1" />
-					</Button>
-				</div>
-				<div class="space-y-3">
-					{#each quotations.slice(0, 5) as quote}
-						<div class="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-							<div>
-								<p class="font-medium text-gray-900 dark:text-white">{quote.quotationNumber}</p>
-								<p class="text-sm text-gray-500 dark:text-gray-400">
-									{quote.origin} → {quote.destination}
-								</p>
-							</div>
-							<div class="text-right">
-								<p class="font-semibold text-gray-900 dark:text-white">
-									{formatCurrency(quote.salePriceHnl)}
-								</p>
-								<StatusBadge status={quote.status} variant="quotation" />
-							</div>
+		<!-- Main Content Grid -->
+		<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+			<!-- Left Column: Activity & Alerts -->
+			<div class="lg:col-span-2 space-y-6">
+				<!-- Recent Activity -->
+				<Card class="max-w-none !p-6">
+					<div class="flex items-center justify-between mb-4">
+						<h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+							{$t('dashboard.recentActivity') || 'Recent Activity'}
+						</h3>
+					</div>
+					{#if activities.length > 0}
+						<div class="space-y-3">
+							{#each activities.slice(0, 8) as activity}
+								{@const config = activityConfig[activity.type] || activityConfig.quotation}
+								<div class="flex items-start gap-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+									<div class="p-2 bg-white dark:bg-gray-900 rounded-lg shadow-sm">
+										<svelte:component this={config.icon} class="w-4 h-4 {config.color}" />
+									</div>
+									<div class="flex-1 min-w-0">
+										<div class="flex items-center gap-2">
+											<span class="font-medium text-gray-900 dark:text-white text-sm">{activity.title}</span>
+											<StatusBadge status={activity.action} size="sm" />
+										</div>
+										<p class="text-xs text-gray-500 dark:text-gray-400 truncate">{activity.description}</p>
+									</div>
+									<span class="text-xs text-gray-400 dark:text-gray-500 whitespace-nowrap">
+										{formatRelativeTime(activity.timestamp)}
+									</span>
+								</div>
+							{/each}
 						</div>
-					{/each}
-				</div>
-			</Card>
-		{/if}
+					{:else}
+						<p class="text-center text-gray-500 dark:text-gray-400 py-8">
+							{$t('common.noData')}
+						</p>
+					{/if}
+				</Card>
+
+				<!-- Warnings & Info Alerts -->
+				{#if warningAlerts.length > 0 || infoAlerts.length > 0}
+					<Card class="max-w-none !p-6">
+						<div class="flex items-center gap-2 mb-4">
+							<ExclamationCircleOutline class="w-5 h-5 text-amber-500" />
+							<h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+								{$t('dashboard.alerts') || 'Alerts'}
+							</h3>
+						</div>
+						<div class="space-y-2">
+							{#each warningAlerts.slice(0, 5) as alert}
+								<div class="flex items-start gap-3 p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-800">
+									<ExclamationCircleOutline class="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
+									<div>
+										<p class="font-medium text-amber-800 dark:text-amber-200 text-sm">{alert.title}</p>
+										<p class="text-xs text-amber-600 dark:text-amber-400">{alert.message}</p>
+									</div>
+								</div>
+							{/each}
+							{#each infoAlerts.slice(0, 3) as alert}
+								<div class="flex items-start gap-3 p-3 bg-sky-50 dark:bg-sky-900/20 rounded-lg border border-sky-200 dark:border-sky-800">
+									<InfoCircleOutline class="w-5 h-5 text-sky-500 flex-shrink-0 mt-0.5" />
+									<div>
+										<p class="font-medium text-sky-800 dark:text-sky-200 text-sm">{alert.title}</p>
+										<p class="text-xs text-sky-600 dark:text-sky-400">{alert.message}</p>
+									</div>
+								</div>
+							{/each}
+						</div>
+					</Card>
+				{/if}
+			</div>
+
+			<!-- Right Column: Upcoming & Quick Actions -->
+			<div class="space-y-6">
+				<!-- Upcoming Itineraries -->
+				<Card class="max-w-none !p-6">
+					<div class="flex items-center justify-between mb-4">
+						<h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+							{$t('dashboard.upcomingTrips') || 'Upcoming Trips'}
+						</h3>
+						<Button href="/itineraries" size="xs" color="light">
+							{$t('common.view')}
+							<ArrowRightOutline class="w-3 h-3 ml-1" />
+						</Button>
+					</div>
+					{#if upcomingItineraries.length > 0}
+						<div class="space-y-3">
+							{#each upcomingItineraries as itinerary}
+								<a
+									href="/itineraries/{itinerary._id}"
+									class="block p-3 bg-gray-50 dark:bg-gray-800 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+								>
+									<div class="flex items-center justify-between mb-1">
+										<span class="font-medium text-gray-900 dark:text-white text-sm">{itinerary.itineraryNumber}</span>
+										<span class="text-xs text-gray-500 dark:text-gray-400">
+											{formatDate(itinerary.startDate)}
+										</span>
+									</div>
+									<p class="text-xs text-gray-500 dark:text-gray-400 truncate">
+										{itinerary.origin} → {itinerary.destination}
+									</p>
+									<div class="flex items-center gap-2 mt-2 text-xs">
+										{#if itinerary.driverName}
+											<span class="text-emerald-600 dark:text-emerald-400">
+												<UserOutline class="w-3 h-3 inline" />
+												{itinerary.driverName}
+											</span>
+										{:else}
+											<span class="text-amber-600 dark:text-amber-400">No driver</span>
+										{/if}
+										{#if itinerary.vehicleName}
+											<span class="text-purple-600 dark:text-purple-400">
+												<TruckOutline class="w-3 h-3 inline" />
+												{itinerary.vehicleName}
+											</span>
+										{:else}
+											<span class="text-amber-600 dark:text-amber-400">No vehicle</span>
+										{/if}
+									</div>
+								</a>
+							{/each}
+						</div>
+					{:else}
+						<p class="text-center text-gray-500 dark:text-gray-400 py-4 text-sm">
+							{$t('dashboard.noUpcomingTrips') || 'No upcoming trips scheduled'}
+						</p>
+					{/if}
+				</Card>
+
+				<!-- Quick Actions -->
+				<Card class="max-w-none !p-6">
+					<div class="flex items-center gap-2 mb-4">
+						<ChartPieOutline class="w-5 h-5 text-gray-500 dark:text-gray-400" />
+						<h3 class="text-lg font-semibold text-gray-900 dark:text-white">{$t('dashboard.quickActions')}</h3>
+					</div>
+					<div class="space-y-2">
+						<a
+							href="/quotations/new"
+							class="flex items-center justify-between p-3 bg-primary-50 dark:bg-primary-900/20 rounded-lg hover:bg-primary-100 dark:hover:bg-primary-900/30 transition-colors"
+						>
+							<div class="flex items-center gap-3">
+								<FileLinesOutline class="w-5 h-5 text-primary-600 dark:text-primary-400" />
+								<span class="font-medium text-gray-900 dark:text-white text-sm">{$t('dashboard.createNewQuotation')}</span>
+							</div>
+							<ArrowRightOutline class="w-4 h-4 text-gray-400" />
+						</a>
+						<a
+							href="/clients?action=new"
+							class="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+						>
+							<div class="flex items-center gap-3">
+								<UsersOutline class="w-5 h-5 text-green-600 dark:text-green-400" />
+								<span class="font-medium text-gray-900 dark:text-white text-sm">{$t('clients.addClient')}</span>
+							</div>
+							<ArrowRightOutline class="w-4 h-4 text-gray-400" />
+						</a>
+						<a
+							href="/vehicles?action=new"
+							class="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+						>
+							<div class="flex items-center gap-3">
+								<TruckOutline class="w-5 h-5 text-purple-600 dark:text-purple-400" />
+								<span class="font-medium text-gray-900 dark:text-white text-sm">{$t('vehicles.addVehicle')}</span>
+							</div>
+							<ArrowRightOutline class="w-4 h-4 text-gray-400" />
+						</a>
+						<a
+							href="/invoices"
+							class="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+						>
+							<div class="flex items-center gap-3">
+								<CashOutline class="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+								<span class="font-medium text-gray-900 dark:text-white text-sm">{$t('invoices.title')}</span>
+							</div>
+							<ArrowRightOutline class="w-4 h-4 text-gray-400" />
+						</a>
+						<a
+							href="/settings"
+							class="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+						>
+							<div class="flex items-center gap-3">
+								<CalendarMonthOutline class="w-5 h-5 text-gray-600 dark:text-gray-400" />
+								<span class="font-medium text-gray-900 dark:text-white text-sm">{$t('dashboard.systemParameters')}</span>
+							</div>
+							<ArrowRightOutline class="w-4 h-4 text-gray-400" />
+						</a>
+					</div>
+				</Card>
+			</div>
+		</div>
 	{/if}
 </div>
