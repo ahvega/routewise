@@ -216,6 +216,8 @@
 			"driver": "Conductor",
 			"contact": "Contacto",
 			"license": "Licencia",
+			"category": "Categoría",
+			"expiry": "Vencimiento",
 			"dailyRate": "Tarifa/Día",
 			"status": "Estado"
 		}

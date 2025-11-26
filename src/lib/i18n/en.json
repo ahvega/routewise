@@ -216,6 +216,8 @@
 			"driver": "Driver",
 			"contact": "Contact",
 			"license": "License",
+			"category": "Category",
+			"expiry": "Expiry",
 			"dailyRate": "Rate/Day",
 			"status": "Status"
 		}
