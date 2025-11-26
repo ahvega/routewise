@@ -15,16 +15,16 @@
 	<div class="container mx-auto px-4 py-16">
 		<div class="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
 			<!-- Left Column: Info -->
-			<div class="space-y-8">
+			<div class="space-y-6">
 				<!-- Pretitle -->
-				<div class="inline-flex items-center px-4 py-2 rounded-full bg-primary-500/10 border border-primary-500/20">
-					<span class="text-primary-400 text-sm font-medium">
+				<div>
+					<span class="text-primary-400 text-xs font-light uppercase tracking-[0.3em]">
 						{$t('landing.pretitle')}
 					</span>
 				</div>
 
 				<!-- Title -->
-				<h1 class="text-4xl md:text-5xl lg:text-6xl font-bold text-white leading-tight">
+				<h1 class="text-4xl md:text-5xl lg:text-6xl font-semibold text-white leading-tight -mt-4">
 					{$t('landing.title')}
 				</h1>
 
@@ -86,13 +86,13 @@
 								<svg class="w-5 h-5 text-green-500" fill="currentColor" viewBox="0 0 20 20">
 									<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
 								</svg>
-								<span>Free trial</span>
+								<span>{$t('landing.freeTrial')}</span>
 							</div>
 							<div class="flex items-center gap-2">
 								<svg class="w-5 h-5 text-green-500" fill="currentColor" viewBox="0 0 20 20">
 									<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
 								</svg>
-								<span>No credit card</span>
+								<span>{$t('landing.noCreditCard')}</span>
 							</div>
 						</div>
 					</div>

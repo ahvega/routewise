@@ -379,7 +379,7 @@
 		}
 	},
 	"landing": {
-		"pretitle": "Plataforma de Cotización de Transporte",
+		"pretitle": "COTIZACIONES DE TRANSPORTE",
 		"title": "Optimiza las Operaciones de tu Flota",
 		"subtitle": "Cotizaciones profesionales en minutos, no horas",
 		"description": "RouteWise ayuda a empresas de turismo y operadores de flotas a calcular costos precisos de viaje, generar cotizaciones profesionales y administrar toda su flota desde una sola plataforma.",
@@ -393,7 +393,9 @@
 		"getStarted": "Comenzar",
 		"learnMore": "Saber Más",
 		"alreadyHaveAccount": "¿Ya tienes una cuenta?",
-		"signIn": "Iniciar sesión"
+		"signIn": "Iniciar sesión",
+		"freeTrial": "Prueba gratuita",
+		"noCreditCard": "Sin tarjeta de crédito"
 	},
 	"session": {
 		"timeoutWarning": "Sesión Por Expirar",

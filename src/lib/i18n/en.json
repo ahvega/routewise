@@ -379,7 +379,7 @@
 		}
 	},
 	"landing": {
-		"pretitle": "Transportation Quotation Platform",
+		"pretitle": "TRANSPORTATION QUOTATIONS",
 		"title": "Streamline Your Fleet Operations",
 		"subtitle": "Professional quotations in minutes, not hours",
 		"description": "RouteWise helps tour companies and fleet operators calculate accurate trip costs, generate professional quotations, and manage their entire fleet from one powerful platform.",
@@ -393,7 +393,9 @@
 		"getStarted": "Get Started",
 		"learnMore": "Learn More",
 		"alreadyHaveAccount": "Already have an account?",
-		"signIn": "Sign in"
+		"signIn": "Sign in",
+		"freeTrial": "Free trial",
+		"noCreditCard": "No credit card"
 	},
 	"session": {
 		"timeoutWarning": "Session Expiring Soon",
