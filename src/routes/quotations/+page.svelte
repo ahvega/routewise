@@ -229,28 +229,28 @@
 						<Button size="xs" color="light" id="actions-{quote._id}">
 							<DotsHorizontalOutline class="w-4 h-4" />
 						</Button>
-						<Dropdown triggeredBy="#actions-{quote._id}">
-							<DropdownItem href="/quotations/{quote._id}">
+						<Dropdown triggeredBy="#actions-{quote._id}" class="dark:bg-gray-800 dark:border-gray-700">
+							<DropdownItem href="/quotations/{quote._id}" class="dark:text-gray-200 dark:hover:bg-gray-700">
 								<EyeOutline class="w-4 h-4 mr-2 inline" />
 								{$t('quotations.viewQuotation')}
 							</DropdownItem>
 							{#if quote.status === 'draft'}
-								<DropdownItem onclick={() => updateStatus(quote._id, 'sent')}>
+								<DropdownItem onclick={() => updateStatus(quote._id, 'sent')} class="dark:text-gray-200 dark:hover:bg-gray-700">
 									<PaperPlaneOutline class="w-4 h-4 mr-2 inline" />
 									{$t('common.sent')}
 								</DropdownItem>
 							{/if}
 							{#if quote.status === 'sent'}
-								<DropdownItem onclick={() => updateStatus(quote._id, 'approved')}>
+								<DropdownItem onclick={() => updateStatus(quote._id, 'approved')} class="dark:text-gray-200 dark:hover:bg-gray-700">
 									<CheckCircleOutline class="w-4 h-4 mr-2 inline" />
 									{$t('common.accepted')}
 								</DropdownItem>
-								<DropdownItem onclick={() => updateStatus(quote._id, 'rejected')}>
+								<DropdownItem onclick={() => updateStatus(quote._id, 'rejected')} class="dark:text-gray-200 dark:hover:bg-gray-700">
 									<CloseCircleOutline class="w-4 h-4 mr-2 inline" />
 									{$t('common.rejected')}
 								</DropdownItem>
 							{/if}
-							<DropdownItem class="text-red-600 dark:text-red-400" onclick={() => handleDelete(quote._id)}>
+							<DropdownItem class="text-red-600 dark:text-red-400 dark:hover:bg-gray-700" onclick={() => handleDelete(quote._id)}>
 								<TrashBinOutline class="w-4 h-4 mr-2 inline" />
 								{$t('common.delete')}
 							</DropdownItem>

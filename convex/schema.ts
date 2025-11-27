@@ -65,18 +65,26 @@ export default defineSchema({
   parameters: defineTable({
     tenantId: v.id("tenants"),
     year: v.number(),
-    fuelPrice: v.number(),
-    mealCostPerDay: v.number(),
-    hotelCostPerNight: v.number(),
-    driverIncentivePerDay: v.number(),
-    exchangeRate: v.number(),
-    useCustomExchangeRate: v.boolean(),
+    // Currency configuration
+    localCurrency: v.optional(v.string()), // 3-letter code: HNL, GTQ, NIO, etc. Defaults to HNL
+    exchangeRate: v.number(), // USD to local currency rate
+    useCustomExchangeRate: v.boolean(), // false = use API rate
+    exchangeRateUpdatedAt: v.optional(v.number()), // Last API update timestamp
     preferredDistanceUnit: v.string(),
-    preferredCurrency: v.string(),
+    preferredCurrency: v.string(), // Display preference: 'USD' or local currency code
+    // Operating costs (stored in local currency)
+    fuelPrice: v.number(),
+    fuelPriceCurrency: v.optional(v.string()), // Currency of fuelPrice
+    mealCostPerDay: v.number(),
+    mealCostCurrency: v.optional(v.string()),
+    hotelCostPerNight: v.number(),
+    hotelCostCurrency: v.optional(v.string()),
+    driverIncentivePerDay: v.number(),
+    driverIncentiveCurrency: v.optional(v.string()),
     // Deadhead (base-to-origin) charging mode
     deadheadChargeMode: v.optional(v.string()), // 'cost_only' | 'cost_plus_margin'
     deadheadMarginPercentage: v.optional(v.number()), // Margin for cost_plus_margin mode (e.g., 15)
-    // Toll costs (Honduras-specific)
+    // Toll costs (stored in local currency)
     tollSapYojoa: v.optional(v.number()),
     tollSapSiguatepeque: v.optional(v.number()),
     tollSapZambrano: v.optional(v.number()),
@@ -85,8 +93,8 @@ export default defineSchema({
     // Default markup percentages
     defaultMarkupPercentage: v.optional(v.number()),
     // Rounding preferences
-    roundingHnl: v.optional(v.number()), // e.g., 100 (round to nearest 100 Lps)
-    roundingUsd: v.optional(v.number()), // e.g., 5 (round to nearest $5)
+    roundingLocal: v.optional(v.number()), // Round local currency to nearest N (e.g., 100)
+    roundingUsd: v.optional(v.number()), // Round USD to nearest N (e.g., 5)
     // Terms and Conditions parameters
     quotationValidityDays: v.optional(v.number()), // e.g., 30 days
     prepaymentDays: v.optional(v.number()), // e.g., 3 days before trip

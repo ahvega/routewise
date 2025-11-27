@@ -46,16 +46,24 @@ export const create = mutation({
   args: {
     tenantId: v.id("tenants"),
     year: v.number(),
-    fuelPrice: v.number(),
-    mealCostPerDay: v.number(),
-    hotelCostPerNight: v.number(),
-    driverIncentivePerDay: v.number(),
+    // Currency configuration
+    localCurrency: v.optional(v.string()),
     exchangeRate: v.number(),
     useCustomExchangeRate: v.boolean(),
+    exchangeRateUpdatedAt: v.optional(v.number()),
     preferredDistanceUnit: v.string(),
     preferredCurrency: v.string(),
+    // Operating costs
+    fuelPrice: v.number(),
+    fuelPriceCurrency: v.optional(v.string()),
+    mealCostPerDay: v.number(),
+    mealCostCurrency: v.optional(v.string()),
+    hotelCostPerNight: v.number(),
+    hotelCostCurrency: v.optional(v.string()),
+    driverIncentivePerDay: v.number(),
+    driverIncentiveCurrency: v.optional(v.string()),
     // Rounding preferences
-    roundingHnl: v.optional(v.number()),
+    roundingLocal: v.optional(v.number()),
     roundingUsd: v.optional(v.number()),
     // Terms and Conditions
     quotationValidityDays: v.optional(v.number()),
@@ -67,6 +75,9 @@ export const create = mutation({
   },
   handler: async (ctx, args) => {
     const now = Date.now();
+
+    // Set defaults for new currency fields
+    const localCurrency = args.localCurrency || 'HNL';
 
     // If setting as active, deactivate other parameters
     if (args.isActive) {
@@ -84,6 +95,11 @@ export const create = mutation({
 
     return await ctx.db.insert("parameters", {
       ...args,
+      localCurrency,
+      fuelPriceCurrency: args.fuelPriceCurrency || localCurrency,
+      mealCostCurrency: args.mealCostCurrency || localCurrency,
+      hotelCostCurrency: args.hotelCostCurrency || localCurrency,
+      driverIncentiveCurrency: args.driverIncentiveCurrency || localCurrency,
       createdAt: now,
       updatedAt: now,
     });
@@ -94,16 +110,24 @@ export const create = mutation({
 export const update = mutation({
   args: {
     id: v.id("parameters"),
-    fuelPrice: v.optional(v.number()),
-    mealCostPerDay: v.optional(v.number()),
-    hotelCostPerNight: v.optional(v.number()),
-    driverIncentivePerDay: v.optional(v.number()),
+    // Currency configuration
+    localCurrency: v.optional(v.string()),
     exchangeRate: v.optional(v.number()),
     useCustomExchangeRate: v.optional(v.boolean()),
+    exchangeRateUpdatedAt: v.optional(v.number()),
     preferredDistanceUnit: v.optional(v.string()),
     preferredCurrency: v.optional(v.string()),
+    // Operating costs
+    fuelPrice: v.optional(v.number()),
+    fuelPriceCurrency: v.optional(v.string()),
+    mealCostPerDay: v.optional(v.number()),
+    mealCostCurrency: v.optional(v.string()),
+    hotelCostPerNight: v.optional(v.number()),
+    hotelCostCurrency: v.optional(v.string()),
+    driverIncentivePerDay: v.optional(v.number()),
+    driverIncentiveCurrency: v.optional(v.string()),
     // Rounding preferences
-    roundingHnl: v.optional(v.number()),
+    roundingLocal: v.optional(v.number()),
     roundingUsd: v.optional(v.number()),
     // Terms and Conditions
     quotationValidityDays: v.optional(v.number()),
@@ -119,8 +143,11 @@ export const update = mutation({
 
     const now = Date.now();
 
+    // Determine the final isActive value - use provided value, or preserve existing, or default to true
+    const finalIsActive = isActive !== undefined ? isActive : (existing.isActive ?? true);
+
     // If setting as active, deactivate other parameters
-    if (isActive === true) {
+    if (finalIsActive === true) {
       const allParams = await ctx.db
         .query("parameters")
         .withIndex("by_tenant", (q) => q.eq("tenantId", existing.tenantId))
@@ -133,9 +160,14 @@ export const update = mutation({
       }
     }
 
+    // Clean up undefined values from updates
+    const cleanUpdates = Object.fromEntries(
+      Object.entries(updates).filter(([_, v]) => v !== undefined)
+    );
+
     await ctx.db.patch(id, {
-      ...updates,
-      isActive,
+      ...cleanUpdates,
+      isActive: finalIsActive,
       updatedAt: now,
     });
     return id;

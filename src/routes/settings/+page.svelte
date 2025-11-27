@@ -9,14 +9,23 @@
 		Tabs,
 		TabItem,
 		Spinner,
-		Toast
+		Toast,
+		Helper
 	} from 'flowbite-svelte';
-	import { CheckCircleOutline, CloseCircleOutline, CogOutline } from 'flowbite-svelte-icons';
+	import { CheckCircleOutline, CloseCircleOutline, CogOutline, RefreshOutline } from 'flowbite-svelte-icons';
 	import { useQuery, useConvexClient } from 'convex-svelte';
 	import { api } from '$convex/_generated/api';
 	import { tenantStore } from '$lib/stores';
 	import { StatusBadge } from '$lib/components/ui';
 	import { t } from '$lib/i18n';
+	import {
+		LATIN_AMERICAN_CURRENCIES,
+		getCurrencySymbol,
+		fetchExchangeRate,
+		getDefaultExchangeRate,
+		formatCurrency,
+		convertCurrency
+	} from '$lib/services/currency';
 
 	const client = useConvexClient();
 
@@ -32,16 +41,39 @@
 		() => (tenantStore.tenantId ? { id: tenantStore.tenantId } : 'skip')
 	);
 
-	// Form state
+	// Form state for parameters
 	let formData = $state({
-		fuelPrice: 110,
-		mealCostPerDay: 250,
-		hotelCostPerNight: 800,
-		driverIncentivePerDay: 500,
+		// Currency configuration
+		localCurrency: 'HNL',
 		exchangeRate: 24.75,
-		useCustomExchangeRate: false,
+		useCustomExchangeRate: true,
 		preferredDistanceUnit: 'km',
-		preferredCurrency: 'HNL'
+		preferredCurrency: 'HNL',
+		// Operating costs
+		fuelPrice: 110,
+		fuelPriceCurrency: 'HNL',
+		mealCostPerDay: 250,
+		mealCostCurrency: 'HNL',
+		hotelCostPerNight: 800,
+		hotelCostCurrency: 'HNL',
+		driverIncentivePerDay: 500,
+		driverIncentiveCurrency: 'HNL',
+		// Rounding
+		roundingLocal: 100,
+		roundingUsd: 5,
+		// Terms
+		quotationValidityDays: 30
+	});
+
+	// Form state for organization
+	let orgFormData = $state({
+		companyName: '',
+		primaryContactEmail: '',
+		primaryContactPhone: '',
+		address: '',
+		city: '',
+		country: '',
+		timezone: ''
 	});
 
 	// Toast state
@@ -49,25 +81,71 @@
 	let toastMessage = $state('');
 	let toastType = $state<'success' | 'error'>('success');
 
-	// Loading state
+	// Loading states
 	let isSaving = $state(false);
+	let isSavingOrg = $state(false);
+	let isFetchingRate = $state(false);
 
-	// Update form when data loads
+	// Update form when parameters data loads
 	$effect(() => {
 		const params = parametersQuery.data;
 		if (params) {
+			const localCurr = params.localCurrency || 'HNL';
 			formData = {
-				fuelPrice: params.fuelPrice,
-				mealCostPerDay: params.mealCostPerDay,
-				hotelCostPerNight: params.hotelCostPerNight,
-				driverIncentivePerDay: params.driverIncentivePerDay,
+				localCurrency: localCurr,
 				exchangeRate: params.exchangeRate,
 				useCustomExchangeRate: params.useCustomExchangeRate,
 				preferredDistanceUnit: params.preferredDistanceUnit,
-				preferredCurrency: params.preferredCurrency
+				preferredCurrency: params.preferredCurrency,
+				fuelPrice: params.fuelPrice,
+				fuelPriceCurrency: params.fuelPriceCurrency || localCurr,
+				mealCostPerDay: params.mealCostPerDay,
+				mealCostCurrency: params.mealCostCurrency || localCurr,
+				hotelCostPerNight: params.hotelCostPerNight,
+				hotelCostCurrency: params.hotelCostCurrency || localCurr,
+				driverIncentivePerDay: params.driverIncentivePerDay,
+				driverIncentiveCurrency: params.driverIncentiveCurrency || localCurr,
+				roundingLocal: params.roundingLocal || 100,
+				roundingUsd: params.roundingUsd || 5,
+				quotationValidityDays: params.quotationValidityDays || 30
 			};
 		}
 	});
+
+	// Update org form when tenant data loads
+	$effect(() => {
+		const tenant = tenantQuery.data;
+		if (tenant) {
+			orgFormData = {
+				companyName: tenant.companyName,
+				primaryContactEmail: tenant.primaryContactEmail,
+				primaryContactPhone: tenant.primaryContactPhone || '',
+				address: tenant.address || '',
+				city: tenant.city || '',
+				country: tenant.country,
+				timezone: tenant.timezone
+			};
+		}
+	});
+
+	// Derived values
+	const parameters = $derived(parametersQuery.data);
+	const tenant = $derived(tenantQuery.data);
+	const isLoading = $derived(parametersQuery.isLoading);
+	const localCurrencySymbol = $derived(getCurrencySymbol(formData.localCurrency));
+	const localCurrencyInfo = $derived(LATIN_AMERICAN_CURRENCIES.find(c => c.code === formData.localCurrency));
+
+	// Currency options for cost fields
+	const currencyOptions = $derived([
+		{ value: 'USD', name: 'USD ($)' },
+		{ value: formData.localCurrency, name: `${formData.localCurrency} (${localCurrencySymbol})` }
+	]);
+
+	// Derived converted values for display
+	const fuelConverted = $derived(getConvertedValue(formData.fuelPrice, formData.fuelPriceCurrency));
+	const mealConverted = $derived(getConvertedValue(formData.mealCostPerDay, formData.mealCostCurrency));
+	const hotelConverted = $derived(getConvertedValue(formData.hotelCostPerNight, formData.hotelCostCurrency));
+	const driverConverted = $derived(getConvertedValue(formData.driverIncentivePerDay, formData.driverIncentiveCurrency));
 
 	async function handleSave() {
 		if (!tenantStore.tenantId) return;
@@ -76,17 +154,45 @@
 		try {
 			const params = parametersQuery.data;
 			if (params) {
-				// Update existing
 				await client.mutation(api.parameters.update, {
 					id: params._id,
-					...formData
+					localCurrency: formData.localCurrency,
+					exchangeRate: formData.exchangeRate,
+					useCustomExchangeRate: formData.useCustomExchangeRate,
+					preferredDistanceUnit: formData.preferredDistanceUnit,
+					preferredCurrency: formData.preferredCurrency,
+					fuelPrice: formData.fuelPrice,
+					fuelPriceCurrency: formData.fuelPriceCurrency,
+					mealCostPerDay: formData.mealCostPerDay,
+					mealCostCurrency: formData.mealCostCurrency,
+					hotelCostPerNight: formData.hotelCostPerNight,
+					hotelCostCurrency: formData.hotelCostCurrency,
+					driverIncentivePerDay: formData.driverIncentivePerDay,
+					driverIncentiveCurrency: formData.driverIncentiveCurrency,
+					roundingLocal: formData.roundingLocal,
+					roundingUsd: formData.roundingUsd,
+					quotationValidityDays: formData.quotationValidityDays
 				});
 			} else {
-				// Create new for current year
 				await client.mutation(api.parameters.create, {
 					tenantId: tenantStore.tenantId,
 					year: new Date().getFullYear(),
-					...formData,
+					localCurrency: formData.localCurrency,
+					exchangeRate: formData.exchangeRate,
+					useCustomExchangeRate: formData.useCustomExchangeRate,
+					preferredDistanceUnit: formData.preferredDistanceUnit,
+					preferredCurrency: formData.preferredCurrency,
+					fuelPrice: formData.fuelPrice,
+					fuelPriceCurrency: formData.fuelPriceCurrency,
+					mealCostPerDay: formData.mealCostPerDay,
+					mealCostCurrency: formData.mealCostCurrency,
+					hotelCostPerNight: formData.hotelCostPerNight,
+					hotelCostCurrency: formData.hotelCostCurrency,
+					driverIncentivePerDay: formData.driverIncentivePerDay,
+					driverIncentiveCurrency: formData.driverIncentiveCurrency,
+					roundingLocal: formData.roundingLocal,
+					roundingUsd: formData.roundingUsd,
+					quotationValidityDays: formData.quotationValidityDays,
 					isActive: true
 				});
 			}
@@ -99,6 +205,61 @@
 		}
 	}
 
+	async function handleSaveOrg() {
+		if (!tenantStore.tenantId) return;
+
+		isSavingOrg = true;
+		try {
+			await client.mutation(api.tenants.update, {
+				id: tenantStore.tenantId,
+				companyName: orgFormData.companyName,
+				primaryContactEmail: orgFormData.primaryContactEmail,
+				primaryContactPhone: orgFormData.primaryContactPhone || undefined,
+				address: orgFormData.address || undefined,
+				city: orgFormData.city || undefined,
+				country: orgFormData.country,
+				timezone: orgFormData.timezone
+			});
+			showToastMessage($t('settings.updateSuccess'), 'success');
+		} catch (error) {
+			console.error('Failed to save organization:', error);
+			showToastMessage($t('settings.saveFailed'), 'error');
+		} finally {
+			isSavingOrg = false;
+		}
+	}
+
+	async function handleFetchExchangeRate() {
+		isFetchingRate = true;
+		try {
+			const result = await fetchExchangeRate(formData.localCurrency);
+			if (result.success) {
+				formData.exchangeRate = Math.round(result.rate * 100) / 100;
+				showToastMessage(`Tasa actualizada: 1 USD = ${formData.exchangeRate} ${formData.localCurrency}`, 'success');
+			} else {
+				// Use default rate as fallback
+				formData.exchangeRate = getDefaultExchangeRate(formData.localCurrency);
+				showToastMessage(`No se pudo obtener tasa. Usando valor predeterminado: ${formData.exchangeRate}`, 'error');
+			}
+		} catch (error) {
+			formData.exchangeRate = getDefaultExchangeRate(formData.localCurrency);
+			showToastMessage('Error al obtener tasa de cambio', 'error');
+		} finally {
+			isFetchingRate = false;
+		}
+	}
+
+	function handleLocalCurrencyChange() {
+		// Update all currency fields to use the new local currency
+		formData.fuelPriceCurrency = formData.localCurrency;
+		formData.mealCostCurrency = formData.localCurrency;
+		formData.hotelCostCurrency = formData.localCurrency;
+		formData.driverIncentiveCurrency = formData.localCurrency;
+		formData.preferredCurrency = formData.localCurrency;
+		// Set default exchange rate for the new currency
+		formData.exchangeRate = getDefaultExchangeRate(formData.localCurrency);
+	}
+
 	function showToastMessage(message: string, type: 'success' | 'error') {
 		toastMessage = message;
 		toastType = type;
@@ -106,17 +267,66 @@
 		setTimeout(() => (showToast = false), 3000);
 	}
 
-	function formatCurrency(value: number): string {
-		return new Intl.NumberFormat('es-HN', {
-			style: 'currency',
-			currency: 'HNL',
-			minimumFractionDigits: 2
-		}).format(value);
+	function formatLocalCurrency(value: number): string {
+		return formatCurrency(value, formData.localCurrency);
 	}
 
-	const parameters = $derived(parametersQuery.data);
-	const tenant = $derived(tenantQuery.data);
-	const isLoading = $derived(parametersQuery.isLoading);
+	// Convert cost to display in both currencies
+	function getConvertedValue(value: number, fromCurrency: string): { local: number; usd: number } {
+		if (fromCurrency === 'USD') {
+			return {
+				usd: value,
+				local: convertCurrency(value, 'USD', formData.localCurrency, formData.exchangeRate)
+			};
+		} else {
+			return {
+				local: value,
+				usd: convertCurrency(value, formData.localCurrency, 'USD', formData.exchangeRate)
+			};
+		}
+	}
+
+	// Currency change handlers - convert value when currency changes
+	function handleFuelCurrencyChange(event: Event) {
+		const newCurrency = (event.target as HTMLSelectElement).value;
+		const oldCurrency = formData.fuelPriceCurrency;
+		if (newCurrency !== oldCurrency) {
+			formData.fuelPrice = Math.round(convertCurrency(formData.fuelPrice, oldCurrency, newCurrency, formData.exchangeRate) * 100) / 100;
+			formData.fuelPriceCurrency = newCurrency;
+		}
+	}
+
+	function handleMealCurrencyChange(event: Event) {
+		const newCurrency = (event.target as HTMLSelectElement).value;
+		const oldCurrency = formData.mealCostCurrency;
+		if (newCurrency !== oldCurrency) {
+			formData.mealCostPerDay = Math.round(convertCurrency(formData.mealCostPerDay, oldCurrency, newCurrency, formData.exchangeRate) * 100) / 100;
+			formData.mealCostCurrency = newCurrency;
+		}
+	}
+
+	function handleHotelCurrencyChange(event: Event) {
+		const newCurrency = (event.target as HTMLSelectElement).value;
+		const oldCurrency = formData.hotelCostCurrency;
+		if (newCurrency !== oldCurrency) {
+			formData.hotelCostPerNight = Math.round(convertCurrency(formData.hotelCostPerNight, oldCurrency, newCurrency, formData.exchangeRate) * 100) / 100;
+			formData.hotelCostCurrency = newCurrency;
+		}
+	}
+
+	function handleDriverCurrencyChange(event: Event) {
+		const newCurrency = (event.target as HTMLSelectElement).value;
+		const oldCurrency = formData.driverIncentiveCurrency;
+		if (newCurrency !== oldCurrency) {
+			formData.driverIncentivePerDay = Math.round(convertCurrency(formData.driverIncentivePerDay, oldCurrency, newCurrency, formData.exchangeRate) * 100) / 100;
+			formData.driverIncentiveCurrency = newCurrency;
+		}
+	}
+
+	// Get currency label for display
+	function getCurrencyLabel(currency: string): string {
+		return currency === 'USD' ? 'USD' : formData.localCurrency;
+	}
 </script>
 
 <div class="space-y-6">
@@ -139,6 +349,62 @@
 	{:else}
 		<Tabs>
 			<TabItem open title={$t('settings.tabs.costParameters')}>
+				<!-- Currency Configuration -->
+				<Card class="max-w-none mt-4">
+					<h5 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Configuración de Moneda</h5>
+
+					<div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+						<div>
+							<Label for="localCurrency">Moneda Local</Label>
+							<Select id="localCurrency" bind:value={formData.localCurrency} onchange={handleLocalCurrencyChange}>
+								{#each LATIN_AMERICAN_CURRENCIES as currency}
+									<option value={currency.code}>{currency.code} - {currency.name} ({currency.country})</option>
+								{/each}
+							</Select>
+							<Helper class="mt-1">Moneda principal para operaciones locales</Helper>
+						</div>
+
+						<div>
+							<Label for="exchangeRate">Tasa de Cambio (1 USD = ?)</Label>
+							<div class="flex gap-2">
+								<Input
+									id="exchangeRate"
+									type="number"
+									bind:value={formData.exchangeRate}
+									step="0.01"
+									min="0"
+									disabled={!formData.useCustomExchangeRate}
+									class="flex-1"
+								/>
+								<Button
+									color="light"
+									size="sm"
+									onclick={handleFetchExchangeRate}
+									disabled={isFetchingRate || formData.useCustomExchangeRate}
+									title="Obtener tasa de API"
+								>
+									{#if isFetchingRate}
+										<Spinner size="4" />
+									{:else}
+										<RefreshOutline class="w-4 h-4" />
+									{/if}
+								</Button>
+							</div>
+							<Helper class="mt-1">1 USD = {formData.exchangeRate} {formData.localCurrency}</Helper>
+						</div>
+
+						<div class="flex items-center">
+							<Toggle bind:checked={formData.useCustomExchangeRate}>
+								Usar tasa manual
+							</Toggle>
+							<Helper class="ml-2 text-xs">
+								{formData.useCustomExchangeRate ? 'Ingrese tasa manualmente' : 'Obtener de API'}
+							</Helper>
+						</div>
+					</div>
+				</Card>
+
+				<!-- Operating Costs -->
 				<Card class="max-w-none mt-4">
 					<div class="flex items-center gap-2 mb-4">
 						<CogOutline class="w-5 h-5 text-gray-500 dark:text-gray-400" />
@@ -146,68 +412,102 @@
 					</div>
 
 					<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+						<!-- Fuel Price -->
 						<div>
-							<Label for="fuelPrice">{$t('settings.fields.fuelPrice')}</Label>
-							<Input id="fuelPrice" type="number" bind:value={formData.fuelPrice} step="0.01" min="0" />
-							<p class="text-xs text-gray-500 dark:text-gray-400 mt-1">{$t('settings.fields.fuelPriceHelp')}</p>
+							<Label for="fuelPrice">Precio Combustible ({formData.fuelPriceCurrency})</Label>
+							<div class="flex gap-2">
+								<Input id="fuelPrice" type="number" bind:value={formData.fuelPrice} step="0.01" min="0" class="flex-1" />
+								<Select value={formData.fuelPriceCurrency} onchange={handleFuelCurrencyChange} class="w-28">
+									{#each currencyOptions as opt}
+										<option value={opt.value}>{opt.value}</option>
+									{/each}
+								</Select>
+							</div>
+							<Helper class="mt-1">
+								{formatCurrency(fuelConverted.local, formData.localCurrency)} / ${fuelConverted.usd.toFixed(2)} USD por galón
+							</Helper>
 						</div>
 
+						<!-- Meal Cost -->
 						<div>
-							<Label for="mealCost">{$t('settings.fields.mealCost')}</Label>
-							<Input id="mealCost" type="number" bind:value={formData.mealCostPerDay} step="0.01" min="0" />
-							<p class="text-xs text-gray-500 dark:text-gray-400 mt-1">{$t('settings.fields.mealCostHelp')}</p>
+							<Label for="mealCost">Costo de Comidas por Día ({formData.mealCostCurrency})</Label>
+							<div class="flex gap-2">
+								<Input id="mealCost" type="number" bind:value={formData.mealCostPerDay} step="0.01" min="0" class="flex-1" />
+								<Select value={formData.mealCostCurrency} onchange={handleMealCurrencyChange} class="w-28">
+									{#each currencyOptions as opt}
+										<option value={opt.value}>{opt.value}</option>
+									{/each}
+								</Select>
+							</div>
+							<Helper class="mt-1">
+								{formatCurrency(mealConverted.local, formData.localCurrency)} / ${mealConverted.usd.toFixed(2)} USD por día
+							</Helper>
 						</div>
 
+						<!-- Hotel Cost -->
 						<div>
-							<Label for="hotelCost">{$t('settings.fields.hotelCost')}</Label>
-							<Input id="hotelCost" type="number" bind:value={formData.hotelCostPerNight} step="0.01" min="0" />
-							<p class="text-xs text-gray-500 dark:text-gray-400 mt-1">{$t('settings.fields.hotelCostHelp')}</p>
+							<Label for="hotelCost">Costo de Hotel por Noche ({formData.hotelCostCurrency})</Label>
+							<div class="flex gap-2">
+								<Input id="hotelCost" type="number" bind:value={formData.hotelCostPerNight} step="0.01" min="0" class="flex-1" />
+								<Select value={formData.hotelCostCurrency} onchange={handleHotelCurrencyChange} class="w-28">
+									{#each currencyOptions as opt}
+										<option value={opt.value}>{opt.value}</option>
+									{/each}
+								</Select>
+							</div>
+							<Helper class="mt-1">
+								{formatCurrency(hotelConverted.local, formData.localCurrency)} / ${hotelConverted.usd.toFixed(2)} USD por noche
+							</Helper>
 						</div>
 
+						<!-- Driver Incentive -->
 						<div>
-							<Label for="driverIncentive">{$t('settings.fields.driverIncentive')}</Label>
-							<Input id="driverIncentive" type="number" bind:value={formData.driverIncentivePerDay} step="0.01" min="0" />
-							<p class="text-xs text-gray-500 dark:text-gray-400 mt-1">{$t('settings.fields.driverIncentiveHelp')}</p>
-						</div>
-					</div>
-
-					<div class="mt-6 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
-						<h6 class="font-medium text-gray-900 dark:text-white mb-2">{$t('settings.costSummary')}</h6>
-						<div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-							<div>
-								<p class="text-gray-500 dark:text-gray-400">{$t('settings.sections.fuel')}</p>
-								<p class="font-semibold text-gray-900 dark:text-white">{formatCurrency(formData.fuelPrice)}/gal</p>
+							<Label for="driverIncentive">Incentivo Conductor por Día ({formData.driverIncentiveCurrency})</Label>
+							<div class="flex gap-2">
+								<Input id="driverIncentive" type="number" bind:value={formData.driverIncentivePerDay} step="0.01" min="0" class="flex-1" />
+								<Select value={formData.driverIncentiveCurrency} onchange={handleDriverCurrencyChange} class="w-28">
+									{#each currencyOptions as opt}
+										<option value={opt.value}>{opt.value}</option>
+									{/each}
+								</Select>
 							</div>
-							<div>
-								<p class="text-gray-500 dark:text-gray-400">{$t('quotations.new.mealsCost')}</p>
-								<p class="font-semibold text-gray-900 dark:text-white">{formatCurrency(formData.mealCostPerDay)}/{$t('units.days')}</p>
-							</div>
-							<div>
-								<p class="text-gray-500 dark:text-gray-400">Hotel</p>
-								<p class="font-semibold text-gray-900 dark:text-white">{formatCurrency(formData.hotelCostPerNight)}/night</p>
-							</div>
-							<div>
-								<p class="text-gray-500 dark:text-gray-400">{$t('settings.fields.driverIncentive')}</p>
-								<p class="font-semibold text-gray-900 dark:text-white">{formatCurrency(formData.driverIncentivePerDay)}/{$t('units.days')}</p>
-							</div>
+							<Helper class="mt-1">
+								{formatCurrency(driverConverted.local, formData.localCurrency)} / ${driverConverted.usd.toFixed(2)} USD por día
+							</Helper>
 						</div>
 					</div>
 				</Card>
 
+				<!-- Rounding & Terms -->
 				<Card class="max-w-none mt-4">
-					<h5 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">{$t('settings.currencyUnits')}</h5>
+					<h5 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Redondeo y Términos</h5>
+
+					<div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+						<div>
+							<Label for="roundingLocal">Redondeo {formData.localCurrency}</Label>
+							<Input id="roundingLocal" type="number" bind:value={formData.roundingLocal} step="1" min="1" />
+							<Helper class="mt-1">Redondear a múltiplos de {formData.roundingLocal} {localCurrencySymbol}</Helper>
+						</div>
+
+						<div>
+							<Label for="roundingUsd">Redondeo USD</Label>
+							<Input id="roundingUsd" type="number" bind:value={formData.roundingUsd} step="1" min="1" />
+							<Helper class="mt-1">Redondear a múltiplos de ${formData.roundingUsd}</Helper>
+						</div>
+
+						<div>
+							<Label for="quotationValidity">Validez Cotización (días)</Label>
+							<Input id="quotationValidity" type="number" bind:value={formData.quotationValidityDays} step="1" min="1" />
+							<Helper class="mt-1">Días de validez para cotizaciones</Helper>
+						</div>
+					</div>
+				</Card>
+
+				<!-- Units -->
+				<Card class="max-w-none mt-4">
+					<h5 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Unidades y Preferencias</h5>
 
 					<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-						<div>
-							<Label for="exchangeRate">{$t('settings.fields.exchangeRate')}</Label>
-							<Input id="exchangeRate" type="number" bind:value={formData.exchangeRate} step="0.01" min="0" />
-							<p class="text-xs text-gray-500 dark:text-gray-400 mt-1">1 USD = {formData.exchangeRate} HNL</p>
-						</div>
-
-						<div class="flex items-center gap-4">
-							<Toggle bind:checked={formData.useCustomExchangeRate}>{$t('settings.useCustomExchangeRate')}</Toggle>
-						</div>
-
 						<div>
 							<Label for="distanceUnit">{$t('settings.distanceUnit')}</Label>
 							<Select id="distanceUnit" bind:value={formData.preferredDistanceUnit}>
@@ -217,11 +517,12 @@
 						</div>
 
 						<div>
-							<Label for="currency">{$t('settings.preferredCurrency')}</Label>
+							<Label for="currency">Moneda de Visualización</Label>
 							<Select id="currency" bind:value={formData.preferredCurrency}>
-								<option value="HNL">{$t('settings.hnl')}</option>
-								<option value="USD">{$t('settings.usd')}</option>
+								<option value={formData.localCurrency}>{formData.localCurrency} ({localCurrencySymbol})</option>
+								<option value="USD">USD ($)</option>
 							</Select>
+							<Helper class="mt-1">Moneda preferida para mostrar precios</Helper>
 						</div>
 					</div>
 				</Card>
@@ -243,29 +544,62 @@
 					{#if tenant}
 						<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
 							<div>
-								<Label>{$t('settings.organization.companyName')}</Label>
-								<p class="text-lg font-medium text-gray-900 dark:text-white">{tenant.companyName}</p>
+								<Label for="companyName">{$t('settings.organization.companyName')}</Label>
+								<Input id="companyName" bind:value={orgFormData.companyName} />
 							</div>
+
 							<div>
 								<Label>{$t('settings.organization.plan')}</Label>
-								<StatusBadge status={tenant.plan} variant="plan" showIcon />
+								<div class="mt-2">
+									<StatusBadge status={tenant.plan} variant="plan" showIcon />
+								</div>
 							</div>
+
 							<div>
-								<Label>{$t('settings.organization.primaryContact')}</Label>
-								<p class="text-gray-700 dark:text-gray-300">{tenant.primaryContactEmail}</p>
+								<Label for="primaryEmail">{$t('settings.organization.primaryContact')}</Label>
+								<Input id="primaryEmail" type="email" bind:value={orgFormData.primaryContactEmail} />
 							</div>
+
 							<div>
-								<Label>{$t('settings.organization.timezone')}</Label>
-								<p class="text-gray-700 dark:text-gray-300">{tenant.timezone}</p>
+								<Label for="primaryPhone">Teléfono</Label>
+								<Input id="primaryPhone" bind:value={orgFormData.primaryContactPhone} />
 							</div>
+
+							<div>
+								<Label for="address">Dirección</Label>
+								<Input id="address" bind:value={orgFormData.address} />
+							</div>
+
+							<div>
+								<Label for="city">Ciudad</Label>
+								<Input id="city" bind:value={orgFormData.city} />
+							</div>
+
+							<div>
+								<Label for="country">{$t('settings.organization.country')}</Label>
+								<Input id="country" bind:value={orgFormData.country} />
+							</div>
+
+							<div>
+								<Label for="timezone">{$t('settings.organization.timezone')}</Label>
+								<Input id="timezone" bind:value={orgFormData.timezone} />
+							</div>
+
 							<div>
 								<Label>{$t('settings.organization.status')}</Label>
-								<StatusBadge status={tenant.status} showIcon />
+								<div class="mt-2">
+									<StatusBadge status={tenant.status} showIcon />
+								</div>
 							</div>
-							<div>
-								<Label>{$t('settings.organization.country')}</Label>
-								<p class="text-gray-700 dark:text-gray-300">{tenant.country}</p>
-							</div>
+						</div>
+
+						<div class="mt-6 flex justify-end">
+							<Button onclick={handleSaveOrg} disabled={isSavingOrg}>
+								{#if isSavingOrg}
+									<Spinner size="4" class="mr-2" />
+								{/if}
+								Guardar Organización
+							</Button>
 						</div>
 					{:else}
 						<p class="text-gray-500 dark:text-gray-400">{$t('settings.organization.notAvailable')}</p>

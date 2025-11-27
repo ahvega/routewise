@@ -23,7 +23,7 @@
 		UserOutline,
 		CheckCircleOutline,
 		CloseCircleOutline,
-		MapOutline,
+		MapPinAltOutline,
 		CalendarWeekOutline
 	} from 'flowbite-svelte-icons';
 	import { useQuery, useConvexClient } from 'convex-svelte';
@@ -784,7 +784,7 @@
 									color="blue"
 									onclick={showMap}
 								>
-									<MapOutline class="w-3 h-3 mr-1" />
+									<MapPinAltOutline class="w-3 h-3 mr-1" />
 									{$t('quotations.new.viewMap')}
 								</Button>
 							{/if}
