@@ -12,7 +12,9 @@
 		TrashBinOutline,
 		CashOutline,
 		CalendarMonthOutline,
-		FileLinesOutline
+		FileLinesOutline,
+		DownloadOutline,
+		EnvelopeOutline
 	} from 'flowbite-svelte-icons';
 	import { useQuery, useConvexClient } from 'convex-svelte';
 	import { api } from '$convex/_generated/api';
@@ -20,6 +22,7 @@
 	import { StatusBadge } from '$lib/components/ui';
 	import { t } from '$lib/i18n';
 	import type { Id } from '$convex/_generated/dataModel';
+	import type { InvoicePdfData } from '$lib/services/pdf';
 
 	const client = useConvexClient();
 
@@ -38,10 +41,17 @@
 		() => (tenantStore.tenantId ? { tenantId: tenantStore.tenantId } : 'skip')
 	);
 
+	// Query tenant for company info
+	const tenantQuery = useQuery(
+		api.tenants.get,
+		() => (tenantStore.tenantId ? { id: tenantStore.tenantId as Id<'tenants'> } : 'skip')
+	);
+
 	const invoice = $derived(invoiceQuery.data);
 	const payments = $derived(paymentsQuery.data || []);
 	const clients = $derived(clientsQuery.data || []);
 	const itineraries = $derived(itinerariesQuery.data || []);
+	const tenant = $derived(tenantQuery.data);
 	const isLoading = $derived(invoiceQuery.isLoading);
 
 	// Get related data
@@ -65,6 +75,12 @@
 	let showToast = $state(false);
 	let toastMessage = $state('');
 	let toastType = $state<'success' | 'error'>('success');
+
+	// PDF and Email state
+	let isGeneratingPdf = $state(false);
+	let isSendingEmail = $state(false);
+	let showEmailModal = $state(false);
+	let emailRecipient = $state('');
 
 	// Payment methods
 	const paymentMethods = [
@@ -198,6 +214,166 @@
 		const found = paymentMethods.find((m) => m.value === method);
 		return found?.name || method;
 	}
+
+	// Build PDF data
+	function buildPdfData(): InvoicePdfData | null {
+		if (!invoice || !tenant) return null;
+
+		return {
+			invoiceNumber: invoice.invoiceNumber,
+			date: formatDate(invoice.invoiceDate),
+			dueDate: formatDate(invoice.dueDate),
+			client: {
+				name: getClientName(),
+				rtn: clientData?.taxId || undefined,
+				email: clientData?.email || undefined,
+				phone: clientData?.phone || undefined,
+				address: clientData?.address || undefined
+			},
+			items: [
+				{
+					description: invoice.description,
+					quantity: 1,
+					unitPrice: invoice.subtotalHnl,
+					total: invoice.subtotalHnl
+				}
+			],
+			subtotal: invoice.subtotalHnl,
+			tax: invoice.taxAmountHnl,
+			taxRate: invoice.taxPercentage,
+			total: invoice.totalHnl,
+			totalUsd: invoice.totalUsd || 0,
+			amountPaid: invoice.amountPaid,
+			amountDue: invoice.amountDue,
+			company: {
+				name: tenant.companyName,
+				rtn: undefined, // TODO: Add company RTN to tenant
+				phone: tenant.primaryContactPhone || undefined,
+				email: tenant.primaryContactEmail || undefined,
+				address: tenant.address || undefined
+			},
+			notes: invoice.notes,
+			paymentInstructions: invoice.paymentInstructions
+		};
+	}
+
+	// Download PDF
+	async function downloadPdf() {
+		const pdfData = buildPdfData();
+		if (!pdfData) {
+			toastMessage = $t('errors.unknown');
+			toastType = 'error';
+			showToast = true;
+			return;
+		}
+
+		isGeneratingPdf = true;
+		try {
+			const response = await fetch('/api/pdf/invoice', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify(pdfData)
+			});
+
+			if (!response.ok) {
+				throw new Error('Failed to generate PDF');
+			}
+
+			const blob = await response.blob();
+			const url = URL.createObjectURL(blob);
+			const link = document.createElement('a');
+			link.href = url;
+			link.download = `factura-${invoice!.invoiceNumber}.pdf`;
+			document.body.appendChild(link);
+			link.click();
+			document.body.removeChild(link);
+			URL.revokeObjectURL(url);
+
+			toastMessage = $t('common.downloadComplete');
+			toastType = 'success';
+			showToast = true;
+		} catch (error) {
+			console.error('PDF generation error:', error);
+			toastMessage = $t('errors.unknown');
+			toastType = 'error';
+			showToast = true;
+		} finally {
+			isGeneratingPdf = false;
+		}
+	}
+
+	// Open email modal
+	function openEmailModal() {
+		emailRecipient = clientData?.email || '';
+		showEmailModal = true;
+	}
+
+	// Send invoice email
+	async function sendInvoiceEmail() {
+		if (!emailRecipient || !invoice || !tenant) return;
+
+		isSendingEmail = true;
+		try {
+			// First generate the PDF
+			const pdfData = buildPdfData();
+			if (!pdfData) throw new Error('Missing PDF data');
+
+			const pdfResponse = await fetch('/api/pdf/invoice', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify(pdfData)
+			});
+
+			if (!pdfResponse.ok) throw new Error('Failed to generate PDF');
+
+			const pdfBlob = await pdfResponse.blob();
+			const pdfArrayBuffer = await pdfBlob.arrayBuffer();
+			const pdfBase64 = btoa(String.fromCharCode(...new Uint8Array(pdfArrayBuffer)));
+
+			// Send the email
+			const emailResponse = await fetch('/api/email/send', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					type: 'invoice',
+					to: emailRecipient,
+					data: {
+						recipientName: getClientName(),
+						invoiceNumber: invoice.invoiceNumber,
+						totalAmount: formatCurrency(invoice.totalHnl),
+						dueDate: formatDate(invoice.dueDate),
+						companyName: tenant.companyName,
+						companyPhone: tenant.primaryContactPhone,
+						companyEmail: tenant.primaryContactEmail,
+						paymentInstructions: invoice.paymentInstructions
+					},
+					pdfBase64
+				})
+			});
+
+			if (!emailResponse.ok) {
+				const error = await emailResponse.json();
+				throw new Error(error.message || 'Failed to send email');
+			}
+
+			showEmailModal = false;
+			toastMessage = $t('common.emailSent');
+			toastType = 'success';
+			showToast = true;
+
+			// Update status to sent if still draft
+			if (invoice.status === 'draft') {
+				await updateStatus('sent');
+			}
+		} catch (error) {
+			console.error('Email send error:', error);
+			toastMessage = $t('errors.unknown');
+			toastType = 'error';
+			showToast = true;
+		} finally {
+			isSendingEmail = false;
+		}
+	}
 </script>
 
 <svelte:head>
@@ -235,7 +411,21 @@
 					</p>
 				</div>
 			</div>
-			<div class="flex gap-2">
+			<div class="flex gap-2 flex-wrap">
+				<!-- PDF and Email buttons -->
+				<Button size="sm" color="light" onclick={downloadPdf} disabled={isGeneratingPdf || !tenant}>
+					{#if isGeneratingPdf}
+						<Spinner size="4" class="mr-2" />
+					{:else}
+						<DownloadOutline class="w-4 h-4 mr-2" />
+					{/if}
+					PDF
+				</Button>
+				<Button size="sm" color="light" onclick={openEmailModal} disabled={!tenant}>
+					<EnvelopeOutline class="w-4 h-4 mr-2" />
+					{$t('common.email')}
+				</Button>
+
 				{#if invoice.status === 'draft'}
 					<Button color="blue" on:click={() => updateStatus('sent')}>
 						<PaperPlaneSolid class="w-4 h-4 mr-2" />
@@ -511,6 +701,56 @@
 			<Button color="red" on:click={deletePayment}>
 				<TrashBinOutline class="w-4 h-4 mr-2" />
 				{$t('common.delete')}
+			</Button>
+		</div>
+	</svelte:fragment>
+</Modal>
+
+<!-- Email Modal -->
+<Modal bind:open={showEmailModal} title={$t('common.sendEmail')} size="md">
+	<div class="space-y-4">
+		<p class="text-gray-600 dark:text-gray-400">
+			{$t('invoices.emailDescription')}
+		</p>
+
+		<div>
+			<Label for="email-recipient" class="mb-2">{$t('common.email')} *</Label>
+			<Input
+				id="email-recipient"
+				type="email"
+				bind:value={emailRecipient}
+				placeholder="cliente@ejemplo.com"
+				required
+			/>
+		</div>
+
+		{#if invoice}
+			<div class="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+				<p class="text-sm text-gray-600 dark:text-gray-400 mb-2">{$t('quotations.emailPreview')}:</p>
+				<p class="font-medium text-gray-900 dark:text-white">
+					{$t('invoices.title')} {invoice.invoiceNumber}
+				</p>
+				<p class="text-sm text-gray-500 dark:text-gray-400">
+					{getClientName()}
+				</p>
+				<p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
+					{$t('invoices.total')}: {formatCurrency(invoice.totalHnl)}
+				</p>
+			</div>
+		{/if}
+	</div>
+	<svelte:fragment slot="footer">
+		<div class="flex justify-end gap-2">
+			<Button color="alternative" onclick={() => (showEmailModal = false)} disabled={isSendingEmail}>
+				{$t('common.cancel')}
+			</Button>
+			<Button onclick={sendInvoiceEmail} disabled={!emailRecipient || isSendingEmail}>
+				{#if isSendingEmail}
+					<Spinner size="4" class="mr-2" />
+				{:else}
+					<EnvelopeOutline class="w-4 h-4 mr-2" />
+				{/if}
+				{$t('common.send')}
 			</Button>
 		</div>
 	</svelte:fragment>

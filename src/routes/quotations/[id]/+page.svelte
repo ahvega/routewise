@@ -23,7 +23,9 @@
 		TruckOutline,
 		UserOutline,
 		CalendarMonthOutline,
-		ClockOutline
+		ClockOutline,
+		DownloadOutline,
+		EnvelopeOutline
 	} from 'flowbite-svelte-icons';
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
@@ -33,6 +35,7 @@
 	import { StatusBadge } from '$lib/components/ui';
 	import { t } from '$lib/i18n';
 	import type { Id } from '$convex/_generated/dataModel';
+	import type { QuotationPdfData } from '$lib/services/pdf';
 
 	const client = useConvexClient();
 
@@ -61,6 +64,12 @@
 		() => (tenantStore.tenantId ? { tenantId: tenantStore.tenantId } : 'skip')
 	);
 
+	// Query tenant for company info
+	const tenantQuery = useQuery(
+		api.tenants.get,
+		() => (tenantStore.tenantId ? { id: tenantStore.tenantId as Id<'tenants'> } : 'skip')
+	);
+
 	// Check if already converted to itinerary
 	const existingItineraryQuery = useQuery(
 		api.itineraries.byQuotation,
@@ -72,6 +81,7 @@
 	const clients = $derived(clientsQuery.data || []);
 	const drivers = $derived(driversQuery.data || []);
 	const existingItinerary = $derived(existingItineraryQuery.data);
+	const tenant = $derived(tenantQuery.data);
 	const isLoading = $derived(quotationQuery.isLoading);
 
 	// Active resources for assignment
@@ -97,6 +107,12 @@
 	let convertDriverId = $state('');
 	let convertVehicleId = $state('');
 	let isConverting = $state(false);
+
+	// PDF and Email state
+	let isGeneratingPdf = $state(false);
+	let isSendingEmail = $state(false);
+	let showEmailModal = $state(false);
+	let emailRecipient = $state('');
 
 	function getClientName(client: any): string {
 		if (!client) return 'Walk-in';
@@ -211,6 +227,167 @@
 			isConverting = false;
 		}
 	}
+
+	function buildPdfData(): QuotationPdfData | null {
+		if (!quotation || !vehicle || !tenant) return null;
+
+		return {
+			quotationNumber: quotation.quotationNumber,
+			date: formatDate(quotation.createdAt),
+			validUntil: quotation.validUntil ? formatDate(quotation.validUntil) : '',
+			client: {
+				name: getClientName(clientData),
+				email: clientData?.email || undefined,
+				phone: clientData?.phone || undefined,
+				address: clientData?.address || undefined
+			},
+			trip: {
+				origin: quotation.origin,
+				destination: quotation.destination,
+				departureDate: quotation.departureDate ? formatDate(quotation.departureDate) : '',
+				returnDate: quotation.returnDate ? formatDate(quotation.returnDate) : undefined,
+				groupSize: quotation.groupSize,
+				estimatedDays: quotation.estimatedDays,
+				totalDistance: quotation.totalDistance,
+				totalTime: quotation.totalTime
+			},
+			vehicle: {
+				name: vehicle.name,
+				type: vehicle.type,
+				capacity: vehicle.passengerCapacity
+			},
+			costs: {
+				fuelCost: quotation.includeFuel ? quotation.fuelCost : 0,
+				driverMealsCost: quotation.includeMeals ? quotation.driverMealsCost : 0,
+				driverLodgingCost: quotation.includeMeals ? quotation.driverLodgingCost : 0,
+				driverIncentiveCost: quotation.includeDriverIncentive ? quotation.driverIncentiveCost : 0,
+				vehicleDistanceCost: quotation.vehicleDistanceCost,
+				vehicleDailyCost: quotation.vehicleDailyCost,
+				tollCost: quotation.includeTolls ? quotation.tollCost : 0,
+				totalCost: quotation.totalCost
+			},
+			pricing: {
+				salePriceHnl: quotation.salePriceHnl,
+				salePriceUsd: quotation.salePriceUsd,
+				markup: quotation.selectedMarkupPercentage
+			},
+			company: {
+				name: tenant.companyName,
+				phone: tenant.primaryContactPhone || undefined,
+				email: tenant.primaryContactEmail || undefined,
+				address: tenant.address || undefined,
+				city: tenant.city || undefined
+			},
+			notes: quotation.notes
+		};
+	}
+
+	async function downloadPdf() {
+		const pdfData = buildPdfData();
+		if (!pdfData) {
+			showToastMessage($t('errors.unknown'), 'error');
+			return;
+		}
+
+		isGeneratingPdf = true;
+		try {
+			const response = await fetch('/api/pdf/quotation', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify(pdfData)
+			});
+
+			if (!response.ok) {
+				throw new Error('Failed to generate PDF');
+			}
+
+			const blob = await response.blob();
+			const url = URL.createObjectURL(blob);
+			const link = document.createElement('a');
+			link.href = url;
+			link.download = `cotizacion-${quotation!.quotationNumber}.pdf`;
+			document.body.appendChild(link);
+			link.click();
+			document.body.removeChild(link);
+			URL.revokeObjectURL(url);
+
+			showToastMessage($t('common.downloadComplete'), 'success');
+		} catch (error) {
+			console.error('PDF generation error:', error);
+			showToastMessage($t('errors.unknown'), 'error');
+		} finally {
+			isGeneratingPdf = false;
+		}
+	}
+
+	function openEmailModal() {
+		emailRecipient = clientData?.email || '';
+		showEmailModal = true;
+	}
+
+	async function sendQuotationEmail() {
+		if (!emailRecipient || !quotation || !tenant) return;
+
+		isSendingEmail = true;
+		try {
+			// First generate the PDF
+			const pdfData = buildPdfData();
+			if (!pdfData) throw new Error('Missing PDF data');
+
+			const pdfResponse = await fetch('/api/pdf/quotation', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify(pdfData)
+			});
+
+			if (!pdfResponse.ok) throw new Error('Failed to generate PDF');
+
+			const pdfBlob = await pdfResponse.blob();
+			const pdfArrayBuffer = await pdfBlob.arrayBuffer();
+			const pdfBase64 = btoa(String.fromCharCode(...new Uint8Array(pdfArrayBuffer)));
+
+			// Send the email
+			const emailResponse = await fetch('/api/email/send', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					type: 'quotation',
+					to: emailRecipient,
+					data: {
+						recipientName: getClientName(clientData),
+						quotationNumber: quotation.quotationNumber,
+						origin: quotation.origin,
+						destination: quotation.destination,
+						departureDate: quotation.departureDate ? formatDate(quotation.departureDate) : '',
+						totalPrice: formatCurrency(quotation.salePriceHnl),
+						validUntil: quotation.validUntil ? formatDate(quotation.validUntil) : '',
+						companyName: tenant.companyName,
+						companyPhone: tenant.primaryContactPhone,
+						companyEmail: tenant.primaryContactEmail
+					},
+					pdfBase64
+				})
+			});
+
+			if (!emailResponse.ok) {
+				const error = await emailResponse.json();
+				throw new Error(error.message || 'Failed to send email');
+			}
+
+			showEmailModal = false;
+			showToastMessage($t('common.emailSent'), 'success');
+
+			// Update status to sent if still draft
+			if (quotation.status === 'draft') {
+				await updateStatus('sent');
+			}
+		} catch (error) {
+			console.error('Email send error:', error);
+			showToastMessage($t('errors.unknown'), 'error');
+		} finally {
+			isSendingEmail = false;
+		}
+	}
 </script>
 
 <div class="space-y-6">
@@ -229,8 +406,23 @@
 			{/if}
 		</div>
 		{#if quotation}
-			<div class="flex items-center gap-2">
+			<div class="flex items-center gap-2 flex-wrap">
 				<StatusBadge status={quotation.status} variant="quotation" />
+
+				<!-- PDF and Email buttons -->
+				<Button size="sm" color="light" onclick={downloadPdf} disabled={isGeneratingPdf || !vehicle || !tenant}>
+					{#if isGeneratingPdf}
+						<Spinner size="4" class="mr-2" />
+					{:else}
+						<DownloadOutline class="w-4 h-4 mr-2" />
+					{/if}
+					PDF
+				</Button>
+				<Button size="sm" color="light" onclick={openEmailModal} disabled={!vehicle || !tenant}>
+					<EnvelopeOutline class="w-4 h-4 mr-2" />
+					{$t('common.email')}
+				</Button>
+
 				{#if quotation.status === 'draft'}
 					<Button size="sm" onclick={() => updateStatus('sent')}>
 						<PaperPlaneOutline class="w-4 h-4 mr-2" />
@@ -567,6 +759,56 @@
 					<ArrowRightOutline class="w-4 h-4 mr-2" />
 				{/if}
 				{$t('itineraries.convertFromQuotation')}
+			</Button>
+		</div>
+	</svelte:fragment>
+</Modal>
+
+<!-- Email Modal -->
+<Modal bind:open={showEmailModal} title={$t('common.sendEmail')} size="md">
+	<div class="space-y-4">
+		<p class="text-gray-600 dark:text-gray-400">
+			{$t('quotations.emailDescription')}
+		</p>
+
+		<div>
+			<Label for="email-recipient" class="mb-2">{$t('common.email')} *</Label>
+			<Input
+				id="email-recipient"
+				type="email"
+				bind:value={emailRecipient}
+				placeholder="cliente@ejemplo.com"
+				required
+			/>
+		</div>
+
+		{#if quotation}
+			<div class="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+				<p class="text-sm text-gray-600 dark:text-gray-400 mb-2">{$t('quotations.emailPreview')}:</p>
+				<p class="font-medium text-gray-900 dark:text-white">
+					{$t('quotations.title')} {quotation.quotationNumber}
+				</p>
+				<p class="text-sm text-gray-500 dark:text-gray-400">
+					{quotation.origin} → {quotation.destination}
+				</p>
+				<p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
+					{$t('quotations.new.total')}: {formatCurrency(quotation.salePriceHnl)}
+				</p>
+			</div>
+		{/if}
+	</div>
+	<svelte:fragment slot="footer">
+		<div class="flex justify-end gap-2">
+			<Button color="alternative" onclick={() => (showEmailModal = false)} disabled={isSendingEmail}>
+				{$t('common.cancel')}
+			</Button>
+			<Button onclick={sendQuotationEmail} disabled={!emailRecipient || isSendingEmail}>
+				{#if isSendingEmail}
+					<Spinner size="4" class="mr-2" />
+				{:else}
+					<EnvelopeOutline class="w-4 h-4 mr-2" />
+				{/if}
+				{$t('common.send')}
 			</Button>
 		</div>
 	</svelte:fragment>

@@ -58,12 +58,14 @@ Transform PlannerTours from a single-tenant JSON-based quotation calculator into
 **Objective**: Get team comfortable with Svelte fundamentals
 
 #### Day 1-2: Svelte Basics
+
 - [ ] Complete [Svelte Tutorial](https://learn.svelte.dev/) (official)
 - [ ] Understand reactivity (`$:`, `bind:`, stores)
 - [ ] Practice component composition
 - [ ] Compare with React patterns
 
 #### Day 3-4: SvelteKit
+
 - [ ] Complete [SvelteKit Tutorial](https://learn.svelte.dev/tutorial/introducing-sveltekit)
 - [ ] Understand file-based routing (`+page.svelte`, `+layout.svelte`)
 - [ ] Server-side rendering vs client-side
@@ -71,6 +73,7 @@ Transform PlannerTours from a single-tenant JSON-based quotation calculator into
 - [ ] Load functions (`+page.ts`, `+page.server.ts`)
 
 #### Day 5: Convex Basics
+
 - [ ] Complete [Convex Tutorial](https://docs.convex.dev/tutorial)
 - [ ] Understand schema definition
 - [ ] Mutations and queries
@@ -78,6 +81,7 @@ Transform PlannerTours from a single-tenant JSON-based quotation calculator into
 - [ ] TypeScript integration
 
 **Deliverables**:
+
 - [ ] Each team member completes Svelte tutorial
 - [ ] Each team member completes SvelteKit tutorial
 - [ ] Each team member completes Convex tutorial
@@ -86,6 +90,7 @@ Transform PlannerTours from a single-tenant JSON-based quotation calculator into
 ### Week 2: Project Setup
 
 #### Day 1: Account Setup
+
 - [ ] Create Convex account (convex.dev)
 - [ ] Create WorkOS account (workos.com)
 - [ ] Create Vercel account (vercel.com)
@@ -94,6 +99,7 @@ Transform PlannerTours from a single-tenant JSON-based quotation calculator into
 - [ ] Verify Google Maps API key (existing)
 
 #### Day 2: Project Initialization
+
 ```bash
 # Create new SvelteKit project
 npm create svelte@latest routewise
@@ -128,6 +134,7 @@ npm install @googlemaps/js-api-loader
 #### Day 2b: TailwindCSS 4 Configuration
 
 **vite.config.ts**:
+
 ```typescript
 import { sveltekit } from '@sveltejs/kit/vite';
 import tailwindcss from '@tailwindcss/vite';
@@ -139,6 +146,7 @@ export default defineConfig({
 ```
 
 **src/app.css**:
+
 ```css
 @import 'tailwindcss';
 
@@ -164,6 +172,7 @@ export default defineConfig({
 ```
 
 **src/app.html** (dark mode default):
+
 ```html
 <!doctype html>
 <html lang="en" class="dark">
@@ -180,6 +189,7 @@ export default defineConfig({
 ```
 
 #### Day 3: Project Structure
+
 ```
 routewise/
 ├── src/
@@ -246,6 +256,7 @@ routewise/
 #### Day 3b: Theme Implementation (Dark/Light Mode)
 
 **src/lib/stores/theme.ts**:
+
 ```typescript
 import { writable } from 'svelte/store';
 import { browser } from '$app/environment';
@@ -286,6 +297,7 @@ export const theme = createThemeStore();
 ```
 
 **src/lib/components/layout/ThemeToggle.svelte**:
+
 ```svelte
 <script lang="ts">
   import { theme } from '$lib/stores/theme';
@@ -308,6 +320,7 @@ export const theme = createThemeStore();
 ```
 
 **Usage in Navbar.svelte**:
+
 ```svelte
 <script lang="ts">
   import { Navbar, NavBrand, NavLi, NavUl, NavHamburger } from 'flowbite-svelte';
@@ -332,6 +345,7 @@ export const theme = createThemeStore();
 ```
 
 #### Day 4: Environment Configuration
+
 ```bash
 # .env.local
 PUBLIC_CONVEX_URL=https://your-project.convex.cloud
@@ -344,6 +358,7 @@ SENTRY_DSN=https://xxx@sentry.io/xxx
 ```
 
 #### Day 5: CI/CD Setup
+
 - [ ] Connect GitHub repo to Vercel
 - [ ] Configure Convex deployment
 - [ ] Set up environment variables in Vercel
@@ -351,6 +366,7 @@ SENTRY_DSN=https://xxx@sentry.io/xxx
 - [ ] Set up Sentry error tracking
 
 **Deliverables**:
+
 - [ ] All accounts created and configured
 - [ ] SvelteKit project initialized
 - [ ] Convex backend connected
@@ -364,6 +380,7 @@ SENTRY_DSN=https://xxx@sentry.io/xxx
 ### Week 2 (continued): Convex Schema
 
 #### Convex Schema Definition (`convex/schema.ts`)
+
 ```typescript
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
@@ -675,6 +692,7 @@ export default defineSchema({
 ### Week 3: Authentication with WorkOS
 
 #### Tasks
+
 - [ ] Set up WorkOS AuthKit integration
 - [ ] Create auth callback handler
 - [ ] Implement sign-up flow (creates tenant + user)
@@ -684,6 +702,7 @@ export default defineSchema({
 - [ ] Implement session management
 
 #### Key Files
+
 - `src/routes/auth/login/+page.svelte`
 - `src/routes/auth/signup/+page.svelte`
 - `src/routes/auth/callback/+page.server.ts`
@@ -693,6 +712,7 @@ export default defineSchema({
 ### Week 4: User & Tenant Management
 
 #### Tasks
+
 - [ ] Create tenant on signup
 - [ ] User profile page
 - [ ] User settings page
@@ -702,6 +722,7 @@ export default defineSchema({
 - [ ] Tenant settings page
 
 **Phase 1 Deliverables**:
+
 - [ ] Database schema deployed to Convex
 - [ ] Authentication working (sign-up, sign-in, sign-out)
 - [ ] Tenant created on signup
@@ -725,6 +746,7 @@ export default defineSchema({
 | `validation.ts` | `src/lib/utils/validation.ts` | Direct copy |
 
 #### Tasks
+
 - [ ] Port cost calculation algorithms
 - [ ] Port route calculation logic
 - [ ] Port utility functions
@@ -734,6 +756,7 @@ export default defineSchema({
 - [ ] Create Convex functions for seeding data
 
 **Phase 2 Deliverables**:
+
 - [ ] All business logic ported and tested
 - [ ] Sample vehicles in database
 - [ ] Sample parameters in database
@@ -744,12 +767,14 @@ export default defineSchema({
 ## Phase 3: Client Management (Week 6)
 
 ### Screens to Build
+
 - [ ] Client list page (`/clients`)
 - [ ] Client detail page (`/clients/[id]`)
 - [ ] Create client page (`/clients/new`)
 - [ ] Edit client page (`/clients/[id]/edit`)
 
 ### Features
+
 - [ ] Client CRUD operations
 - [ ] Client search with autocomplete
 - [ ] Filter by type (individual/company)
@@ -760,12 +785,14 @@ export default defineSchema({
 - [ ] Pagination
 
 ### Components
+
 - [ ] ClientList component
 - [ ] ClientCard component
 - [ ] ClientForm component
 - [ ] ClientSearch component
 
 **Phase 3 Deliverables**:
+
 - [ ] Complete client management system
 - [ ] Client data properly isolated by tenant
 
@@ -774,12 +801,14 @@ export default defineSchema({
 ## Phase 4: Quotation System (Weeks 7-8)
 
 ### Screens to Build
+
 - [ ] Quotation list page (`/quotations`)
 - [ ] Quotation detail page (`/quotations/[id]`)
 - [ ] Create quotation wizard (`/quotations/new`)
 - [ ] Edit quotation page (`/quotations/[id]/edit`)
 
 ### Features (Week 7)
+
 - [ ] Multi-step quotation wizard
   - Step 1: Select client (or quick-create)
   - Step 2: Enter route details (origin, destination, dates)
@@ -793,6 +822,7 @@ export default defineSchema({
 - [ ] Auto-generate quotation number
 
 ### Features (Week 8)
+
 - [ ] Quotation status workflow (draft → sent → approved/rejected)
 - [ ] Quotation listing with filters (status, client, date range)
 - [ ] Duplicate quotation
@@ -801,6 +831,7 @@ export default defineSchema({
 - [ ] Internal notes vs client-visible notes
 
 ### Components
+
 - [ ] QuotationWizard component
 - [ ] QuotationList component
 - [ ] QuotationCard component
@@ -809,6 +840,7 @@ export default defineSchema({
 - [ ] RouteMap component
 
 **Phase 4 Deliverables**:
+
 - [ ] Complete quotation workflow
 - [ ] All quotations persisted to database
 - [ ] Status management working
@@ -819,6 +851,7 @@ export default defineSchema({
 ## Phase 5: PDF Generation & Email (Week 9)
 
 ### Tasks
+
 - [ ] Design PDF template for quotations
 - [ ] Implement Puppeteer PDF generation
 - [ ] Upload PDFs to Convex storage
@@ -829,6 +862,7 @@ export default defineSchema({
 - [ ] Email templates (quotation sent, reminder)
 
 ### PDF Template Design
+
 - Company header with logo
 - Client information
 - Trip details
@@ -838,6 +872,7 @@ export default defineSchema({
 - Contact information
 
 **Phase 5 Deliverables**:
+
 - [ ] Professional PDF generation working
 - [ ] Email delivery working
 - [ ] PDFs stored in cloud storage
@@ -847,12 +882,14 @@ export default defineSchema({
 ## Phase 6: Driver Management (Week 10)
 
 ### Screens to Build
+
 - [ ] Driver list page (`/drivers`)
 - [ ] Driver detail page (`/drivers/[id]`)
 - [ ] Create driver page (`/drivers/new`)
 - [ ] Edit driver page (`/drivers/[id]/edit`)
 
 ### Features
+
 - [ ] Driver CRUD operations
 - [ ] License expiry tracking and alerts
 - [ ] Driver availability status
@@ -861,6 +898,7 @@ export default defineSchema({
 - [ ] Driver schedule view
 
 **Phase 6 Deliverables**:
+
 - [ ] Complete driver management system
 - [ ] License expiry alerts
 
@@ -869,12 +907,14 @@ export default defineSchema({
 ## Phase 7: Itinerary Management (Weeks 11-12)
 
 ### Screens to Build
+
 - [ ] Itinerary list page (`/itineraries`)
 - [ ] Itinerary detail page (`/itineraries/[id]`)
 - [ ] Create from quotation (`/quotations/[id]/convert`)
 - [ ] Calendar view (`/itineraries/calendar`)
 
 ### Features (Week 11)
+
 - [ ] Convert approved quotation to itinerary
 - [ ] Assign driver and vehicle
 - [ ] Set pickup/dropoff details
@@ -882,6 +922,7 @@ export default defineSchema({
 - [ ] Itinerary status workflow (scheduled → in_progress → completed)
 
 ### Features (Week 12)
+
 - [ ] Calendar view of itineraries
 - [ ] Driver schedule view
 - [ ] Vehicle availability calendar
@@ -889,6 +930,7 @@ export default defineSchema({
 - [ ] Itinerary report/summary
 
 **Phase 7 Deliverables**:
+
 - [ ] Quote → Itinerary conversion working
 - [ ] Driver/vehicle assignment
 - [ ] Calendar views
@@ -899,12 +941,14 @@ export default defineSchema({
 ## Phase 8: Invoice System (Weeks 13-14)
 
 ### Screens to Build
+
 - [ ] Invoice list page (`/invoices`)
 - [ ] Invoice detail page (`/invoices/[id]`)
 - [ ] Create from itinerary (`/itineraries/[id]/invoice`)
 - [ ] Payment recording
 
 ### Features (Week 13)
+
 - [ ] Generate invoice from completed itinerary
 - [ ] Auto-calculate ISV (15% tax)
 - [ ] Invoice PDF generation
@@ -912,6 +956,7 @@ export default defineSchema({
 - [ ] Invoice status management
 
 ### Features (Week 14)
+
 - [ ] Payment recording
 - [ ] Payment history
 - [ ] Partial payments
@@ -920,6 +965,7 @@ export default defineSchema({
 - [ ] Send invoice email
 
 **Phase 8 Deliverables**:
+
 - [ ] Complete invoicing system
 - [ ] Payment tracking
 - [ ] Financial reports
@@ -929,12 +975,14 @@ export default defineSchema({
 ## Phase 9: Expense Advances (Week 15)
 
 ### Screens to Build
+
 - [ ] Expense advance list (`/expenses`)
 - [ ] Create advance request (`/itineraries/[id]/advance`)
 - [ ] Advance approval workflow
 - [ ] Settlement screen
 
 ### Features
+
 - [ ] Calculate suggested advance from itinerary costs
 - [ ] Request/approval workflow
 - [ ] Mark as paid
@@ -944,6 +992,7 @@ export default defineSchema({
 - [ ] Expense reports
 
 **Phase 9 Deliverables**:
+
 - [ ] Complete expense advance lifecycle
 - [ ] Receipt management
 - [ ] Settlement workflow
@@ -953,6 +1002,7 @@ export default defineSchema({
 ## Phase 10: Dashboard & Analytics (Weeks 16-18)
 
 ### Week 16: Dashboard
+
 - [ ] Main dashboard with KPIs
   - Total quotations (this month)
   - Conversion rate (approved/sent)
@@ -964,6 +1014,7 @@ export default defineSchema({
 - [ ] Alerts (license expiry, overdue invoices)
 
 ### Week 17: Reports
+
 - [ ] Sales reports
   - Pipeline (quotations by status)
   - Conversion funnel
@@ -979,6 +1030,7 @@ export default defineSchema({
   - Route analysis
 
 ### Week 18: Polish & Launch Prep
+
 - [ ] Data export (CSV)
 - [ ] Performance optimization
 - [ ] Error handling polish
@@ -990,6 +1042,7 @@ export default defineSchema({
 - [ ] User onboarding flow
 
 **Phase 10 Deliverables**:
+
 - [ ] Comprehensive dashboard
 - [ ] All reports functional
 - [ ] Production-ready application
@@ -999,6 +1052,7 @@ export default defineSchema({
 ## Launch Checklist
 
 ### Pre-Launch (Week 18)
+
 - [ ] All features tested
 - [ ] Mobile responsive
 - [ ] Error tracking configured (Sentry)
@@ -1013,6 +1067,7 @@ export default defineSchema({
 - [ ] Support email configured
 
 ### Launch Day
+
 - [ ] Deploy to production
 - [ ] Monitor error logs
 - [ ] Test critical flows
@@ -1020,6 +1075,7 @@ export default defineSchema({
 - [ ] Onboard first customers
 
 ### Post-Launch (Week 19+)
+
 - [ ] Monitor usage patterns
 - [ ] Gather feedback
 - [ ] Fix bugs
@@ -1052,6 +1108,7 @@ export default defineSchema({
 ## Success Metrics
 
 ### Development Phase
+
 - [ ] On-time delivery (within 18 weeks)
 - [ ] All 50+ screens built
 - [ ] Zero critical bugs at launch
@@ -1059,6 +1116,7 @@ export default defineSchema({
 - [ ] >90 Lighthouse score
 
 ### Post-Launch (Year 1)
+
 - [ ] 33 paying customers
 - [ ] 120 total users
 - [ ] $7,080 MRR by Month 12
@@ -1070,6 +1128,7 @@ export default defineSchema({
 ## Appendix: Key Resources
 
 ### Documentation
+
 - [SvelteKit Docs](https://kit.svelte.dev/docs)
 - [Convex Docs](https://docs.convex.dev/)
 - [WorkOS Docs](https://workos.com/docs)
@@ -1077,11 +1136,13 @@ export default defineSchema({
 - [Puppeteer Docs](https://pptr.dev/)
 
 ### Tutorials
+
 - [Svelte Tutorial](https://learn.svelte.dev/)
 - [SvelteKit + Convex Tutorial](https://docs.convex.dev/quickstart/sveltekit)
 - [WorkOS AuthKit Guide](https://workos.com/docs/user-management)
 
 ### Design Resources
+
 - [TailwindCSS 4](https://tailwindcss.com/docs/v4-beta) - CSS framework
 - [Flowbite-svelte](https://flowbite-svelte.com/) - Tailwind component library for Svelte
 - [Flowbite-svelte-icons](https://flowbite-svelte.com/icons) - Icon library

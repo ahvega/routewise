@@ -45,7 +45,13 @@
 		"information": "Información",
 		"notes": "Notas",
 		"back": "Volver",
-		"saved": "Guardado exitosamente"
+		"saved": "Guardado exitosamente",
+		"email": "Correo",
+		"send": "Enviar",
+		"sendEmail": "Enviar Correo",
+		"emailSent": "Correo enviado exitosamente",
+		"downloadComplete": "Descarga completada",
+		"downloadPdf": "Descargar PDF"
 	},
 	"nav": {
 		"dashboard": "Panel",
@@ -312,7 +318,9 @@
 			"pricingOptions": "Opciones de Precio",
 			"generateQuotation": "Generar Cotización",
 			"saveDraft": "Guardar Borrador"
-		}
+		},
+		"emailDescription": "Envía esta cotización por correo electrónico al cliente con el PDF adjunto.",
+		"emailPreview": "Vista previa"
 	},
 	"settings": {
 		"title": "Configuración",
@@ -632,7 +640,8 @@
 			"recordPayment": "Registrar Pago",
 			"addPayment": "Agregar Pago",
 			"cancel": "Cancelar Factura"
-		}
+		},
+		"emailDescription": "Envía esta factura por correo electrónico al cliente con el PDF adjunto."
 	},
 	"expenses": {
 		"title": "Anticipos de Gastos",
