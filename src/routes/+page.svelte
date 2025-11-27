@@ -157,8 +157,8 @@
 				</div>
 				<p class="text-3xl font-bold text-gray-900 dark:text-white">{stats.quotations.total}</p>
 				<div class="mt-2 flex gap-2 text-xs flex-wrap">
-					<span class="text-amber-600 dark:text-amber-400">{stats.quotations.draft} draft</span>
-					<span class="text-emerald-600 dark:text-emerald-400">{stats.quotations.approved} approved</span>
+					<span class="text-amber-600 dark:text-amber-400">{stats.quotations.draft} {$t('statuses.draft').toLowerCase()}</span>
+					<span class="text-emerald-600 dark:text-emerald-400">{stats.quotations.approved} {$t('statuses.approved').toLowerCase()}</span>
 				</div>
 				<div class="mt-auto pt-3">
 					<Button href="/quotations" size="xs" color="light" class="w-full">
@@ -178,13 +178,13 @@
 						<span class="text-sm font-medium text-gray-700 dark:text-gray-300">{$t('dashboard.itineraries')}</span>
 					</div>
 					<span class="text-xs text-amber-600 dark:text-amber-400 font-medium">
-						{stats.itineraries.inProgress} active
+						{stats.itineraries.inProgress} {$t('dashboard.inProgress')}
 					</span>
 				</div>
 				<p class="text-3xl font-bold text-gray-900 dark:text-white">{stats.itineraries.total}</p>
 				<div class="mt-2 flex gap-2 text-xs flex-wrap">
-					<span class="text-sky-600 dark:text-sky-400">{stats.itineraries.scheduled} scheduled</span>
-					<span class="text-emerald-600 dark:text-emerald-400">{stats.itineraries.completed} done</span>
+					<span class="text-sky-600 dark:text-sky-400">{stats.itineraries.scheduled} {$t('dashboard.scheduled')}</span>
+					<span class="text-emerald-600 dark:text-emerald-400">{stats.itineraries.completed} {$t('statuses.completed').toLowerCase()}</span>
 				</div>
 				<div class="mt-auto pt-3">
 					<Button href="/itineraries" size="xs" color="light" class="w-full">
@@ -205,14 +205,14 @@
 					</div>
 					{#if stats.invoices.overdue > 0}
 						<span class="text-xs text-red-600 dark:text-red-400 font-medium">
-							{stats.invoices.overdue} overdue
+							{stats.invoices.overdue} {$t('statuses.overdue').toLowerCase()}
 						</span>
 					{/if}
 				</div>
 				<p class="text-3xl font-bold text-gray-900 dark:text-white">{stats.invoices.total}</p>
 				<div class="mt-2 flex gap-2 text-xs flex-wrap">
-					<span class="text-rose-600 dark:text-rose-400">{stats.invoices.unpaid} unpaid</span>
-					<span class="text-emerald-600 dark:text-emerald-400">{stats.invoices.paid} paid</span>
+					<span class="text-rose-600 dark:text-rose-400">{stats.invoices.unpaid} {$t('statuses.unpaid').toLowerCase()}</span>
+					<span class="text-emerald-600 dark:text-emerald-400">{stats.invoices.paid} {$t('statuses.paid').toLowerCase()}</span>
 				</div>
 				<div class="mt-auto pt-3">
 					<Button href="/invoices" size="xs" color="light" class="w-full">
@@ -233,14 +233,14 @@
 					</div>
 					{#if stats.advances.pending > 0}
 						<span class="text-xs text-amber-600 dark:text-amber-400 font-medium">
-							{stats.advances.pending} pending
+							{stats.advances.pending} {$t('statuses.pending').toLowerCase()}
 						</span>
 					{/if}
 				</div>
 				<p class="text-3xl font-bold text-gray-900 dark:text-white">{stats.advances.total}</p>
 				<div class="mt-2 flex gap-2 text-xs flex-wrap">
-					<span class="text-sky-600 dark:text-sky-400">{stats.advances.disbursed} disbursed</span>
-					<span class="text-emerald-600 dark:text-emerald-400">{stats.advances.settled} settled</span>
+					<span class="text-sky-600 dark:text-sky-400">{stats.advances.disbursed} {$t('statuses.disbursed').toLowerCase()}</span>
+					<span class="text-emerald-600 dark:text-emerald-400">{stats.advances.settled} {$t('statuses.settled').toLowerCase()}</span>
 				</div>
 				<div class="mt-auto pt-3">
 					<Button href="/expenses" size="xs" color="light" class="w-full">
@@ -408,7 +408,7 @@
 												{itinerary.driverName}
 											</span>
 										{:else}
-											<span class="text-amber-600 dark:text-amber-400">No driver</span>
+											<span class="text-amber-600 dark:text-amber-400">{$t('itineraries.noDriverAssigned')}</span>
 										{/if}
 										{#if itinerary.vehicleName}
 											<span class="text-purple-600 dark:text-purple-400">
@@ -416,7 +416,7 @@
 												{itinerary.vehicleName}
 											</span>
 										{:else}
-											<span class="text-amber-600 dark:text-amber-400">No vehicle</span>
+											<span class="text-amber-600 dark:text-amber-400">{$t('itineraries.noVehicleAssigned')}</span>
 										{/if}
 									</div>
 								</a>
