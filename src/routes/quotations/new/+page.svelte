@@ -13,7 +13,7 @@
 	import {
 		ArrowLeftOutline,
 		TruckOutline,
-		UserGroupOutline,
+		UsersGroupOutline,
 		CheckCircleSolid,
 		MapPinOutline,
 		ExclamationCircleOutline,
@@ -548,7 +548,7 @@
 					</div>
 				{:else if suitableVehicles.length === 0}
 					<div class="text-center py-8">
-						<UserGroupOutline class="w-12 h-12 mx-auto text-amber-400 mb-3" />
+						<UsersGroupOutline class="w-12 h-12 mx-auto text-amber-400 mb-3" />
 						<p class="text-gray-500 dark:text-gray-400 mb-2">
 							{$t('quotations.new.noVehiclesAvailable')} ({groupSize} {$t('quotations.new.passengers')})
 						</p>

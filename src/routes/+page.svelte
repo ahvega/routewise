@@ -141,48 +141,67 @@
 		</div>
 	{:else if stats}
 		<!-- Main Stats Grid -->
-		<div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+		<div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
 			<!-- Quotations -->
-			<Card class="max-w-none !p-4">
-				<div class="flex items-center justify-between mb-2">
-					<div class="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
-						<FileLinesOutline class="w-5 h-5 text-blue-600 dark:text-blue-400" />
+			<Card class="max-w-none !p-4 flex flex-col h-full">
+				<div class="flex items-center justify-between mb-3">
+					<div class="flex items-center gap-2">
+						<div class="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
+							<FileLinesOutline class="w-4 h-4 text-blue-600 dark:text-blue-400" />
+						</div>
+						<span class="text-sm font-medium text-gray-700 dark:text-gray-300">{$t('dashboard.quotations')}</span>
 					</div>
 					<span class="text-xs text-emerald-600 dark:text-emerald-400 font-medium">
 						{stats.quotations.conversionRate.toFixed(0)}%
 					</span>
 				</div>
-				<p class="text-2xl font-bold text-gray-900 dark:text-white">{stats.quotations.total}</p>
-				<p class="text-xs text-gray-500 dark:text-gray-400">{$t('dashboard.quotations')}</p>
-				<div class="mt-2 flex gap-2 text-xs">
+				<p class="text-3xl font-bold text-gray-900 dark:text-white">{stats.quotations.total}</p>
+				<div class="mt-2 flex gap-2 text-xs flex-wrap">
 					<span class="text-amber-600 dark:text-amber-400">{stats.quotations.draft} draft</span>
 					<span class="text-emerald-600 dark:text-emerald-400">{stats.quotations.approved} approved</span>
+				</div>
+				<div class="mt-auto pt-3">
+					<Button href="/quotations" size="xs" color="light" class="w-full">
+						{$t('common.view')}
+						<ArrowRightOutline class="w-3 h-3 ml-1" />
+					</Button>
 				</div>
 			</Card>
 
 			<!-- Itineraries -->
-			<Card class="max-w-none !p-4">
-				<div class="flex items-center justify-between mb-2">
-					<div class="p-2 bg-cyan-100 dark:bg-cyan-900/30 rounded-lg">
-						<CalendarMonthOutline class="w-5 h-5 text-cyan-600 dark:text-cyan-400" />
+			<Card class="max-w-none !p-4 flex flex-col h-full">
+				<div class="flex items-center justify-between mb-3">
+					<div class="flex items-center gap-2">
+						<div class="p-2 bg-cyan-100 dark:bg-cyan-900/30 rounded-lg">
+							<CalendarMonthOutline class="w-4 h-4 text-cyan-600 dark:text-cyan-400" />
+						</div>
+						<span class="text-sm font-medium text-gray-700 dark:text-gray-300">{$t('dashboard.itineraries')}</span>
 					</div>
 					<span class="text-xs text-amber-600 dark:text-amber-400 font-medium">
 						{stats.itineraries.inProgress} active
 					</span>
 				</div>
-				<p class="text-2xl font-bold text-gray-900 dark:text-white">{stats.itineraries.total}</p>
-				<p class="text-xs text-gray-500 dark:text-gray-400">{$t('dashboard.itineraries')}</p>
-				<div class="mt-2 flex gap-2 text-xs">
+				<p class="text-3xl font-bold text-gray-900 dark:text-white">{stats.itineraries.total}</p>
+				<div class="mt-2 flex gap-2 text-xs flex-wrap">
 					<span class="text-sky-600 dark:text-sky-400">{stats.itineraries.scheduled} scheduled</span>
 					<span class="text-emerald-600 dark:text-emerald-400">{stats.itineraries.completed} done</span>
+				</div>
+				<div class="mt-auto pt-3">
+					<Button href="/itineraries" size="xs" color="light" class="w-full">
+						{$t('common.view')}
+						<ArrowRightOutline class="w-3 h-3 ml-1" />
+					</Button>
 				</div>
 			</Card>
 
 			<!-- Invoices -->
-			<Card class="max-w-none !p-4">
-				<div class="flex items-center justify-between mb-2">
-					<div class="p-2 bg-emerald-100 dark:bg-emerald-900/30 rounded-lg">
-						<CashOutline class="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+			<Card class="max-w-none !p-4 flex flex-col h-full">
+				<div class="flex items-center justify-between mb-3">
+					<div class="flex items-center gap-2">
+						<div class="p-2 bg-emerald-100 dark:bg-emerald-900/30 rounded-lg">
+							<CashOutline class="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+						</div>
+						<span class="text-sm font-medium text-gray-700 dark:text-gray-300">{$t('invoices.title')}</span>
 					</div>
 					{#if stats.invoices.overdue > 0}
 						<span class="text-xs text-red-600 dark:text-red-400 font-medium">
@@ -190,19 +209,27 @@
 						</span>
 					{/if}
 				</div>
-				<p class="text-2xl font-bold text-gray-900 dark:text-white">{stats.invoices.total}</p>
-				<p class="text-xs text-gray-500 dark:text-gray-400">{$t('invoices.title')}</p>
-				<div class="mt-2 flex gap-2 text-xs">
+				<p class="text-3xl font-bold text-gray-900 dark:text-white">{stats.invoices.total}</p>
+				<div class="mt-2 flex gap-2 text-xs flex-wrap">
 					<span class="text-rose-600 dark:text-rose-400">{stats.invoices.unpaid} unpaid</span>
 					<span class="text-emerald-600 dark:text-emerald-400">{stats.invoices.paid} paid</span>
+				</div>
+				<div class="mt-auto pt-3">
+					<Button href="/invoices" size="xs" color="light" class="w-full">
+						{$t('common.view')}
+						<ArrowRightOutline class="w-3 h-3 ml-1" />
+					</Button>
 				</div>
 			</Card>
 
 			<!-- Expenses -->
-			<Card class="max-w-none !p-4">
-				<div class="flex items-center justify-between mb-2">
-					<div class="p-2 bg-amber-100 dark:bg-amber-900/30 rounded-lg">
-						<CashOutline class="w-5 h-5 text-amber-600 dark:text-amber-400" />
+			<Card class="max-w-none !p-4 flex flex-col h-full">
+				<div class="flex items-center justify-between mb-3">
+					<div class="flex items-center gap-2">
+						<div class="p-2 bg-amber-100 dark:bg-amber-900/30 rounded-lg">
+							<CashOutline class="w-4 h-4 text-amber-600 dark:text-amber-400" />
+						</div>
+						<span class="text-sm font-medium text-gray-700 dark:text-gray-300">{$t('expenses.title')}</span>
 					</div>
 					{#if stats.advances.pending > 0}
 						<span class="text-xs text-amber-600 dark:text-amber-400 font-medium">
@@ -210,47 +237,19 @@
 						</span>
 					{/if}
 				</div>
-				<p class="text-2xl font-bold text-gray-900 dark:text-white">{stats.advances.total}</p>
-				<p class="text-xs text-gray-500 dark:text-gray-400">{$t('expenses.title')}</p>
-				<div class="mt-2 flex gap-2 text-xs">
+				<p class="text-3xl font-bold text-gray-900 dark:text-white">{stats.advances.total}</p>
+				<div class="mt-2 flex gap-2 text-xs flex-wrap">
 					<span class="text-sky-600 dark:text-sky-400">{stats.advances.disbursed} disbursed</span>
 					<span class="text-emerald-600 dark:text-emerald-400">{stats.advances.settled} settled</span>
 				</div>
-			</Card>
-
-			<!-- Vehicles -->
-			<Card class="max-w-none !p-4">
-				<div class="flex items-center justify-between mb-2">
-					<div class="p-2 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
-						<TruckOutline class="w-5 h-5 text-purple-600 dark:text-purple-400" />
-					</div>
-				</div>
-				<p class="text-2xl font-bold text-gray-900 dark:text-white">{stats.resources.vehicles.total}</p>
-				<p class="text-xs text-gray-500 dark:text-gray-400">{$t('dashboard.vehicles')}</p>
-				<div class="mt-2 flex gap-2 text-xs">
-					<span class="text-emerald-600 dark:text-emerald-400">{stats.resources.vehicles.active} active</span>
-					{#if stats.resources.vehicles.maintenance > 0}
-						<span class="text-amber-600 dark:text-amber-400">{stats.resources.vehicles.maintenance} maint.</span>
-					{/if}
+				<div class="mt-auto pt-3">
+					<Button href="/expenses" size="xs" color="light" class="w-full">
+						{$t('common.view')}
+						<ArrowRightOutline class="w-3 h-3 ml-1" />
+					</Button>
 				</div>
 			</Card>
 
-			<!-- Drivers -->
-			<Card class="max-w-none !p-4">
-				<div class="flex items-center justify-between mb-2">
-					<div class="p-2 bg-orange-100 dark:bg-orange-900/30 rounded-lg">
-						<UserOutline class="w-5 h-5 text-orange-600 dark:text-orange-400" />
-					</div>
-				</div>
-				<p class="text-2xl font-bold text-gray-900 dark:text-white">{stats.resources.drivers.total}</p>
-				<p class="text-xs text-gray-500 dark:text-gray-400">{$t('dashboard.drivers')}</p>
-				<div class="mt-2 flex gap-2 text-xs">
-					<span class="text-emerald-600 dark:text-emerald-400">{stats.resources.drivers.active} active</span>
-					{#if stats.resources.drivers.onLeave > 0}
-						<span class="text-violet-600 dark:text-violet-400">{stats.resources.drivers.onLeave} on leave</span>
-					{/if}
-				</div>
-			</Card>
 		</div>
 
 		<!-- Financial Summary Row -->

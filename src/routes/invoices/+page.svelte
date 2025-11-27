@@ -205,7 +205,7 @@
 								<TableBodyCell class="font-medium">{invoice.invoiceNumber}</TableBodyCell>
 								<TableBodyCell>{getClientName(invoice.clientId)}</TableBodyCell>
 								<TableBodyCell>{formatDate(invoice.invoiceDate)}</TableBodyCell>
-								<TableBodyCell class:text-rose-600={isOverdue(invoice)} class:dark:text-rose-400={isOverdue(invoice)}>
+								<TableBodyCell class={isOverdue(invoice) ? 'text-rose-600 dark:text-rose-400' : ''}>
 									{formatDate(invoice.dueDate)}
 								</TableBodyCell>
 								<TableBodyCell class="text-right font-medium">{formatCurrency(invoice.totalHnl)}</TableBodyCell>
