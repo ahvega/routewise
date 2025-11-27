@@ -6,6 +6,10 @@
 /* Dark mode as default */
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* IMPORTANT: Include Flowbite Svelte component styles */
+@source "../node_modules/flowbite-svelte/dist";
+@source "../node_modules/flowbite-svelte-icons/dist";
+
 /* Custom theme colors for RouteWise */
 @theme {
   --color-primary-50: #f0f9ff;
@@ -80,4 +84,55 @@ main {
   main {
     padding: 2rem;
   }
+}
+
+/* Range slider thumb styling for visibility */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 8px;
+  background: #374151;
+  border-radius: 4px;
+  outline: none;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  background: #0ea5e9;
+  border-radius: 50%;
+  cursor: pointer;
+  border: 2px solid #ffffff;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+input[type="range"]::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  background: #0ea5e9;
+  border-radius: 50%;
+  cursor: pointer;
+  border: 2px solid #ffffff;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+input[type="range"]:hover::-webkit-slider-thumb {
+  background: #38bdf8;
+}
+
+input[type="range"]:hover::-moz-range-thumb {
+  background: #38bdf8;
+}
+
+/* Light mode adjustments */
+:root:not(.dark) input[type="range"] {
+  background: #d1d5db;
+}
+
+/* Toggle switch dark mode visibility fix */
+.dark [type='checkbox']:checked {
+  background-color: #0ea5e9;
+  border-color: #0ea5e9;
 }

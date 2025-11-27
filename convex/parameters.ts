@@ -54,6 +54,14 @@ export const create = mutation({
     useCustomExchangeRate: v.boolean(),
     preferredDistanceUnit: v.string(),
     preferredCurrency: v.string(),
+    // Rounding preferences
+    roundingHnl: v.optional(v.number()),
+    roundingUsd: v.optional(v.number()),
+    // Terms and Conditions
+    quotationValidityDays: v.optional(v.number()),
+    prepaymentDays: v.optional(v.number()),
+    cancellationMinHours: v.optional(v.number()),
+    cancellationPenaltyPercentage: v.optional(v.number()),
     isActive: v.boolean(),
     createdBy: v.optional(v.id("users")),
   },
@@ -94,6 +102,14 @@ export const update = mutation({
     useCustomExchangeRate: v.optional(v.boolean()),
     preferredDistanceUnit: v.optional(v.string()),
     preferredCurrency: v.optional(v.string()),
+    // Rounding preferences
+    roundingHnl: v.optional(v.number()),
+    roundingUsd: v.optional(v.number()),
+    // Terms and Conditions
+    quotationValidityDays: v.optional(v.number()),
+    prepaymentDays: v.optional(v.number()),
+    cancellationMinHours: v.optional(v.number()),
+    cancellationPenaltyPercentage: v.optional(v.number()),
     isActive: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {

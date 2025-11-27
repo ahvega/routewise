@@ -9,6 +9,7 @@
 	 */
 
 	import type { Snippet } from 'svelte';
+	import { t } from '$lib/i18n';
 	import {
 		CheckCircleSolid,
 		CloseCircleSolid,
@@ -178,7 +179,10 @@
 	};
 
 	const colors = $derived(statusColors[status.toLowerCase()] || defaultColors);
-	const displayText = $derived(status.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()));
+	// Use i18n translation for status text, fallback to formatted status name
+	const translationKey = $derived(`statuses.${status.toLowerCase()}`);
+	const fallbackText = $derived(status.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()));
+	const displayText = $derived($t(translationKey) !== translationKey ? $t(translationKey) : fallbackText);
 	const IconComponent = $derived(statusIcons[status.toLowerCase()]);
 
 	const iconSizeClasses = {

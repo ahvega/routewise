@@ -107,13 +107,13 @@
 	<footer class="py-6 border-t border-gray-800">
 		<div class="container mx-auto px-4">
 			<div class="flex flex-col sm:flex-row justify-between items-center gap-4 text-sm text-gray-500">
-				<p>&copy; {new Date().getFullYear()} RouteWise. All rights reserved.</p>
+				<p>&copy; {new Date().getFullYear()} {$t('common.appName')}. {$t('footer.allRightsReserved')}</p>
 				<div class="flex items-center gap-6">
 					<a href="/legal/terms" class="hover:text-gray-300 transition-colors">
-						Terms of Service
+						{$t('footer.termsOfService')}
 					</a>
 					<a href="/legal/privacy" class="hover:text-gray-300 transition-colors">
-						Privacy Policy
+						{$t('footer.privacyPolicy')}
 					</a>
 				</div>
 			</div>

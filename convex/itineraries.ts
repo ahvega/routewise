@@ -333,3 +333,87 @@ export const remove = mutation({
     await ctx.db.delete(args.id);
   },
 });
+
+// Check vehicle availability for a date range
+export const checkVehicleAvailability = query({
+  args: {
+    vehicleId: v.id("vehicles"),
+    startDate: v.number(),
+    endDate: v.number(),
+  },
+  handler: async (ctx, args) => {
+    const { vehicleId, startDate, endDate } = args;
+
+    // Get all itineraries for this vehicle that are not cancelled or completed
+    const itineraries = await ctx.db
+      .query("itineraries")
+      .withIndex("by_vehicle", (q) => q.eq("vehicleId", vehicleId))
+      .collect();
+
+    // Filter for active itineraries (scheduled or in_progress)
+    const activeItineraries = itineraries.filter(
+      (i) => i.status === 'scheduled' || i.status === 'in_progress'
+    );
+
+    // Check for overlapping date ranges
+    const conflicts = activeItineraries.filter((i) => {
+      const itineraryStart = i.startDate;
+      const itineraryEnd = i.endDate || (i.startDate + (i.estimatedDays * 24 * 60 * 60 * 1000));
+
+      // Check if date ranges overlap
+      return !(endDate < itineraryStart || startDate > itineraryEnd);
+    });
+
+    return {
+      available: conflicts.length === 0,
+      conflicts: conflicts.map((c) => ({
+        id: c._id,
+        itineraryNumber: c.itineraryNumber,
+        startDate: c.startDate,
+        endDate: c.endDate,
+        destination: c.destination,
+      })),
+    };
+  },
+});
+
+// Get unavailable vehicles for a date range (for filtering in quotation form)
+export const getUnavailableVehicles = query({
+  args: {
+    tenantId: v.id("tenants"),
+    startDate: v.number(),
+    endDate: v.number(),
+  },
+  handler: async (ctx, args) => {
+    const { tenantId, startDate, endDate } = args;
+
+    // Get all itineraries for this tenant that are scheduled or in_progress
+    const itineraries = await ctx.db
+      .query("itineraries")
+      .withIndex("by_tenant", (q) => q.eq("tenantId", tenantId))
+      .collect();
+
+    const activeItineraries = itineraries.filter(
+      (i) => i.status === 'scheduled' || i.status === 'in_progress'
+    );
+
+    // Find vehicles with overlapping bookings
+    const unavailableVehicleIds: string[] = [];
+
+    for (const itinerary of activeItineraries) {
+      if (!itinerary.vehicleId) continue;
+
+      const itineraryStart = itinerary.startDate;
+      const itineraryEnd = itinerary.endDate || (itinerary.startDate + (itinerary.estimatedDays * 24 * 60 * 60 * 1000));
+
+      // Check if date ranges overlap
+      const overlaps = !(endDate < itineraryStart || startDate > itineraryEnd);
+
+      if (overlaps && !unavailableVehicleIds.includes(itinerary.vehicleId)) {
+        unavailableVehicleIds.push(itinerary.vehicleId);
+      }
+    }
+
+    return unavailableVehicleIds;
+  },
+});

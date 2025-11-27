@@ -5,10 +5,12 @@
 		Label,
 		Input,
 		Toggle,
+		Range,
 		Spinner,
 		Alert,
 		Select,
-		Toast
+		Toast,
+		Modal
 	} from 'flowbite-svelte';
 	import {
 		ArrowLeftOutline,
@@ -20,7 +22,9 @@
 		RefreshOutline,
 		UserOutline,
 		CheckCircleOutline,
-		CloseCircleOutline
+		CloseCircleOutline,
+		MapOutline,
+		CalendarWeekOutline
 	} from 'flowbite-svelte-icons';
 	import { useQuery, useConvexClient } from 'convex-svelte';
 	import { api } from '$convex/_generated/api';
@@ -57,6 +61,22 @@
 		() => (tenantStore.tenantId ? { tenantId: tenantStore.tenantId } : 'skip')
 	);
 
+	// Calculate date range for vehicle availability
+	const departureDateMs = $derived(departureDate ? new Date(departureDate).getTime() : 0);
+	const endDateMs = $derived(departureDateMs ? departureDateMs + (estimatedDays * 24 * 60 * 60 * 1000) : 0);
+
+	// Query unavailable vehicles when departure date is set
+	const unavailableVehiclesQuery = useQuery(
+		api.itineraries.getUnavailableVehicles,
+		() => (tenantStore.tenantId && departureDateMs && endDateMs ? {
+			tenantId: tenantStore.tenantId,
+			startDate: departureDateMs,
+			endDate: endDateMs
+		} : 'skip')
+	);
+
+	const unavailableVehicleIds = $derived(unavailableVehiclesQuery.data || []);
+
 	const vehicles = $derived(vehiclesQuery.data || []);
 	const clients = $derived(clientsQuery.data || []);
 	const activeVehicles = $derived(vehicles.filter((v) => v.status === 'active'));
@@ -85,16 +105,26 @@
 	let destination = $state('');
 	let groupSize = $state(1);
 	let estimatedDays = $state(1);
+	let extraKm = $state(0); // Extra km for local movement at destination
 	let selectedVehicleId = $state<string | null>(null);
 	let selectedClientId = $state<string>('');
 	let selectedMarkup = $state(20); // Default 20% markup
 	let notes = $state('');
+
+	// Departure date
+	let departureDate = $state('');
 
 	// Cost options
 	let includeFuel = $state(true);
 	let includeMeals = $state(true);
 	let includeTolls = $state(true);
 	let includeDriverIncentive = $state(true);
+
+	// Map modal state
+	let showMapModal = $state(false);
+	let mapContainer: HTMLDivElement | null = $state(null);
+	let mapInstance: google.maps.Map | null = $state(null);
+	let directionsRenderer: google.maps.DirectionsRenderer | null = $state(null);
 
 	// Get client display name
 	function getClientName(clientData: any): string {
@@ -131,10 +161,15 @@
 		vehicleBaseLocation && origin && vehicleBaseLocation.toLowerCase() !== origin.toLowerCase()
 	);
 
-	// Filter vehicles by capacity
+	// Filter vehicles by capacity (availability is shown in UI but not filtered out)
 	const suitableVehicles = $derived(
 		activeVehicles.filter((v) => v.passengerCapacity >= groupSize)
 	);
+
+	// Check if a vehicle is unavailable for the selected dates
+	function isVehicleUnavailable(vehicleId: string): boolean {
+		return unavailableVehicleIds.includes(vehicleId);
+	}
 
 	// Initialize Google Maps on mount
 	onMount(() => {
@@ -203,20 +238,60 @@
 		}
 	}
 
-	// Auto-recalculate when relevant fields change
-	$effect(() => {
-		// Track dependencies
-		const _ = [origin, destination, vehicleBaseLocation];
+	// Map modal functions
+	async function showMap() {
+		if (!routeResult || !origin || !destination) return;
 
-		// Only auto-calculate if we have both origin and destination
-		if (origin && destination && mapsLoaded && !isCalculatingRoute) {
-			// Debounce the calculation
-			const timeout = setTimeout(() => {
-				calculateRoute();
-			}, 500);
-			return () => clearTimeout(timeout);
+		showMapModal = true;
+
+		// Wait for modal to open and container to be available
+		await new Promise(resolve => setTimeout(resolve, 100));
+
+		if (mapContainer && window.google?.maps) {
+			initializeMapInModal();
 		}
-	});
+	}
+
+	function initializeMapInModal() {
+		if (!mapContainer || !window.google?.maps) return;
+
+		// Create map instance
+		mapInstance = new google.maps.Map(mapContainer, {
+			zoom: 8,
+			center: { lat: 15.5, lng: -88.0 }, // Honduras center
+			mapTypeControl: false,
+			streetViewControl: false,
+			fullscreenControl: true
+		});
+
+		// Create directions renderer
+		directionsRenderer = new google.maps.DirectionsRenderer({
+			map: mapInstance,
+			suppressMarkers: false,
+			polylineOptions: {
+				strokeColor: '#0ea5e9',
+				strokeWeight: 4
+			}
+		});
+
+		// Get directions and display on map
+		const directionsService = new google.maps.DirectionsService();
+		directionsService.route({
+			origin,
+			destination,
+			travelMode: google.maps.TravelMode.DRIVING
+		}, (result, status) => {
+			if (status === 'OK' && result && directionsRenderer) {
+				directionsRenderer.setDirections(result);
+			}
+		});
+	}
+
+	function closeMapModal() {
+		showMapModal = false;
+		mapInstance = null;
+		directionsRenderer = null;
+	}
 
 	function formatCurrency(value: number): string {
 		return new Intl.NumberFormat('es-HN', {
@@ -225,6 +300,12 @@
 			minimumFractionDigits: 0,
 			maximumFractionDigits: 0
 		}).format(value);
+	}
+
+	// Round to nearest value (e.g., round to nearest 50)
+	function roundToNearest(value: number, nearest: number): number {
+		if (nearest <= 0) return Math.round(value);
+		return Math.round(value / nearest) * nearest;
 	}
 
 	function selectVehicle(vehicleId: string) {
@@ -237,7 +318,8 @@
 	const estimatedCosts = $derived(() => {
 		if (!routeResult || !selectedVehicle || !parameters) return null;
 
-		const distance = routeResult.totalDistance;
+		// Include extra km in total distance calculation
+		const distance = routeResult.totalDistance + extraKm;
 		const days = estimatedDays;
 
 		// Fuel costs
@@ -270,11 +352,19 @@
 
 		// Apply client discount
 		const discountAmount = priceBeforeDiscount * (clientDiscount / 100);
-		const finalPriceHnl = priceBeforeDiscount - discountAmount;
+		const priceAfterDiscount = priceBeforeDiscount - discountAmount;
+
+		// Get rounding parameters (defaults: HNL=50, USD=5)
+		const roundingHnl = parameters.roundingHnl || 50;
+		const roundingUsd = parameters.roundingUsd || 5;
 
 		// Calculate USD price
 		const exchangeRate = parameters.exchangeRate || 24.5;
-		const finalPriceUsd = finalPriceHnl / exchangeRate;
+		const priceUsd = priceAfterDiscount / exchangeRate;
+
+		// Apply rounding
+		const finalPriceHnl = roundToNearest(priceAfterDiscount, roundingHnl);
+		const finalPriceUsd = roundToNearest(priceUsd, roundingUsd);
 
 		return {
 			fuel: Math.round(fuelCost),
@@ -288,9 +378,13 @@
 			priceBeforeDiscount: Math.round(priceBeforeDiscount),
 			discount: clientDiscount,
 			discountAmount: Math.round(discountAmount),
-			finalPriceHnl: Math.round(finalPriceHnl),
-			finalPriceUsd: Math.round(finalPriceUsd * 100) / 100,
-			exchangeRate
+			finalPriceHnl,
+			finalPriceUsd,
+			exchangeRate,
+			roundingHnl,
+			roundingUsd,
+			totalDistance: distance,
+			extraKm
 		};
 	});
 
@@ -305,13 +399,17 @@
 			const markupMultiplier = 1 + (markup / 100);
 			const priceBeforeDiscount = costs.baseCost * markupMultiplier;
 			const discountAmount = priceBeforeDiscount * (clientDiscount / 100);
-			const finalPriceHnl = priceBeforeDiscount - discountAmount;
-			const finalPriceUsd = finalPriceHnl / costs.exchangeRate;
+			const priceAfterDiscount = priceBeforeDiscount - discountAmount;
+			const priceUsd = priceAfterDiscount / costs.exchangeRate;
+
+			// Apply rounding
+			const finalPriceHnl = roundToNearest(priceAfterDiscount, costs.roundingHnl);
+			const finalPriceUsd = roundToNearest(priceUsd, costs.roundingUsd);
 
 			return {
 				markup,
-				priceHnl: Math.round(finalPriceHnl),
-				priceUsd: Math.round(finalPriceUsd * 100) / 100,
+				priceHnl: finalPriceHnl,
+				priceUsd: finalPriceUsd,
 				selected: markup === selectedMarkup
 			};
 		});
@@ -345,9 +443,10 @@
 				destination,
 				baseLocation: vehicleBaseLocation || origin,
 				groupSize,
-				extraMileage: 0,
+				extraMileage: extraKm,
 				estimatedDays,
-				totalDistance: routeResult.totalDistance,
+				departureDate: departureDate ? new Date(departureDate).getTime() : undefined,
+				totalDistance: routeResult.totalDistance + extraKm,
 				totalTime: routeResult.totalTime,
 				fuelCost: costs.fuel,
 				refuelingCost: 0,
@@ -435,26 +534,48 @@
 						</div>
 					</div>
 
-					<div class="grid grid-cols-2 gap-4">
+					<div class="grid grid-cols-1 md:grid-cols-4 gap-4">
 						<div>
-							<Label for="groupSize" class="mb-2">{$t('quotations.new.passengers')}</Label>
-							<Input
+							<Label for="groupSize" class="mb-2">{$t('quotations.new.passengers')}: <span class="font-bold text-primary-600 dark:text-primary-400">{groupSize}</span></Label>
+							<Range
 								id="groupSize"
-								type="number"
 								bind:value={groupSize}
-								min="1"
-								placeholder="1"
-								class="h-11"
+								min={1}
+								max={60}
+								step={1}
 							/>
 						</div>
 						<div>
-							<Label for="estimatedDays" class="mb-2">{$t('quotations.new.days')}</Label>
-							<Input
+							<Label for="estimatedDays" class="mb-2">{$t('quotations.new.days')}: <span class="font-bold text-primary-600 dark:text-primary-400">{estimatedDays}</span></Label>
+							<Range
 								id="estimatedDays"
-								type="number"
 								bind:value={estimatedDays}
-								min="1"
-								placeholder="1"
+								min={1}
+								max={30}
+								step={1}
+							/>
+						</div>
+						<div>
+							<Label for="extraKm" class="mb-2">{$t('quotations.new.extraKm')}: <span class="font-bold text-primary-600 dark:text-primary-400">{extraKm}</span> km</Label>
+							<Range
+								id="extraKm"
+								bind:value={extraKm}
+								min={0}
+								max={500}
+								step={10}
+							/>
+							<p class="text-xs text-gray-500 dark:text-gray-400 mt-1">{$t('quotations.new.extraKmHelp')}</p>
+						</div>
+						<div>
+							<Label for="departureDate" class="mb-2 flex items-center gap-1">
+								<CalendarWeekOutline class="w-4 h-4" />
+								{$t('quotations.new.departureDate')}
+							</Label>
+							<Input
+								id="departureDate"
+								type="date"
+								bind:value={departureDate}
+								min={new Date().toISOString().split('T')[0]}
 								class="h-11"
 							/>
 						</div>
@@ -556,26 +677,35 @@
 				{:else}
 					<div class="grid grid-cols-1 md:grid-cols-2 gap-3">
 						{#each suitableVehicles as vehicle}
+							{@const unavailable = isVehicleUnavailable(vehicle._id)}
 							<button
 								type="button"
-								onclick={() => selectVehicle(vehicle._id)}
+								onclick={() => !unavailable && selectVehicle(vehicle._id)}
+								disabled={unavailable}
 								class="relative p-4 rounded-lg border-2 text-left transition-all
-									{selectedVehicleId === vehicle._id
+									{unavailable
+									? 'border-red-300 dark:border-red-800 bg-red-50 dark:bg-red-900/20 opacity-60 cursor-not-allowed'
+									: selectedVehicleId === vehicle._id
 									? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20'
 									: 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 bg-white dark:bg-gray-800'}"
 							>
-								{#if selectedVehicleId === vehicle._id}
+								{#if selectedVehicleId === vehicle._id && !unavailable}
 									<div class="absolute top-2 right-2">
 										<CheckCircleSolid class="w-5 h-5 text-primary-500" />
 									</div>
 								{/if}
+								{#if unavailable}
+									<div class="absolute top-2 right-2">
+										<span class="text-xs font-medium text-red-600 dark:text-red-400 px-2 py-1 bg-red-100 dark:bg-red-900/50 rounded">{$t('quotations.new.vehicleUnavailable')}</span>
+									</div>
+								{/if}
 
 								<div class="flex items-start gap-3">
-									<div class="p-2 rounded-lg bg-gray-100 dark:bg-gray-700">
-										<TruckOutline class="w-6 h-6 text-gray-600 dark:text-gray-400" />
+									<div class="p-2 rounded-lg {unavailable ? 'bg-red-100 dark:bg-red-900/30' : 'bg-gray-100 dark:bg-gray-700'}">
+										<TruckOutline class="w-6 h-6 {unavailable ? 'text-red-500 dark:text-red-400' : 'text-gray-600 dark:text-gray-400'}" />
 									</div>
 									<div class="flex-1 min-w-0">
-										<div class="font-medium text-gray-900 dark:text-white truncate">
+										<div class="font-medium {unavailable ? 'text-red-800 dark:text-red-300' : 'text-gray-900 dark:text-white'} truncate">
 											{vehicle.name}
 										</div>
 										{#if vehicle.make || vehicle.model}
@@ -634,19 +764,31 @@
 				<div class="flex items-center justify-between mb-4">
 					<h5 class="text-lg font-semibold text-gray-900 dark:text-white">{$t('quotations.new.routeInfo')}</h5>
 					{#if origin && destination}
-						<Button
-							size="xs"
-							color="light"
-							onclick={calculateRoute}
-							disabled={isCalculatingRoute}
-						>
-							{#if isCalculatingRoute}
-								<Spinner size="3" class="mr-1" />
-							{:else}
-								<RefreshOutline class="w-3 h-3 mr-1" />
+						<div class="flex gap-2">
+							<Button
+								size="xs"
+								color="light"
+								onclick={calculateRoute}
+								disabled={isCalculatingRoute}
+							>
+								{#if isCalculatingRoute}
+									<Spinner size="3" class="mr-1" />
+								{:else}
+									<RefreshOutline class="w-3 h-3 mr-1" />
+								{/if}
+								{$t('quotations.new.calculateRoute')}
+							</Button>
+							{#if routeResult}
+								<Button
+									size="xs"
+									color="blue"
+									onclick={showMap}
+								>
+									<MapOutline class="w-3 h-3 mr-1" />
+									{$t('quotations.new.viewMap')}
+								</Button>
 							{/if}
-							{$t('quotations.new.calculateRoute')}
-						</Button>
+						</div>
 					{/if}
 				</div>
 
@@ -667,8 +809,11 @@
 							<div class="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
 								<p class="text-xs text-gray-500 dark:text-gray-400">{$t('quotations.new.totalDistance')}</p>
 								<p class="text-lg font-bold text-gray-900 dark:text-white">
-									{formatDistance(routeResult.totalDistance)}
+									{formatDistance(routeResult.totalDistance + extraKm)}
 								</p>
+								{#if extraKm > 0}
+									<p class="text-xs text-amber-600 dark:text-amber-400">+{formatDistance(extraKm)} extra</p>
+								{/if}
 							</div>
 							<div class="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
 								<p class="text-xs text-gray-500 dark:text-gray-400">{$t('quotations.new.estimatedTime')}</p>
@@ -713,6 +858,16 @@
 									<span>{formatDistance(routeResult.mainTripDistance)}</span>
 								</div>
 							</div>
+
+							{#if extraKm > 0}
+								<div class="p-2 bg-amber-50 dark:bg-amber-900/20 rounded border border-amber-200 dark:border-amber-800">
+									<p class="text-xs text-amber-600 dark:text-amber-400 font-medium mb-1">{$t('quotations.new.extraKm')}</p>
+									<div class="flex justify-between text-amber-700 dark:text-amber-300">
+										<span>{$t('quotations.new.extraKmHelp')}</span>
+										<span>{formatDistance(extraKm)}</span>
+									</div>
+								</div>
+							{/if}
 						</div>
 					</div>
 				{:else}
@@ -885,3 +1040,33 @@
 		{toastMessage}
 	</Toast>
 {/if}
+
+<!-- Map Modal -->
+<Modal bind:open={showMapModal} size="xl" title={$t('quotations.new.routeMap')} on:close={closeMapModal}>
+	<div class="space-y-4">
+		<div class="flex items-center gap-4 text-sm text-gray-600 dark:text-gray-400">
+			<div class="flex items-center gap-1">
+				<MapPinOutline class="w-4 h-4 text-green-500" />
+				<span>{origin}</span>
+			</div>
+			<span class="text-gray-400">→</span>
+			<div class="flex items-center gap-1">
+				<MapPinOutline class="w-4 h-4 text-red-500" />
+				<span>{destination}</span>
+			</div>
+		</div>
+		<div
+			bind:this={mapContainer}
+			class="w-full h-96 rounded-lg border border-gray-200 dark:border-gray-700"
+		></div>
+		{#if routeResult}
+			<div class="flex items-center justify-between text-sm">
+				<span class="text-gray-600 dark:text-gray-400">{$t('quotations.new.totalDistance')}: <strong class="text-gray-900 dark:text-white">{formatDistance(routeResult.totalDistance + extraKm)}</strong></span>
+				<span class="text-gray-600 dark:text-gray-400">{$t('quotations.new.estimatedTime')}: <strong class="text-gray-900 dark:text-white">{formatDuration(routeResult.totalTime)}</strong></span>
+			</div>
+		{/if}
+	</div>
+	<svelte:fragment slot="footer">
+		<Button color="alternative" onclick={closeMapModal}>{$t('common.close')}</Button>
+	</svelte:fragment>
+</Modal>

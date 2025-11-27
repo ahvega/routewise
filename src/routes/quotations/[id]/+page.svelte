@@ -70,6 +70,12 @@
 		() => (tenantStore.tenantId ? { id: tenantStore.tenantId as Id<'tenants'> } : 'skip')
 	);
 
+	// Query parameters for terms and conditions
+	const parametersQuery = useQuery(
+		api.parameters.getActive,
+		() => (tenantStore.tenantId ? { tenantId: tenantStore.tenantId } : 'skip')
+	);
+
 	// Check if already converted to itinerary
 	const existingItineraryQuery = useQuery(
 		api.itineraries.byQuotation,
@@ -82,6 +88,7 @@
 	const drivers = $derived(driversQuery.data || []);
 	const existingItinerary = $derived(existingItineraryQuery.data);
 	const tenant = $derived(tenantQuery.data);
+	const parameters = $derived(parametersQuery.data);
 	const isLoading = $derived(quotationQuery.isLoading);
 
 	// Active resources for assignment
@@ -231,6 +238,11 @@
 	function buildPdfData(): QuotationPdfData | null {
 		if (!quotation || !vehicle || !tenant) return null;
 
+		// Calculate discount if client has one
+		const discountPercentage = clientData?.discountPercentage || 0;
+		const priceBeforeDiscount = quotation.totalCost * (1 + quotation.selectedMarkupPercentage / 100);
+		const discountAmountHnl = priceBeforeDiscount * (discountPercentage / 100);
+
 		return {
 			quotationNumber: quotation.quotationNumber,
 			date: formatDate(quotation.createdAt),
@@ -239,13 +251,14 @@
 				name: getClientName(clientData),
 				email: clientData?.email || undefined,
 				phone: clientData?.phone || undefined,
-				address: clientData?.address || undefined
+				address: clientData?.address || undefined,
+				discountPercentage: discountPercentage
 			},
 			trip: {
 				origin: quotation.origin,
 				destination: quotation.destination,
-				departureDate: quotation.departureDate ? formatDate(quotation.departureDate) : '',
-				returnDate: quotation.returnDate ? formatDate(quotation.returnDate) : undefined,
+				departureDate: quotation.departureDate ? formatDate(quotation.departureDate) : undefined,
+				returnDate: undefined,
 				groupSize: quotation.groupSize,
 				estimatedDays: quotation.estimatedDays,
 				totalDistance: quotation.totalDistance,
@@ -253,7 +266,7 @@
 			},
 			vehicle: {
 				name: vehicle.name,
-				type: vehicle.type,
+				type: vehicle.make || 'Bus',
 				capacity: vehicle.passengerCapacity
 			},
 			costs: {
@@ -267,6 +280,9 @@
 				totalCost: quotation.totalCost
 			},
 			pricing: {
+				subtotalHnl: Math.round(priceBeforeDiscount),
+				discountPercentage: discountPercentage,
+				discountAmountHnl: Math.round(discountAmountHnl),
 				salePriceHnl: quotation.salePriceHnl,
 				salePriceUsd: quotation.salePriceUsd,
 				markup: quotation.selectedMarkupPercentage
@@ -278,6 +294,12 @@
 				address: tenant.address || undefined,
 				city: tenant.city || undefined
 			},
+			termsAndConditions: parameters ? {
+				validityDays: parameters.quotationValidityDays,
+				prepaymentDays: parameters.prepaymentDays,
+				cancellationMinHours: parameters.cancellationMinHours,
+				cancellationPenaltyPercentage: parameters.cancellationPenaltyPercentage
+			} : undefined,
 			notes: quotation.notes
 		};
 	}

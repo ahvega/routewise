@@ -9,11 +9,12 @@ export interface QuotationPdfData {
     email?: string;
     phone?: string;
     address?: string;
+    discountPercentage?: number;
   };
   trip: {
     origin: string;
     destination: string;
-    departureDate: string;
+    departureDate?: string;
     returnDate?: string;
     groupSize: number;
     estimatedDays: number;
@@ -36,6 +37,9 @@ export interface QuotationPdfData {
     totalCost: number;
   };
   pricing: {
+    subtotalHnl: number;
+    discountPercentage?: number;
+    discountAmountHnl?: number;
     salePriceHnl: number;
     salePriceUsd: number;
     markup: number;
@@ -47,6 +51,12 @@ export interface QuotationPdfData {
     address?: string;
     city?: string;
     logo?: string;
+  };
+  termsAndConditions?: {
+    validityDays?: number;
+    prepaymentDays?: number;
+    cancellationMinHours?: number;
+    cancellationPenaltyPercentage?: number;
   };
   notes?: string;
 }
@@ -358,10 +368,12 @@ export function generateQuotationHtml(data: QuotationPdfData): string {
     <div class="section">
       <div class="section-title">Detalles del Viaje</div>
       <div class="trip-details">
+        ${data.trip.departureDate ? `
         <div class="detail-item">
           <label>Fecha de Salida</label>
           <span>${formatDate(data.trip.departureDate)}</span>
         </div>
+        ` : ''}
         ${data.trip.returnDate ? `
         <div class="detail-item">
           <label>Fecha de Retorno</label>
@@ -391,6 +403,16 @@ export function generateQuotationHtml(data: QuotationPdfData): string {
     <div class="section">
       <div class="section-title">Precio</div>
       <div class="totals">
+        ${data.pricing.discountPercentage && data.pricing.discountPercentage > 0 ? `
+        <div class="totals-row">
+          <span>Subtotal</span>
+          <span>${formatCurrency(data.pricing.subtotalHnl, 'HNL')}</span>
+        </div>
+        <div class="totals-row" style="color: #22c55e;">
+          <span>Descuento (${data.pricing.discountPercentage}%)</span>
+          <span>-${formatCurrency(data.pricing.discountAmountHnl || 0, 'HNL')}</span>
+        </div>
+        ` : ''}
         <div class="totals-row total">
           <span>Total</span>
           <span>${formatCurrency(data.pricing.salePriceHnl, 'HNL')}</span>
@@ -424,8 +446,15 @@ export function generateQuotationHtml(data: QuotationPdfData): string {
       <div class="section-title">Términos y Condiciones</div>
       <ul style="font-size: 10px; color: #666; padding-left: 20px;">
         <li>El precio incluye conductor, combustible y peajes (según lo especificado).</li>
-        <li>El pago debe realizarse antes de la fecha de salida.</li>
-        <li>Cancelaciones con menos de 48 horas de anticipación pueden incurrir en cargos.</li>
+        ${data.termsAndConditions?.validityDays
+          ? `<li>Esta cotización tiene una validez de ${data.termsAndConditions.validityDays} días a partir de la fecha de emisión.</li>`
+          : '<li>Esta cotización tiene una validez de 30 días a partir de la fecha de emisión.</li>'}
+        ${data.termsAndConditions?.prepaymentDays
+          ? `<li>El pago debe realizarse al menos ${data.termsAndConditions.prepaymentDays} día(s) antes de la fecha de salida.</li>`
+          : '<li>El pago debe realizarse antes de la fecha de salida.</li>'}
+        ${data.termsAndConditions?.cancellationMinHours && data.termsAndConditions?.cancellationPenaltyPercentage
+          ? `<li>Cancelaciones con menos de ${data.termsAndConditions.cancellationMinHours} horas de anticipación incurrirán en una penalidad del ${data.termsAndConditions.cancellationPenaltyPercentage}% del valor total.</li>`
+          : '<li>Cancelaciones con menos de 48 horas de anticipación pueden incurrir en cargos.</li>'}
         <li>El itinerario puede ajustarse según condiciones de tráfico y clima.</li>
       </ul>
     </div>

@@ -87,6 +87,11 @@ export default defineSchema({
     // Rounding preferences
     roundingHnl: v.optional(v.number()), // e.g., 100 (round to nearest 100 Lps)
     roundingUsd: v.optional(v.number()), // e.g., 5 (round to nearest $5)
+    // Terms and Conditions parameters
+    quotationValidityDays: v.optional(v.number()), // e.g., 30 days
+    prepaymentDays: v.optional(v.number()), // e.g., 3 days before trip
+    cancellationMinHours: v.optional(v.number()), // e.g., 48 hours before
+    cancellationPenaltyPercentage: v.optional(v.number()), // e.g., 50%
     isActive: v.boolean(),
     createdBy: v.optional(v.id("users")),
     createdAt: v.number(),
@@ -154,6 +159,7 @@ export default defineSchema({
     groupSize: v.number(),
     extraMileage: v.number(),
     estimatedDays: v.number(),
+    departureDate: v.optional(v.number()), // Planned departure date
     // Route info
     totalDistance: v.number(),
     totalTime: v.number(),
