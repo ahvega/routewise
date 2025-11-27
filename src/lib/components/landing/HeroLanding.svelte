@@ -19,18 +19,18 @@
 			<div class="space-y-6">
 				<!-- Pretitle -->
 				<div>
-					<span class="text-primary-400 text-xs font-light uppercase tracking-[0.3em]">
+					<span class="text-primary-400 text-xs font-light uppercase tracking-[0.2em] leading-tight">
 						{$t('landing.pretitle')}
 					</span>
 				</div>
 
 				<!-- Title -->
-				<h1 class="text-4xl md:text-5xl lg:text-6xl font-semibold text-white leading-tight -mt-4">
+				<h1 class="text-3xl md:text-4xl lg:text-5xl font-semibold text-white leading-tight -mt-4">
 					{$t('landing.title')}
 				</h1>
 
 				<!-- Subtitle -->
-				<p class="text-xl md:text-2xl text-primary-400 font-medium">
+				<p class="text-l md:text-xl text-primary-300 font-medium leading-tight">
 					{$t('landing.subtitle')}
 				</p>
 
@@ -67,7 +67,7 @@
 
 					<!-- CTA Buttons -->
 					<div class="space-y-4">
-						<Button href="/auth/login" size="xl" class="w-full justify-center text-lg py-4">
+						<Button href="/auth/login" size="l" class="w-full justify-center text-lg py-4">
 							{$t('landing.getStarted')}
 							<ArrowRightOutline class="w-5 h-5 ml-2" />
 						</Button>

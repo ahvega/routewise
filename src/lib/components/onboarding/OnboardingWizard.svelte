@@ -39,54 +39,16 @@
 
 	let currentStep = $state(0);
 
-	const steps = [
-		{
-			title: 'Welcome to RouteWise!',
-			description: 'Your complete transportation quotation and fleet management platform. Let\'s take a quick tour of the key features.',
-			icon: RocketOutline,
-			color: 'text-primary-500'
-		},
-		{
-			title: 'Create Quotations',
-			description: 'Generate professional transportation quotes with automatic cost calculation, route planning via Google Maps, and multiple pricing options.',
-			icon: FileLinesOutline,
-			color: 'text-blue-500',
-			tip: 'Start by clicking "New Quotation" on the dashboard or navigation bar.'
-		},
-		{
-			title: 'Manage Your Fleet',
-			description: 'Track all your vehicles, their costs, capacity, and availability. Set fuel consumption rates and daily costs for accurate pricing.',
-			icon: TruckOutline,
-			color: 'text-purple-500',
-			tip: 'Go to Vehicles to add your fleet with their specifications.'
-		},
-		{
-			title: 'Driver Management',
-			description: 'Keep track of your drivers, their license expiry dates, and availability. Get alerts before licenses expire.',
-			icon: UserOutline,
-			color: 'text-orange-500',
-			tip: 'Add drivers in the Drivers section with their license information.'
-		},
-		{
-			title: 'Client Database',
-			description: 'Maintain a database of your clients with contact info, discounts, and quotation history. Support for both individuals and companies.',
-			icon: UsersOutline,
-			color: 'text-green-500',
-			tip: 'Add clients before creating quotations for a streamlined workflow.'
-		},
-		{
-			title: 'Reports & Analytics',
-			description: 'Monitor your business with comprehensive dashboards, sales reports, receivables aging, and utilization metrics. Export data to CSV anytime.',
-			icon: ChartPieOutline,
-			color: 'text-cyan-500',
-			tip: 'Check the Dashboard daily and explore detailed Reports weekly.'
-		}
-	];
+	const stepKeys = ['welcome', 'quotations', 'fleet', 'drivers', 'clients', 'reports'] as const;
+	const stepIcons = [RocketOutline, FileLinesOutline, TruckOutline, UserOutline, UsersOutline, ChartPieOutline];
+	const stepColors = ['text-primary-500', 'text-blue-500', 'text-purple-500', 'text-orange-500', 'text-green-500', 'text-cyan-500'];
+	const stepsWithTips = ['quotations', 'fleet', 'drivers', 'clients', 'reports'];
 
-	const totalSteps = steps.length;
+	const totalSteps = stepKeys.length;
 	const progress = $derived(((currentStep + 1) / totalSteps) * 100);
 	const isLastStep = $derived(currentStep === totalSteps - 1);
 	const isFirstStep = $derived(currentStep === 0);
+	const currentStepKey = $derived(stepKeys[currentStep]);
 
 	function nextStep() {
 		if (currentStep < totalSteps - 1) {
@@ -123,41 +85,37 @@
 		</div>
 
 		<!-- Step content -->
-		{#each steps as step, i}
-			{#if i === currentStep}
-				<div class="text-center">
-					<!-- Icon -->
-					<div class="flex justify-center mb-6">
-						<div class="p-4 bg-gray-100 dark:bg-gray-700 rounded-full">
-							<svelte:component this={step.icon} class="w-12 h-12 {step.color}" />
-						</div>
-					</div>
+		<div class="text-center">
+			<!-- Icon -->
+			<div class="flex justify-center mb-6">
+				<div class="p-4 bg-gray-100 dark:bg-gray-700 rounded-full">
+					<svelte:component this={stepIcons[currentStep]} class="w-12 h-12 {stepColors[currentStep]}" />
+				</div>
+			</div>
 
-					<!-- Title -->
-					<h3 class="text-2xl font-bold text-gray-900 dark:text-white mb-3">
-						{#if i === 0}
-							{step.title.replace('!', `, ${userName}!`)}
-						{:else}
-							{step.title}
-						{/if}
-					</h3>
+			<!-- Title -->
+			<h3 class="text-2xl font-bold text-gray-900 dark:text-white mb-3">
+				{#if currentStep === 0}
+					{$t(`onboarding.steps.${currentStepKey}.title`)}, {userName}!
+				{:else}
+					{$t(`onboarding.steps.${currentStepKey}.title`)}
+				{/if}
+			</h3>
 
-					<!-- Description -->
-					<p class="text-gray-600 dark:text-gray-300 mb-4 max-w-md mx-auto">
-						{step.description}
+			<!-- Description -->
+			<p class="text-gray-600 dark:text-gray-300 mb-4 max-w-md mx-auto">
+				{$t(`onboarding.steps.${currentStepKey}.description`)}
+			</p>
+
+			<!-- Tip -->
+			{#if stepsWithTips.includes(currentStepKey)}
+				<div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3 max-w-md mx-auto">
+					<p class="text-sm text-blue-700 dark:text-blue-300">
+						<strong>{$t('onboarding.tip')}</strong> {$t(`onboarding.steps.${currentStepKey}.tip`)}
 					</p>
-
-					<!-- Tip -->
-					{#if step.tip}
-						<div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3 max-w-md mx-auto">
-							<p class="text-sm text-blue-700 dark:text-blue-300">
-								<strong>Tip:</strong> {step.tip}
-							</p>
-						</div>
-					{/if}
 				</div>
 			{/if}
-		{/each}
+		</div>
 
 		<!-- Navigation buttons -->
 		<div class="flex justify-between items-center mt-8 pt-4 border-t border-gray-200 dark:border-gray-700">
@@ -165,11 +123,11 @@
 				{#if !isFirstStep}
 					<Button color="light" onclick={prevStep}>
 						<ArrowLeftOutline class="w-4 h-4 mr-2" />
-						Back
+						{$t('onboarding.back')}
 					</Button>
 				{:else}
 					<Button color="light" onclick={skipOnboarding}>
-						Skip tour
+						{$t('onboarding.skipTour')}
 					</Button>
 				{/if}
 			</div>
@@ -178,11 +136,11 @@
 				{#if isLastStep}
 					<Button color="blue" onclick={completeOnboarding}>
 						<CheckOutline class="w-4 h-4 mr-2" />
-						Get Started
+						{$t('onboarding.getStarted')}
 					</Button>
 				{:else}
 					<Button color="blue" onclick={nextStep}>
-						Next
+						{$t('onboarding.next')}
 						<ArrowRightOutline class="w-4 h-4 ml-2" />
 					</Button>
 				{/if}

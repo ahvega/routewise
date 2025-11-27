@@ -786,5 +786,43 @@
 		"driverUtilization": "Driver Utilization",
 		"vehicleUtilization": "Vehicle Utilization",
 		"routeAnalysis": "Popular Routes"
+	},
+	"onboarding": {
+		"steps": {
+			"welcome": {
+				"title": "Welcome to RouteWise",
+				"description": "Your complete transportation quotation and fleet management platform. Let's take a quick tour of the key features."
+			},
+			"quotations": {
+				"title": "Create Quotations",
+				"description": "Generate professional transportation quotes with automatic cost calculation, route planning via Google Maps, and multiple pricing options.",
+				"tip": "Start by clicking \"New Quotation\" on the dashboard or navigation bar."
+			},
+			"fleet": {
+				"title": "Manage Your Fleet",
+				"description": "Track all your vehicles, their costs, capacity, and availability. Set fuel consumption rates and daily costs for accurate pricing.",
+				"tip": "Go to Vehicles to add your fleet with their specifications."
+			},
+			"drivers": {
+				"title": "Driver Management",
+				"description": "Keep track of your drivers, their license expiry dates, and availability. Get alerts before licenses expire.",
+				"tip": "Add drivers in the Drivers section with their license information."
+			},
+			"clients": {
+				"title": "Client Database",
+				"description": "Maintain a database of your clients with contact info, discounts, and quotation history. Support for both individuals and companies.",
+				"tip": "Add clients before creating quotations for a streamlined workflow."
+			},
+			"reports": {
+				"title": "Reports & Analytics",
+				"description": "Monitor your business with comprehensive dashboards, sales reports, receivables aging, and utilization metrics. Export data to CSV anytime.",
+				"tip": "Check the Dashboard daily and explore detailed Reports weekly."
+			}
+		},
+		"tip": "Tip:",
+		"back": "Back",
+		"next": "Next",
+		"skipTour": "Skip tour",
+		"getStarted": "Get Started"
 	}
 }

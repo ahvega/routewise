@@ -464,7 +464,7 @@
         "pretitle": "COTIZACIONES DE TRANSPORTE",
         "title": "Optimiza las Operaciones de tu Flota",
         "subtitle": "Cotizaciones profesionales en minutos",
-        "description": "RouteWise ayuda a empresas de turismo, transporte privado y operadores de flotas a calcular costos precisos de viaje, generar cotizaciones profesionales y administrar toda su flota desde una sola plataforma.",
+        "description": "RouteWise ayuda a empresas de turismo, transporte privado y operadores de flotas a calcular costos precisos de viaje, generar cotizaciones profesionales y administrar eficientemente su flota.",
         "features": {
             "routes": "Cálculo de rutas con Google Maps",
             "pricing": "Opciones de precios multinivel",
@@ -801,5 +801,43 @@
         "driverUtilization": "Utilización de Conductores",
         "vehicleUtilization": "Utilización de Vehículos",
         "routeAnalysis": "Rutas Populares"
+    },
+    "onboarding": {
+        "steps": {
+            "welcome": {
+                "title": "¡Bienvenido a RouteWise",
+                "description": "Tu plataforma completa de cotizaciones de transporte y gestión de flotas. Hagamos un recorrido rápido por las funciones principales."
+            },
+            "quotations": {
+                "title": "Crear Cotizaciones",
+                "description": "Genera cotizaciones de transporte profesionales con cálculo automático de costos, planificación de rutas con Google Maps y múltiples opciones de precios.",
+                "tip": "Comienza haciendo clic en \"Nueva Cotización\" en el panel o la barra de navegación."
+            },
+            "fleet": {
+                "title": "Gestiona tu Flota",
+                "description": "Registra todos tus vehículos, sus costos, capacidad y disponibilidad. Configura tasas de consumo de combustible y costos diarios para precios precisos.",
+                "tip": "Ve a Vehículos para agregar tu flota con sus especificaciones."
+            },
+            "drivers": {
+                "title": "Gestión de Conductores",
+                "description": "Lleva un registro de tus conductores, fechas de vencimiento de licencias y disponibilidad. Recibe alertas antes de que expiren las licencias.",
+                "tip": "Agrega conductores en la sección Conductores con su información de licencia."
+            },
+            "clients": {
+                "title": "Base de Datos de Clientes",
+                "description": "Mantén una base de datos de tus clientes con información de contacto, descuentos e historial de cotizaciones. Soporte para personas y empresas.",
+                "tip": "Agrega clientes antes de crear cotizaciones para un flujo de trabajo más ágil."
+            },
+            "reports": {
+                "title": "Reportes y Análisis",
+                "description": "Monitorea tu negocio con paneles completos, reportes de ventas, antigüedad de cuentas por cobrar y métricas de utilización. Exporta datos a CSV en cualquier momento.",
+                "tip": "Revisa el Panel diariamente y explora los Reportes detallados semanalmente."
+            }
+        },
+        "tip": "Consejo:",
+        "back": "Atrás",
+        "next": "Siguiente",
+        "skipTour": "Omitir tour",
+        "getStarted": "Comenzar"
     }
 }
