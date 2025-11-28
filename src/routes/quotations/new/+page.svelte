@@ -61,22 +61,6 @@
 		() => (tenantStore.tenantId ? { tenantId: tenantStore.tenantId } : 'skip')
 	);
 
-	// Calculate date range for vehicle availability
-	const departureDateMs = $derived(departureDate ? new Date(departureDate).getTime() : 0);
-	const endDateMs = $derived(departureDateMs ? departureDateMs + (estimatedDays * 24 * 60 * 60 * 1000) : 0);
-
-	// Query unavailable vehicles when departure date is set
-	const unavailableVehiclesQuery = useQuery(
-		api.itineraries.getUnavailableVehicles,
-		() => (tenantStore.tenantId && departureDateMs && endDateMs ? {
-			tenantId: tenantStore.tenantId,
-			startDate: departureDateMs,
-			endDate: endDateMs
-		} : 'skip')
-	);
-
-	const unavailableVehicleIds = $derived(unavailableVehiclesQuery.data || []);
-
 	const vehicles = $derived(vehiclesQuery.data || []);
 	const clients = $derived(clientsQuery.data || []);
 	const activeVehicles = $derived(vehicles.filter((v) => v.status === 'active'));
@@ -113,6 +97,22 @@
 
 	// Departure date
 	let departureDate = $state('');
+
+	// Calculate date range for vehicle availability
+	const departureDateMs = $derived(departureDate ? new Date(departureDate).getTime() : 0);
+	const endDateMs = $derived(departureDateMs ? departureDateMs + (estimatedDays * 24 * 60 * 60 * 1000) : 0);
+
+	// Query unavailable vehicles when departure date is set
+	const unavailableVehiclesQuery = useQuery(
+		api.itineraries.getUnavailableVehicles,
+		() => (tenantStore.tenantId && departureDateMs && endDateMs ? {
+			tenantId: tenantStore.tenantId,
+			startDate: departureDateMs,
+			endDate: endDateMs
+		} : 'skip')
+	);
+
+	const unavailableVehicleIds = $derived(unavailableVehiclesQuery.data || []);
 
 	// Cost options
 	let includeFuel = $state(true);
