@@ -1125,6 +1125,65 @@ export default defineSchema({
 
 ---
 
+## Future Considerations: Data Integrity & Historical Records
+
+### Unit & Currency Handling Strategy
+
+When creating quotations, invoices, and other financial documents, units and currencies must be stored with each document to preserve historical accuracy.
+
+#### Current Implementation
+
+- **Google Maps API** returns distances in kilometers (always)
+- **Vehicle costs** are stored in the tenant's preferred distance unit (km or mi)
+- **Cost calculations** convert internally from km to the vehicle's unit
+- **Display** shows values in the user's preferred unit from settings
+
+#### Document Storage Requirements
+
+Each quotation/invoice should store at creation time:
+- `distanceUnit` - The unit used (km or mi)
+- `currency` - The currency used (local currency code)
+- `exchangeRate` - The exchange rate at creation time
+- All calculated values in those units
+
+This ensures historical documents remain accurate even if the user later changes their preferred units or exchange rates fluctuate.
+
+#### Future Enhancements (When Needed)
+
+For features like financial reports or vehicle maintenance tracking, consider adding **normalized fields** alongside display values:
+
+```typescript
+// Example: Quotation with both display and normalized values
+{
+  // Display values (in user's preferred units at creation time)
+  totalDistance: 450,           // km
+  distanceUnit: 'km',
+  totalCostLocal: 15000,        // HNL
+  totalCostUsd: 600,            // USD
+  exchangeRateUsed: 25.0,
+
+  // Normalized values (for reports/analytics)
+  totalDistanceKm: 450,         // Always in km
+  totalCostUsd_normalized: 600, // Always in USD
+}
+```
+
+This dual-storage approach enables:
+- **Historical accuracy**: Documents show original values
+- **Reporting consistency**: All reports use normalized base units
+- **Currency analysis**: Track exchange rate impact over time
+
+#### Implementation Priority
+
+| Feature | Approach | Priority |
+|---------|----------|----------|
+| Quotations/Invoices | Store units with document | **Now** |
+| Financial Reports | Use normalized fields | When building reports |
+| Vehicle Maintenance | Normalize to km/USD | When building feature |
+| Multi-currency Reports | Aggregate using normalized USD | When building feature |
+
+---
+
 ## Appendix: Key Resources
 
 ### Documentation
@@ -1151,6 +1210,6 @@ export default defineSchema({
 
 ---
 
-**Document Version**: 1.0
+**Document Version**: 1.1
 **Created**: November 24, 2025
-**Last Updated**: November 24, 2025
+**Last Updated**: November 29, 2025
