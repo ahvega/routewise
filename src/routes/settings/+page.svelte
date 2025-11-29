@@ -12,7 +12,7 @@
 		Toast,
 		Helper
 	} from 'flowbite-svelte';
-	import { CheckCircleOutline, CloseCircleOutline, CogOutline, RefreshOutline } from 'flowbite-svelte-icons';
+	import { CheckCircleOutline, CloseCircleOutline, CogOutline, UsersOutline, CreditCardOutline, ChevronRightOutline } from 'flowbite-svelte-icons';
 	import { useQuery, useConvexClient } from 'convex-svelte';
 	import { api } from '$convex/_generated/api';
 	import { tenantStore } from '$lib/stores';
@@ -21,13 +21,15 @@
 	import {
 		LATIN_AMERICAN_CURRENCIES,
 		getCurrencySymbol,
-		fetchExchangeRate,
 		getDefaultExchangeRate,
 		formatCurrency,
 		convertCurrency
 	} from '$lib/services/currency';
 
 	const client = useConvexClient();
+
+	// Query exchange rates from Convex (updated daily automatically)
+	const exchangeRatesQuery = useQuery(api.exchangeRates.getLatest, {});
 
 	// Query active parameters
 	const parametersQuery = useQuery(
@@ -40,6 +42,21 @@
 		api.tenants.get,
 		() => (tenantStore.tenantId ? { id: tenantStore.tenantId } : 'skip')
 	);
+
+	// Pricing level type
+	type PricingLevel = {
+		key: string;
+		name: string;
+		discountPercentage: number;
+		isDefault?: boolean;
+	};
+
+	// License category type
+	type LicenseCategory = {
+		key: string;
+		name: string;
+		description?: string;
+	};
 
 	// Form state for parameters
 	let formData = $state({
@@ -62,7 +79,19 @@
 		roundingLocal: 100,
 		roundingUsd: 5,
 		// Terms
-		quotationValidityDays: 30
+		quotationValidityDays: 30,
+		// Pricing levels
+		pricingLevels: [
+			{ key: 'standard', name: 'Estándar', discountPercentage: 0, isDefault: true },
+			{ key: 'preferred', name: 'Preferencial', discountPercentage: 5 },
+			{ key: 'vip', name: 'VIP', discountPercentage: 10 }
+		] as PricingLevel[],
+		// License categories
+		licenseCategories: [
+			{ key: 'comercial_a', name: 'Comercial A', description: 'Vehículos comerciales pesados' },
+			{ key: 'comercial_b', name: 'Comercial B', description: 'Vehículos comerciales livianos' },
+			{ key: 'particular', name: 'Particular', description: 'Vehículos particulares' }
+		] as LicenseCategory[]
 	});
 
 	// Form state for organization
@@ -84,7 +113,20 @@
 	// Loading states
 	let isSaving = $state(false);
 	let isSavingOrg = $state(false);
-	let isFetchingRate = $state(false);
+
+	// Default pricing levels
+	const defaultPricingLevels: PricingLevel[] = [
+		{ key: 'standard', name: 'Estándar', discountPercentage: 0, isDefault: true },
+		{ key: 'preferred', name: 'Preferencial', discountPercentage: 5 },
+		{ key: 'vip', name: 'VIP', discountPercentage: 10 }
+	];
+
+	// Default license categories
+	const defaultLicenseCategories: LicenseCategory[] = [
+		{ key: 'comercial_a', name: 'Comercial A', description: 'Vehículos comerciales pesados' },
+		{ key: 'comercial_b', name: 'Comercial B', description: 'Vehículos comerciales livianos' },
+		{ key: 'particular', name: 'Particular', description: 'Vehículos particulares' }
+	];
 
 	// Update form when parameters data loads
 	$effect(() => {
@@ -107,7 +149,9 @@
 				driverIncentiveCurrency: params.driverIncentiveCurrency || localCurr,
 				roundingLocal: params.roundingLocal || 100,
 				roundingUsd: params.roundingUsd || 5,
-				quotationValidityDays: params.quotationValidityDays || 30
+				quotationValidityDays: params.quotationValidityDays || 30,
+				pricingLevels: (params.pricingLevels as PricingLevel[]) || defaultPricingLevels,
+				licenseCategories: (params.licenseCategories as LicenseCategory[]) || defaultLicenseCategories
 			};
 		}
 	});
@@ -131,9 +175,17 @@
 	// Derived values
 	const parameters = $derived(parametersQuery.data);
 	const tenant = $derived(tenantQuery.data);
+	const exchangeRates = $derived(exchangeRatesQuery.data);
 	const isLoading = $derived(parametersQuery.isLoading);
 	const localCurrencySymbol = $derived(getCurrencySymbol(formData.localCurrency));
 	const localCurrencyInfo = $derived(LATIN_AMERICAN_CURRENCIES.find(c => c.code === formData.localCurrency));
+
+	// Exchange rate info
+	const liveExchangeRate = $derived(
+		exchangeRates?.rates?.[formData.localCurrency as keyof typeof exchangeRates.rates] || getDefaultExchangeRate(formData.localCurrency)
+	);
+	const exchangeRateLastUpdate = $derived(exchangeRates?.fetchedAt);
+	const exchangeRateSource = $derived(exchangeRates?.source || 'default');
 
 	// Currency options for cost fields
 	const currencyOptions = $derived([
@@ -171,7 +223,9 @@
 					driverIncentiveCurrency: formData.driverIncentiveCurrency,
 					roundingLocal: formData.roundingLocal,
 					roundingUsd: formData.roundingUsd,
-					quotationValidityDays: formData.quotationValidityDays
+					quotationValidityDays: formData.quotationValidityDays,
+					pricingLevels: formData.pricingLevels,
+					licenseCategories: formData.licenseCategories
 				});
 			} else {
 				await client.mutation(api.parameters.create, {
@@ -193,6 +247,8 @@
 					roundingLocal: formData.roundingLocal,
 					roundingUsd: formData.roundingUsd,
 					quotationValidityDays: formData.quotationValidityDays,
+					pricingLevels: formData.pricingLevels,
+					licenseCategories: formData.licenseCategories,
 					isActive: true
 				});
 			}
@@ -229,26 +285,6 @@
 		}
 	}
 
-	async function handleFetchExchangeRate() {
-		isFetchingRate = true;
-		try {
-			const result = await fetchExchangeRate(formData.localCurrency);
-			if (result.success) {
-				formData.exchangeRate = Math.round(result.rate * 100) / 100;
-				showToastMessage(`Tasa actualizada: 1 USD = ${formData.exchangeRate} ${formData.localCurrency}`, 'success');
-			} else {
-				// Use default rate as fallback
-				formData.exchangeRate = getDefaultExchangeRate(formData.localCurrency);
-				showToastMessage(`No se pudo obtener tasa. Usando valor predeterminado: ${formData.exchangeRate}`, 'error');
-			}
-		} catch (error) {
-			formData.exchangeRate = getDefaultExchangeRate(formData.localCurrency);
-			showToastMessage('Error al obtener tasa de cambio', 'error');
-		} finally {
-			isFetchingRate = false;
-		}
-	}
-
 	function handleLocalCurrencyChange() {
 		// Update all currency fields to use the new local currency
 		formData.fuelPriceCurrency = formData.localCurrency;
@@ -256,8 +292,35 @@
 		formData.hotelCostCurrency = formData.localCurrency;
 		formData.driverIncentiveCurrency = formData.localCurrency;
 		formData.preferredCurrency = formData.localCurrency;
-		// Set default exchange rate for the new currency
-		formData.exchangeRate = getDefaultExchangeRate(formData.localCurrency);
+		// Auto-apply live exchange rate when not using custom rate
+		if (!formData.useCustomExchangeRate) {
+			const rate = exchangeRates?.rates?.[formData.localCurrency as keyof typeof exchangeRates.rates];
+			formData.exchangeRate = rate ? Math.round(rate * 100) / 100 : getDefaultExchangeRate(formData.localCurrency);
+		} else {
+			formData.exchangeRate = getDefaultExchangeRate(formData.localCurrency);
+		}
+	}
+
+	// Auto-update exchange rate when useCustomExchangeRate is toggled off
+	$effect(() => {
+		if (!formData.useCustomExchangeRate && exchangeRates?.rates) {
+			const rate = exchangeRates.rates[formData.localCurrency as keyof typeof exchangeRates.rates];
+			if (rate) {
+				formData.exchangeRate = Math.round(rate * 100) / 100;
+			}
+		}
+	});
+
+	// Format last update time
+	function formatLastUpdate(timestamp: number | undefined): string {
+		if (!timestamp) return 'Nunca';
+		const date = new Date(timestamp);
+		const now = new Date();
+		const diffHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60));
+
+		if (diffHours < 1) return 'Hace menos de 1 hora';
+		if (diffHours < 24) return `Hace ${diffHours} horas`;
+		return date.toLocaleDateString('es-HN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 	}
 
 	function showToastMessage(message: string, type: 'success' | 'error') {
@@ -342,6 +405,42 @@
 		{/if}
 	</div>
 
+	<!-- Quick Navigation Cards -->
+	<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+		<a href="/settings/team" class="block h-full">
+			<Card class="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors cursor-pointer h-full p-6">
+				<div class="flex items-center justify-between h-full">
+					<div class="flex items-center gap-4">
+						<div class="p-4 bg-blue-100 dark:bg-blue-900 rounded-lg">
+							<UsersOutline class="w-7 h-7 text-blue-600 dark:text-blue-400" />
+						</div>
+						<div>
+							<h3 class="text-lg font-semibold text-gray-900 dark:text-white">{$t('settings.team.title')}</h3>
+							<p class="text-sm text-gray-500">{$t('settings.team.subtitle')}</p>
+						</div>
+					</div>
+					<ChevronRightOutline class="w-5 h-5 text-gray-400" />
+				</div>
+			</Card>
+		</a>
+		<a href="/settings/billing" class="block h-full">
+			<Card class="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors cursor-pointer h-full p-6">
+				<div class="flex items-center justify-between h-full">
+					<div class="flex items-center gap-4">
+						<div class="p-4 bg-green-100 dark:bg-green-900 rounded-lg">
+							<CreditCardOutline class="w-7 h-7 text-green-600 dark:text-green-400" />
+						</div>
+						<div>
+							<h3 class="text-lg font-semibold text-gray-900 dark:text-white">{$t('settings.billing.title')}</h3>
+							<p class="text-sm text-gray-500">{$t('settings.billing.subtitle')}</p>
+						</div>
+					</div>
+					<ChevronRightOutline class="w-5 h-5 text-gray-400" />
+				</div>
+			</Card>
+		</a>
+	</div>
+
 	{#if isLoading}
 		<div class="flex justify-center py-12">
 			<Spinner size="8" />
@@ -376,29 +475,29 @@
 									disabled={!formData.useCustomExchangeRate}
 									class="flex-1"
 								/>
-								<Button
-									color="light"
-									size="sm"
-									onclick={handleFetchExchangeRate}
-									disabled={isFetchingRate || formData.useCustomExchangeRate}
-									title="Obtener tasa de API"
-								>
-									{#if isFetchingRate}
-										<Spinner size="4" />
-									{:else}
-										<RefreshOutline class="w-4 h-4" />
-									{/if}
-								</Button>
 							</div>
-							<Helper class="mt-1">1 USD = {formData.exchangeRate} {formData.localCurrency}</Helper>
+							<Helper class="mt-1">
+								{#if formData.useCustomExchangeRate}
+									1 USD = {formData.exchangeRate} {formData.localCurrency} (manual)
+								{:else}
+									1 USD = {formData.exchangeRate} {formData.localCurrency}
+									<span class="text-green-600 dark:text-green-400">
+										• Actualizado {formatLastUpdate(exchangeRateLastUpdate)}
+									</span>
+								{/if}
+							</Helper>
 						</div>
 
-						<div class="flex items-center">
+						<div class="flex flex-col gap-2">
 							<Toggle bind:checked={formData.useCustomExchangeRate}>
 								Usar tasa manual
 							</Toggle>
-							<Helper class="ml-2 text-xs">
-								{formData.useCustomExchangeRate ? 'Ingrese tasa manualmente' : 'Obtener de API'}
+							<Helper class="text-xs">
+								{#if formData.useCustomExchangeRate}
+									Ingrese su tasa de cambio manualmente
+								{:else}
+									<span class="text-green-600 dark:text-green-400">✓</span> Tasa automática desde {exchangeRateSource === 'apilayer' ? 'API Layer' : exchangeRateSource === 'default' ? 'API Layer' : exchangeRateSource}
+								{/if}
 							</Helper>
 						</div>
 					</div>
@@ -500,6 +599,162 @@
 							<Input id="quotationValidity" type="number" bind:value={formData.quotationValidityDays} step="1" min="1" />
 							<Helper class="mt-1">Días de validez para cotizaciones</Helper>
 						</div>
+					</div>
+				</Card>
+
+				<!-- Pricing Levels -->
+				<Card class="max-w-none mt-4">
+					<h5 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Niveles de Precios para Clientes</h5>
+					<Helper class="mb-4">Define los niveles de precios y sus descuentos asociados para clientes</Helper>
+
+					<div class="space-y-3">
+						{#each formData.pricingLevels as level, index}
+							<div class="flex items-center gap-4 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+								<div class="flex-1">
+									<Label for="level-key-{index}" class="text-xs">Clave</Label>
+									<Input
+										id="level-key-{index}"
+										bind:value={level.key}
+										placeholder="ej: standard"
+										size="sm"
+									/>
+								</div>
+								<div class="flex-1">
+									<Label for="level-name-{index}" class="text-xs">Nombre</Label>
+									<Input
+										id="level-name-{index}"
+										bind:value={level.name}
+										placeholder="ej: Estándar"
+										size="sm"
+									/>
+								</div>
+								<div class="w-32">
+									<Label for="level-discount-{index}" class="text-xs">Descuento %</Label>
+									<Input
+										id="level-discount-{index}"
+										type="number"
+										bind:value={level.discountPercentage}
+										min="0"
+										max="100"
+										step="1"
+										size="sm"
+									/>
+								</div>
+								<div class="w-28 flex items-end pb-1">
+									<Toggle
+										bind:checked={level.isDefault}
+										size="small"
+										on:change={() => {
+											// Only one can be default
+											if (level.isDefault) {
+												formData.pricingLevels = formData.pricingLevels.map((l, i) => ({
+													...l,
+													isDefault: i === index
+												}));
+											}
+										}}
+									>
+										<span class="text-xs">Preselec.</span>
+									</Toggle>
+								</div>
+								<div class="flex items-end pb-1">
+									<Button
+										size="xs"
+										color="red"
+										outline
+										disabled={formData.pricingLevels.length <= 1}
+										onclick={() => {
+											formData.pricingLevels = formData.pricingLevels.filter((_, i) => i !== index);
+										}}
+									>
+										✕
+									</Button>
+								</div>
+							</div>
+						{/each}
+					</div>
+
+					<div class="mt-4">
+						<Button
+							size="sm"
+							color="light"
+							onclick={() => {
+								formData.pricingLevels = [
+									...formData.pricingLevels,
+									{ key: '', name: '', discountPercentage: 0 }
+								];
+							}}
+						>
+							+ Agregar Nivel
+						</Button>
+					</div>
+				</Card>
+
+				<!-- License Categories -->
+				<Card class="max-w-none mt-4">
+					<h5 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Categorías de Licencia de Conducir</h5>
+					<Helper class="mb-4">Define las categorías de licencia disponibles para los conductores</Helper>
+
+					<div class="space-y-3">
+						{#each formData.licenseCategories as category, index}
+							<div class="flex items-center gap-4 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+								<div class="w-32">
+									<Label for="cat-key-{index}" class="text-xs">Clave</Label>
+									<Input
+										id="cat-key-{index}"
+										bind:value={category.key}
+										placeholder="ej: comercial_a"
+										size="sm"
+									/>
+								</div>
+								<div class="flex-1">
+									<Label for="cat-name-{index}" class="text-xs">Nombre</Label>
+									<Input
+										id="cat-name-{index}"
+										bind:value={category.name}
+										placeholder="ej: Comercial A"
+										size="sm"
+									/>
+								</div>
+								<div class="flex-1">
+									<Label for="cat-desc-{index}" class="text-xs">Descripción</Label>
+									<Input
+										id="cat-desc-{index}"
+										bind:value={category.description}
+										placeholder="ej: Vehículos pesados"
+										size="sm"
+									/>
+								</div>
+								<div class="flex items-end pb-1">
+									<Button
+										size="xs"
+										color="red"
+										outline
+										disabled={formData.licenseCategories.length <= 1}
+										onclick={() => {
+											formData.licenseCategories = formData.licenseCategories.filter((_, i) => i !== index);
+										}}
+									>
+										✕
+									</Button>
+								</div>
+							</div>
+						{/each}
+					</div>
+
+					<div class="mt-4">
+						<Button
+							size="sm"
+							color="light"
+							onclick={() => {
+								formData.licenseCategories = [
+									...formData.licenseCategories,
+									{ key: '', name: '', description: '' }
+								];
+							}}
+						>
+							+ Agregar Categoría
+						</Button>
 					</div>
 				</Card>
 
@@ -615,11 +870,6 @@
 						<div class="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
 							<p class="text-sm text-gray-600 dark:text-gray-400">{$t('settings.about.version')}</p>
 							<p class="text-lg font-semibold text-gray-900 dark:text-white">1.0.0</p>
-						</div>
-
-						<div class="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
-							<p class="text-sm text-gray-600 dark:text-gray-400">{$t('settings.about.techStack')}</p>
-							<p class="text-gray-900 dark:text-white">SvelteKit 2 + Svelte 5 + TailwindCSS 4 + Flowbite + Convex</p>
 						</div>
 
 						<div class="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">

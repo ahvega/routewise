@@ -169,8 +169,10 @@ export const createFromQuotation = mutation({
       dropoffLocation: args.dropoffLocation || quotation.destination,
       dropoffTime: args.dropoffTime,
       dropoffNotes: args.dropoffNotes,
-      // Pricing
-      agreedPriceHnl: quotation.salePriceHnl,
+      // Pricing - copy frozen values from quotation
+      localCurrency: quotation.localCurrency,
+      agreedPriceLocal: quotation.salePriceLocal,
+      agreedPriceHnl: quotation.salePriceHnl, // Legacy field
       agreedPriceUsd: quotation.salePriceUsd,
       exchangeRateUsed: quotation.exchangeRateUsed,
       // Status
@@ -204,7 +206,10 @@ export const create = mutation({
     dropoffLocation: v.optional(v.string()),
     dropoffTime: v.optional(v.string()),
     dropoffNotes: v.optional(v.string()),
-    agreedPriceHnl: v.number(),
+    // Pricing - frozen at creation (both currencies)
+    localCurrency: v.optional(v.string()), // 'HNL', 'GTQ', etc.
+    agreedPriceLocal: v.optional(v.number()),
+    agreedPriceHnl: v.number(), // Legacy field
     agreedPriceUsd: v.number(),
     exchangeRateUsed: v.number(),
     notes: v.optional(v.string()),

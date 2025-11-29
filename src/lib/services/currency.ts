@@ -3,14 +3,20 @@
  * Handles currency conversion, exchange rate fetching, and currency formatting
  */
 
-// Latin American currencies supported
+// Latin American currencies supported (Central America first, then others)
 export const LATIN_AMERICAN_CURRENCIES = [
+	// Central America
 	{ code: 'HNL', name: 'Lempira Hondureño', symbol: 'L', country: 'Honduras' },
 	{ code: 'GTQ', name: 'Quetzal', symbol: 'Q', country: 'Guatemala' },
 	{ code: 'NIO', name: 'Córdoba', symbol: 'C$', country: 'Nicaragua' },
 	{ code: 'CRC', name: 'Colón Costarricense', symbol: '₡', country: 'Costa Rica' },
 	{ code: 'PAB', name: 'Balboa', symbol: 'B/.', country: 'Panamá' },
+	{ code: 'BZD', name: 'Dólar Beliceño', symbol: 'BZ$', country: 'Belice' },
+	// Caribbean
+	{ code: 'DOP', name: 'Peso Dominicano', symbol: 'RD$', country: 'República Dominicana' },
+	// North America
 	{ code: 'MXN', name: 'Peso Mexicano', symbol: '$', country: 'México' },
+	// South America
 	{ code: 'COP', name: 'Peso Colombiano', symbol: '$', country: 'Colombia' },
 	{ code: 'PEN', name: 'Sol Peruano', symbol: 'S/', country: 'Perú' },
 	{ code: 'ARS', name: 'Peso Argentino', symbol: '$', country: 'Argentina' },
@@ -19,7 +25,6 @@ export const LATIN_AMERICAN_CURRENCIES = [
 	{ code: 'UYU', name: 'Peso Uruguayo', symbol: '$U', country: 'Uruguay' },
 	{ code: 'PYG', name: 'Guaraní', symbol: '₲', country: 'Paraguay' },
 	{ code: 'BOB', name: 'Boliviano', symbol: 'Bs', country: 'Bolivia' },
-	{ code: 'DOP', name: 'Peso Dominicano', symbol: 'RD$', country: 'República Dominicana' },
 ] as const;
 
 export type LocalCurrencyCode = typeof LATIN_AMERICAN_CURRENCIES[number]['code'];
@@ -101,15 +106,14 @@ export function roundCurrency(value: number, roundingUnit: number): number {
 }
 
 /**
- * Fetch exchange rate from API
- * Uses exchangerate-api.com free tier (1500 requests/month)
+ * Fetch exchange rate from our API endpoint
+ * Rates are stored in Convex and updated daily automatically
+ * Falls back to default rates if unavailable
  */
 export async function fetchExchangeRate(localCurrency: string): Promise<ExchangeRateResponse> {
 	try {
-		// Using exchangerate.host - free, no API key required
-		const response = await fetch(
-			`https://api.exchangerate.host/latest?base=USD&symbols=${localCurrency}`
-		);
+		// Use our server-side API endpoint which returns rates from Convex
+		const response = await fetch('/api/exchange-rates');
 
 		if (!response.ok) {
 			throw new Error(`API returned ${response.status}`);
@@ -117,77 +121,118 @@ export async function fetchExchangeRate(localCurrency: string): Promise<Exchange
 
 		const data = await response.json();
 
-		if (data.success === false) {
-			throw new Error(data.error?.info || 'Unknown API error');
-		}
-
 		const rate = data.rates?.[localCurrency];
 		if (!rate) {
 			throw new Error(`Rate not found for ${localCurrency}`);
 		}
 
 		return {
-			success: true,
+			success: data.success,
 			rate: rate,
-			source: 'exchangerate.host',
-			timestamp: Date.now()
+			source: data.source || 'convex',
+			timestamp: data.timestamp || Date.now()
 		};
 	} catch (error) {
-		// Fallback to frankfurter.app (free, no API key)
-		try {
-			const response = await fetch(
-				`https://api.frankfurter.app/latest?from=USD&to=${localCurrency}`
-			);
-
-			if (!response.ok) {
-				throw new Error(`Frankfurter API returned ${response.status}`);
-			}
-
-			const data = await response.json();
-			const rate = data.rates?.[localCurrency];
-
-			if (!rate) {
-				throw new Error(`Rate not found for ${localCurrency}`);
-			}
-
-			return {
-				success: true,
-				rate: rate,
-				source: 'frankfurter.app',
-				timestamp: Date.now()
-			};
-		} catch (fallbackError) {
-			return {
-				success: false,
-				rate: 0,
-				source: 'none',
-				timestamp: Date.now(),
-				error: error instanceof Error ? error.message : 'Failed to fetch exchange rate'
-			};
-		}
+		// Return default rate on error
+		return {
+			success: false,
+			rate: getDefaultExchangeRate(localCurrency),
+			source: 'default',
+			timestamp: Date.now(),
+			error: error instanceof Error ? error.message : 'Failed to fetch exchange rate'
+		};
 	}
 }
 
 /**
- * Get default exchange rate for a currency (rough estimates for fallback)
+ * Fetch all exchange rates at once
+ * Rates are stored in Convex and updated daily automatically
+ */
+export async function fetchAllExchangeRates(): Promise<{
+	success: boolean;
+	rates: Record<string, number>;
+	source: string;
+	timestamp: number;
+	cached?: boolean;
+	error?: string;
+}> {
+	try {
+		const response = await fetch('/api/exchange-rates');
+
+		if (!response.ok) {
+			throw new Error(`API returned ${response.status}`);
+		}
+
+		const data = await response.json();
+
+		return {
+			success: data.success,
+			rates: data.rates || {},
+			source: data.source || 'convex',
+			timestamp: data.timestamp || Date.now(),
+			cached: data.cached
+		};
+	} catch (error) {
+		return {
+			success: false,
+			rates: {},
+			source: 'error',
+			timestamp: Date.now(),
+			error: error instanceof Error ? error.message : 'Failed to fetch exchange rates'
+		};
+	}
+}
+
+/**
+ * Force refresh exchange rates from external API
+ * Should only be called by admin/cron, not regular users
+ */
+export async function refreshExchangeRates(): Promise<{
+	success: boolean;
+	message?: string;
+	error?: string;
+}> {
+	try {
+		const response = await fetch('/api/exchange-rates', {
+			method: 'POST'
+		});
+
+		const data = await response.json();
+		return data;
+	} catch (error) {
+		return {
+			success: false,
+			error: error instanceof Error ? error.message : 'Failed to refresh rates'
+		};
+	}
+}
+
+/**
+ * Get default exchange rate for a currency (fallback rates as of Nov 2025)
+ * These are used when the API is unavailable
  */
 export function getDefaultExchangeRate(localCurrency: string): number {
 	const defaults: Record<string, number> = {
-		HNL: 24.75,
-		GTQ: 7.85,
-		NIO: 36.50,
-		CRC: 530.00,
-		PAB: 1.00, // Pegged to USD
-		MXN: 17.50,
-		COP: 4000.00,
-		PEN: 3.75,
-		ARS: 350.00,
-		CLP: 900.00,
-		BRL: 5.00,
-		UYU: 39.00,
-		PYG: 7300.00,
-		BOB: 6.90,
-		DOP: 57.00,
+		// Central America (rates as of Nov 28, 2025)
+		HNL: 26.31,    // Honduras
+		GTQ: 7.66,     // Guatemala
+		NIO: 36.78,    // Nicaragua
+		CRC: 498.39,   // Costa Rica
+		PAB: 1.00,     // Panama (pegged to USD)
+		BZD: 2.00,     // Belize (pegged to USD at 2:1)
+		// Caribbean
+		DOP: 62.59,    // Dominican Republic
+		// North America
+		MXN: 18.31,    // Mexico
+		// South America
+		COP: 3740.40,  // Colombia
+		PEN: 3.36,     // Peru
+		ARS: 1450.65,  // Argentina
+		CLP: 927.38,   // Chile
+		BRL: 5.34,     // Brazil
+		UYU: 39.59,    // Uruguay
+		PYG: 6983.83,  // Paraguay
+		BOB: 6.91,     // Bolivia
 	};
 	return defaults[localCurrency] || 1.00;
 }

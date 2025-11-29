@@ -183,16 +183,20 @@
             "year": "Año",
             "passengerCapacity": "Capacidad de Pasajeros",
             "passengers": "pasajeros",
-            "fuelCapacity": "Tanque (galones)",
+            "fuelCapacity": "Capacidad del Tanque",
             "fuelEfficiency": "Rendimiento de Combustible",
-            "costPerDay": "Costo por Día (HNL)",
-            "costPerDistance": "Costo por Km (HNL)",
+            "costPerDay": "Costo por Día",
+            "costPerDistance": "Costo por",
             "ownership": "Propiedad",
             "owned": "Propio",
             "rented": "Rentado",
             "baseLocation": "Ubicación Base",
             "baseLocationPlaceholder": "ej., San Pedro Sula, Honduras",
             "baseLocationHelp": "Base del vehículo. Se usa para calcular costos de reposicionamiento cuando el origen del viaje difiere de la base."
+        },
+        "limits": {
+            "vehicleLimitReached": "¡Límite de vehículos alcanzado!",
+            "upgradeToAddMore": "Actualiza tu plan para agregar más vehículos."
         },
         "filters": {
             "searchPlaceholder": "Buscar vehículos...",
@@ -228,17 +232,43 @@
             "type": "Tipo de Cliente",
             "individual": "Persona Natural",
             "company": "Empresa",
+            "companyName": "Nombre de la Empresa",
+            "companyNamePlaceholder": "ej., Honduras Tours S.A.",
+            "firstName": "Nombre",
+            "firstNamePlaceholder": "ej., Carlos",
+            "lastName": "Apellido",
+            "lastNamePlaceholder": "ej., Martínez",
             "email": "Correo Electrónico",
             "emailPlaceholder": "ej., correo@ejemplo.com",
             "phone": "Teléfono",
-            "phonePlaceholder": "ej., 9999-9999",
+            "phonePlaceholder": "ej., +504 1234-5678",
+            "city": "Ciudad",
+            "cityPlaceholder": "ej., Tegucigalpa",
+            "state": "Estado/Departamento",
+            "statePlaceholder": "ej., Francisco Morazán",
+            "country": "País",
             "address": "Dirección",
             "addressPlaceholder": "Dirección completa",
             "rtn": "RTN",
-            "rtnPlaceholder": "Número de RTN",
+            "rtnPlaceholder": "ej., 0801-1234-56789",
+            "pricingLevel": "Nivel de Precios",
             "discount": "Descuento (%)",
+            "creditLimit": "Límite de Crédito",
+            "paymentTerms": "Plazo de Pago (días)",
+            "paymentTermsDays": "{days} días",
+            "immediate": "Inmediato",
+            "status": "Estado",
             "notes": "Notas",
             "notesPlaceholder": "Notas adicionales sobre el cliente"
+        },
+        "countries": {
+            "HN": "Honduras",
+            "GT": "Guatemala",
+            "SV": "El Salvador",
+            "NI": "Nicaragua",
+            "CR": "Costa Rica",
+            "PA": "Panamá",
+            "US": "Estados Unidos"
         },
         "filters": {
             "searchPlaceholder": "Buscar clientes...",
@@ -249,6 +279,8 @@
             "client": "Cliente",
             "contact": "Contacto",
             "type": "Tipo",
+            "pricing": "Precios",
+            "credit": "Crédito",
             "discount": "Descuento",
             "status": "Estado"
         }
@@ -269,16 +301,37 @@
         "fields": {
             "name": "Nombre Completo",
             "namePlaceholder": "ej., Juan Pérez",
+            "firstName": "Nombre",
+            "firstNamePlaceholder": "ej., José",
+            "lastName": "Apellido",
+            "lastNamePlaceholder": "ej., Hernández",
             "phone": "Teléfono",
-            "phonePlaceholder": "ej., 9999-9999",
+            "phonePlaceholder": "ej., +504 9999-1111",
             "email": "Correo Electrónico",
-            "emailPlaceholder": "ej., correo@ejemplo.com",
+            "emailPlaceholder": "ej., conductor@correo.com",
             "licenseNumber": "Número de Licencia",
-            "licenseNumberPlaceholder": "Número de licencia de conducir",
+            "licenseNumberPlaceholder": "ej., DL-2020-12345",
+            "licenseCategory": "Categoría de Licencia",
+            "licenseCategoryPlaceholder": "Selecciona una categoría",
             "licenseExpiry": "Vencimiento de Licencia",
+            "emergencyContactName": "Contacto de Emergencia",
+            "emergencyContactNamePlaceholder": "ej., María Hernández",
+            "emergencyContactPhone": "Teléfono de Emergencia",
+            "emergencyContactPhonePlaceholder": "ej., +504 8888-2222",
+            "hireDate": "Fecha de Contratación",
+            "status": "Estado",
             "dailyRate": "Tarifa Diaria (HNL)",
             "notes": "Notas",
-            "notesPlaceholder": "Notas adicionales"
+            "notesPlaceholder": "Notas adicionales sobre el conductor..."
+        },
+        "categories": {
+            "comercialA": "Comercial A (Buses)",
+            "comercialB": "Comercial B (Microbuses)",
+            "particular": "Particular"
+        },
+        "limits": {
+            "driverLimitReached": "¡Límite de conductores alcanzado!",
+            "upgradeToAddMore": "Actualiza tu plan para agregar más conductores."
         },
         "filters": {
             "searchPlaceholder": "Buscar conductores...",
@@ -458,6 +511,80 @@
                 "multiTenant": "Soporte multi-tenant",
                 "darkMode": "Soporte de modo oscuro"
             }
+        },
+        "team": {
+            "title": "Gestión de Equipo",
+            "subtitle": "Administra los miembros de tu equipo e invitaciones",
+            "members": "Miembros del Equipo",
+            "member": "Miembro",
+            "role": "Rol",
+            "status": "Estado",
+            "joined": "Ingresó",
+            "seats": "asientos",
+            "noMembers": "Sin miembros de equipo aún",
+            "inviteMember": "Invitar Miembro",
+            "pendingInvitations": "Invitaciones Pendientes",
+            "email": "Correo",
+            "sentAt": "Enviada",
+            "expiresAt": "Expira",
+            "sendInvite": "Enviar Invitación",
+            "inviteSent": "Invitación enviada exitosamente",
+            "inviteFailed": "Error al enviar invitación",
+            "inviteCancelled": "Invitación cancelada",
+            "cancelFailed": "Error al cancelar invitación",
+            "inviteResent": "Invitación reenviada",
+            "resendFailed": "Error al reenviar invitación",
+            "userRemoved": "Usuario removido del equipo",
+            "removeFailed": "Error al remover usuario",
+            "confirmCancelInvite": "¿Estás seguro de cancelar esta invitación?",
+            "confirmRemoveUser": "¿Estás seguro de remover este usuario del equipo?",
+            "resendInvite": "Reenviar Invitación",
+            "cancelInvite": "Cancelar Invitación",
+            "removeUser": "Remover Usuario",
+            "userLimitReached": "¡Límite de usuarios alcanzado!",
+            "upgradeToAddMore": "Mejora tu plan para agregar más miembros.",
+            "inviteNote": "La persona invitada recibirá un correo con un enlace para unirse a tu organización.",
+            "roles": {
+                "admin": "Administrador",
+                "manager": "Gerente",
+                "user": "Usuario"
+            }
+        },
+        "billing": {
+            "title": "Facturación y Suscripción",
+            "subtitle": "Administra tu plan y uso",
+            "active": "Activo",
+            "inactive": "Inactivo",
+            "nextBilling": "Próxima facturación",
+            "daysRemaining": "días restantes",
+            "lifetime": "Acceso de por vida - Sin renovación",
+            "upgrade": "Mejorar Plan",
+            "manageSubscription": "Administrar Suscripción",
+            "usage": "Uso Actual",
+            "users": "Miembros del Equipo",
+            "vehicles": "Vehículos",
+            "drivers": "Conductores",
+            "quotationsThisMonth": "Cotizaciones (este mes)",
+            "emailsThisMonth": "Correos (este mes)",
+            "unlimited": "Ilimitado",
+            "planFeatures": "Características del Plan",
+            "features": {
+                "emailEnabled": "Envío de Correos",
+                "pdfExport": "Exportar a PDF",
+                "customBranding": "Marca Personalizada",
+                "apiAccess": "Acceso API",
+                "advancedReports": "Reportes Avanzados",
+                "multiCurrency": "Multi-Moneda"
+            },
+            "usageHistory": "Historial de Uso",
+            "period": "Período",
+            "quotations": "Cotizaciones",
+            "emails": "Correos",
+            "pdfs": "PDFs",
+            "trialEnding": "¡Prueba por Terminar!",
+            "trialEndsOn": "Tu prueba termina el",
+            "upgradeNow": "Mejorar Ahora",
+            "noTenantError": "No se pudo cargar la información de facturación. Intenta de nuevo."
         }
     },
     "landing": {
@@ -507,6 +634,32 @@
         "validation": "Error de validación",
         "network": "Error de conexión",
         "tryAgain": "Intentar de nuevo"
+    },
+    "plans": {
+        "trial": {
+            "name": "Prueba",
+            "description": "14 días de prueba gratis con funciones limitadas"
+        },
+        "starter": {
+            "name": "Inicial",
+            "description": "Funciones esenciales para equipos pequeños"
+        },
+        "professional": {
+            "name": "Profesional",
+            "description": "Funciones avanzadas para negocios en crecimiento"
+        },
+        "business": {
+            "name": "Empresarial",
+            "description": "Funciones completas para organizaciones más grandes"
+        },
+        "enterprise": {
+            "name": "Enterprise",
+            "description": "Soluciones personalizadas para grandes empresas"
+        },
+        "founder": {
+            "name": "Fundador",
+            "description": "Acceso de por vida con todas las funciones Empresariales"
+        }
     },
     "units": {
         "km": "km",
@@ -833,6 +986,50 @@
                 "description": "Monitorea tu negocio con paneles completos, reportes de ventas, antigüedad de cuentas por cobrar y métricas de utilización. Exporta datos a CSV en cualquier momento.",
                 "tip": "Revisa el Panel diariamente y explora los Reportes detallados semanalmente."
             }
+        },
+        "setup": {
+            "title": "Configura tu Organización",
+            "welcome": "Vamos a configurar tu cuenta",
+            "subtitle": "Cuéntanos sobre tu empresa para comenzar con RouteWise",
+            "companyInfo": "Información de la Empresa",
+            "location": "Ubicación",
+            "confirm": "Confirmar",
+            "companyName": "Nombre de la Empresa",
+            "companyNamePlaceholder": "ej., TransportesCentroamérica S.A.",
+            "companyNameHelp": "Esto aparecerá en tus cotizaciones y facturas",
+            "phone": "Número de Teléfono",
+            "email": "Correo Electrónico",
+            "country": "País",
+            "city": "Ciudad",
+            "cityPlaceholder": "ej., San Pedro Sula",
+            "address": "Dirección",
+            "addressPlaceholder": "ej., Col. Trejo, Blvd. del Norte",
+            "timezone": "Zona Horaria",
+            "reviewInfo": "Revisa tu información",
+            "trialInfo": "Tu prueba gratuita de 14 días incluye:",
+            "trialDays": "14 días de acceso completo",
+            "trialFeatures": "1 usuario, 1 vehículo, 1 conductor, 10 cotizaciones",
+            "noCardRequired": "No se requiere tarjeta de crédito",
+            "startTrial": "Iniciar Prueba Gratuita",
+            "creating": "Creando tu organización..."
+        },
+        "acceptInvite": {
+            "title": "Aceptar Invitación",
+            "invalidLink": "Enlace de Invitación Inválido",
+            "noToken": "Este enlace de invitación no tiene la información requerida.",
+            "notFound": "Invitación No Encontrada",
+            "notFoundDesc": "Esta invitación puede haber sido cancelada o nunca existió.",
+            "expired": "Invitación Expirada",
+            "expiredDesc": "Esta invitación ha expirado. Por favor solicita una nueva al remitente.",
+            "alreadyUsed": "Invitación Ya Utilizada",
+            "alreadyUsedDesc": "Esta invitación ya ha sido aceptada.",
+            "goToDashboard": "Ir al Panel",
+            "youveBeenInvited": "¡Has sido invitado!",
+            "hasInvitedYou": "te ha invitado a unirte a su organización en RouteWise.",
+            "role": "Tu rol",
+            "acceptAndJoin": "Aceptar y Unirse",
+            "joining": "Uniéndose...",
+            "signedInAs": "Has iniciado sesión como"
         },
         "tip": "Consejo:",
         "back": "Atrás",

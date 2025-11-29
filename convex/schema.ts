@@ -6,8 +6,8 @@ export default defineSchema({
   tenants: defineTable({
     companyName: v.string(),
     slug: v.string(),
-    plan: v.string(), // 'starter' | 'professional' | 'business' | 'enterprise'
-    status: v.string(), // 'active' | 'suspended' | 'cancelled'
+    plan: v.string(), // 'trial' | 'starter' | 'professional' | 'business' | 'enterprise' | 'founder'
+    status: v.string(), // 'active' | 'suspended' | 'cancelled' | 'trial_expired'
     logoUrl: v.optional(v.string()),
     primaryContactEmail: v.string(),
     primaryContactPhone: v.optional(v.string()),
@@ -15,9 +15,37 @@ export default defineSchema({
     city: v.optional(v.string()),
     country: v.string(),
     timezone: v.string(),
+    // Subscription fields
+    subscriptionId: v.optional(v.string()), // Stripe subscription ID
+    subscriptionStatus: v.optional(v.string()), // 'trialing' | 'active' | 'past_due' | 'cancelled'
+    billingCycle: v.optional(v.string()), // 'monthly' | 'yearly' | 'lifetime'
+    // Trial tracking
+    trialStartedAt: v.optional(v.number()),
+    trialEndsAt: v.optional(v.number()),
+    // Subscription period
+    currentPeriodStart: v.optional(v.number()),
+    currentPeriodEnd: v.optional(v.number()),
+    // Plan limits (can override defaults)
+    maxUsers: v.optional(v.number()),
+    maxVehicles: v.optional(v.number()),
+    maxDrivers: v.optional(v.number()),
+    maxQuotationsPerMonth: v.optional(v.number()),
+    maxEmailsPerMonth: v.optional(v.number()),
+    // Feature flags
+    features: v.optional(v.object({
+      emailEnabled: v.boolean(),
+      pdfExport: v.boolean(),
+      customBranding: v.boolean(),
+      apiAccess: v.boolean(),
+      advancedReports: v.boolean(),
+      multiCurrency: v.boolean(),
+    })),
+    // Owner reference
+    ownerId: v.optional(v.id("users")),
     createdAt: v.number(),
     updatedAt: v.number(),
-  }).index("by_slug", ["slug"]),
+  }).index("by_slug", ["slug"])
+    .index("by_owner", ["ownerId"]),
 
   // Users
   users: defineTable({
@@ -46,10 +74,13 @@ export default defineSchema({
     licensePlate: v.optional(v.string()),
     passengerCapacity: v.number(),
     fuelCapacity: v.number(),
+    fuelCapacityUnit: v.optional(v.string()), // 'gallons' | 'liters'
     fuelEfficiency: v.number(),
     fuelEfficiencyUnit: v.string(),
     costPerDistance: v.number(),
+    costPerDistanceCurrency: v.optional(v.string()), // 'HNL' | 'USD' | local currency
     costPerDay: v.number(),
+    costPerDayCurrency: v.optional(v.string()), // 'HNL' | 'USD' | local currency
     distanceUnit: v.string(),
     ownership: v.string(), // 'owned' | 'rented'
     status: v.string(),
@@ -92,6 +123,24 @@ export default defineSchema({
     tollSalidaPtz: v.optional(v.number()),
     // Default markup percentages
     defaultMarkupPercentage: v.optional(v.number()),
+    // Client pricing levels configuration
+    pricingLevels: v.optional(v.array(v.object({
+      key: v.string(),        // 'standard', 'preferred', 'vip', or custom
+      name: v.string(),       // Display name
+      discountPercentage: v.number(),  // Discount for this level
+      isDefault: v.optional(v.boolean()), // Is this the default level?
+    }))),
+    // Driver license categories configuration
+    licenseCategories: v.optional(v.array(v.object({
+      key: v.string(),        // e.g., 'comercial_a', 'comercial_b', 'particular'
+      name: v.string(),       // Display name e.g., 'Comercial A'
+      description: v.optional(v.string()), // Optional description
+    }))),
+    // Custom vehicle makes/models (tenant-specific, grows over time)
+    customVehicleMakes: v.optional(v.array(v.object({
+      make: v.string(),       // e.g., 'Scania', 'Marcopolo'
+      models: v.array(v.string()), // e.g., ['K380', 'K400']
+    }))),
     // Rounding preferences
     roundingLocal: v.optional(v.number()), // Round local currency to nearest N (e.g., 100)
     roundingUsd: v.optional(v.number()), // Round USD to nearest N (e.g., 5)
@@ -119,6 +168,7 @@ export default defineSchema({
     phone: v.optional(v.string()),
     address: v.optional(v.string()),
     city: v.optional(v.string()),
+    state: v.optional(v.string()), // State/Province/Department
     country: v.string(),
     taxId: v.optional(v.string()),
     pricingLevel: v.string(), // 'standard' | 'preferred' | 'vip'
@@ -171,7 +221,31 @@ export default defineSchema({
     // Route info
     totalDistance: v.number(),
     totalTime: v.number(),
-    // Cost breakdown
+    // Currency used for this quotation (frozen at creation)
+    localCurrency: v.optional(v.string()), // 'HNL', 'GTQ', etc. - defaults to HNL for backwards compatibility
+    exchangeRateUsed: v.number(), // Exchange rate at time of creation
+    // Cost breakdown - stored in BOTH currencies (frozen at creation)
+    // Local currency values
+    fuelCostLocal: v.optional(v.number()),
+    refuelingCostLocal: v.optional(v.number()),
+    driverMealsCostLocal: v.optional(v.number()),
+    driverLodgingCostLocal: v.optional(v.number()),
+    driverIncentiveCostLocal: v.optional(v.number()),
+    vehicleDistanceCostLocal: v.optional(v.number()),
+    vehicleDailyCostLocal: v.optional(v.number()),
+    tollCostLocal: v.optional(v.number()),
+    totalCostLocal: v.optional(v.number()),
+    // USD values
+    fuelCostUsd: v.optional(v.number()),
+    refuelingCostUsd: v.optional(v.number()),
+    driverMealsCostUsd: v.optional(v.number()),
+    driverLodgingCostUsd: v.optional(v.number()),
+    driverIncentiveCostUsd: v.optional(v.number()),
+    vehicleDistanceCostUsd: v.optional(v.number()),
+    vehicleDailyCostUsd: v.optional(v.number()),
+    tollCostUsd: v.optional(v.number()),
+    totalCostUsd: v.optional(v.number()),
+    // Legacy fields (for backwards compatibility - stored in local currency)
     fuelCost: v.number(),
     refuelingCost: v.number(),
     driverMealsCost: v.number(),
@@ -181,11 +255,11 @@ export default defineSchema({
     vehicleDailyCost: v.number(),
     tollCost: v.number(),
     totalCost: v.number(),
-    // Pricing
+    // Pricing - stored in BOTH currencies (frozen at creation)
     selectedMarkupPercentage: v.number(),
-    salePriceHnl: v.number(),
+    salePriceLocal: v.optional(v.number()), // Sale price in local currency
+    salePriceHnl: v.number(), // Legacy field, kept for backwards compatibility
     salePriceUsd: v.number(),
-    exchangeRateUsed: v.number(),
     // Options
     includeFuel: v.boolean(),
     includeMeals: v.boolean(),
@@ -237,8 +311,10 @@ export default defineSchema({
     dropoffLocation: v.optional(v.string()),
     dropoffTime: v.optional(v.string()),
     dropoffNotes: v.optional(v.string()),
-    // Pricing (from quotation)
-    agreedPriceHnl: v.number(),
+    // Pricing (from quotation) - frozen at creation
+    localCurrency: v.optional(v.string()), // 'HNL', 'GTQ', etc.
+    agreedPriceLocal: v.optional(v.number()), // Price in local currency
+    agreedPriceHnl: v.number(), // Legacy field for backwards compatibility
     agreedPriceUsd: v.number(),
     exchangeRateUsed: v.number(),
     // Status
@@ -273,16 +349,24 @@ export default defineSchema({
     // Invoice details
     invoiceDate: v.number(),
     dueDate: v.number(),
+    // Currency used for this invoice (frozen at creation)
+    localCurrency: v.optional(v.string()), // 'HNL', 'GTQ', etc.
+    exchangeRateUsed: v.number(),
     // Line items (services rendered)
     description: v.string(), // Trip description
-    subtotalHnl: v.number(),
+    // Subtotal in both currencies (frozen at creation)
+    subtotalLocal: v.optional(v.number()), // Subtotal in local currency
+    subtotalHnl: v.number(), // Legacy field
+    subtotalUsd: v.optional(v.number()),
     // Tax (ISV 15% in Honduras)
     taxPercentage: v.number(),
-    taxAmountHnl: v.number(),
-    // Totals
-    totalHnl: v.number(),
+    taxAmountLocal: v.optional(v.number()), // Tax in local currency
+    taxAmountHnl: v.number(), // Legacy field
+    taxAmountUsd: v.optional(v.number()),
+    // Totals in both currencies (frozen at creation)
+    totalLocal: v.optional(v.number()), // Total in local currency
+    totalHnl: v.number(), // Legacy field
     totalUsd: v.optional(v.number()),
-    exchangeRateUsed: v.number(),
     // Payment tracking
     amountPaid: v.number(),
     amountDue: v.number(),
@@ -337,12 +421,15 @@ export default defineSchema({
     itineraryId: v.id("itineraries"),
     driverId: v.optional(v.id("drivers")),
     createdBy: v.optional(v.id("users")),
-    // Advance details
-    amountHnl: v.number(),
-    amountUsd: v.optional(v.number()),
+    // Currency used (frozen at creation)
+    localCurrency: v.optional(v.string()), // 'HNL', 'GTQ', etc.
     exchangeRateUsed: v.number(),
+    // Advance details - both currencies (frozen at creation)
+    amountLocal: v.optional(v.number()), // Amount in local currency
+    amountHnl: v.number(), // Legacy field
+    amountUsd: v.optional(v.number()),
     purpose: v.string(),
-    // Expense breakdown (suggested amounts)
+    // Expense breakdown (suggested amounts - in local currency)
     estimatedFuel: v.optional(v.number()),
     estimatedMeals: v.optional(v.number()),
     estimatedLodging: v.optional(v.number()),
@@ -381,4 +468,62 @@ export default defineSchema({
     .index("by_tenant_status", ["tenantId", "status"])
     .index("by_itinerary", ["itineraryId"])
     .index("by_driver", ["driverId"]),
+
+  // Invitations (for team member invites)
+  invitations: defineTable({
+    tenantId: v.id("tenants"),
+    email: v.string(),
+    role: v.string(), // 'admin' | 'sales' | 'operations' | 'finance' | 'viewer'
+    token: v.string(), // Unique invite token
+    status: v.string(), // 'pending' | 'accepted' | 'expired' | 'cancelled'
+    invitedBy: v.id("users"),
+    acceptedBy: v.optional(v.id("users")),
+    expiresAt: v.number(),
+    acceptedAt: v.optional(v.number()),
+    createdAt: v.number(),
+  })
+    .index("by_token", ["token"])
+    .index("by_email", ["email"])
+    .index("by_tenant", ["tenantId"])
+    .index("by_tenant_status", ["tenantId", "status"]),
+
+  // Usage Tracking (per billing period)
+  usageTracking: defineTable({
+    tenantId: v.id("tenants"),
+    periodStart: v.number(), // Start of billing period (timestamp)
+    periodEnd: v.number(), // End of billing period (timestamp)
+    // Resource counts
+    quotationsCreated: v.number(),
+    emailsSent: v.number(),
+    pdfGenerated: v.number(),
+    // Snapshot of resource counts at period start (for limit checking)
+    usersCount: v.optional(v.number()),
+    vehiclesCount: v.optional(v.number()),
+    driversCount: v.optional(v.number()),
+    clientsCount: v.optional(v.number()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_tenant", ["tenantId"])
+    .index("by_tenant_period", ["tenantId", "periodStart"]),
+
+  // Exchange Rates (global, updated daily)
+  exchangeRates: defineTable({
+    baseCurrency: v.string(), // Always 'USD'
+    rates: v.object({
+      HNL: v.number(),  // Honduras
+      GTQ: v.number(),  // Guatemala
+      CRC: v.number(),  // Costa Rica
+      NIO: v.number(),  // Nicaragua
+      PAB: v.number(),  // Panama
+      BZD: v.number(),  // Belize
+      MXN: v.number(),  // Mexico
+      DOP: v.number(),  // Dominican Republic
+      COP: v.number(),  // Colombia
+      PEN: v.number(),  // Peru
+    }),
+    source: v.string(), // 'apilayer' | 'manual' | 'default'
+    fetchedAt: v.number(), // When the rates were fetched from API
+    createdAt: v.number(),
+  }).index("by_fetched_at", ["fetchedAt"]),
 });

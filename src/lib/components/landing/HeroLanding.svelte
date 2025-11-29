@@ -2,6 +2,7 @@
 	import { Button } from 'flowbite-svelte';
 	import { ArrowRightOutline, MapPinAltSolid, ChartPieSolid, CashOutline, TruckSolid } from 'flowbite-svelte-icons';
 	import { t } from '$lib/i18n';
+	import { page } from '$app/stores';
 
 	const features = $derived([
 		{ icon: MapPinAltSolid, key: 'routes' },
@@ -9,6 +10,10 @@
 		{ icon: CashOutline, key: 'currency' },
 		{ icon: TruckSolid, key: 'fleet' }
 	]);
+
+	// Check if user was just logged out - use fresh login to force new auth
+	const wasLoggedOut = $derived($page.url.searchParams.get('logged_out') === 'true');
+	const loginUrl = $derived(wasLoggedOut ? '/auth/login?fresh=true' : '/auth/login');
 </script>
 
 <div class="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex flex-col">
@@ -67,14 +72,14 @@
 
 					<!-- CTA Buttons -->
 					<div class="space-y-4">
-						<Button href="/auth/login" size="l" class="w-full justify-center text-lg py-4">
+						<Button href={loginUrl} size="l" class="w-full justify-center text-lg py-4">
 							{$t('landing.getStarted')}
 							<ArrowRightOutline class="w-5 h-5 ml-2" />
 						</Button>
 
 						<div class="flex items-center justify-center gap-2 text-gray-400 text-sm">
 							<span>{$t('landing.alreadyHaveAccount')}</span>
-							<a href="/auth/login" class="text-primary-400 hover:text-primary-300 font-medium">
+							<a href={loginUrl} class="text-primary-400 hover:text-primary-300 font-medium">
 								{$t('landing.signIn')}
 							</a>
 						</div>

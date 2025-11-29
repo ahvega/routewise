@@ -9,7 +9,8 @@
 		Select,
 		Textarea,
 		Spinner,
-		Toast
+		Toast,
+		Alert
 	} from 'flowbite-svelte';
 	import {
 		PlusOutline,
@@ -17,7 +18,9 @@
 		TrashBinOutline,
 		CheckCircleOutline,
 		CloseCircleOutline,
-		ExclamationCircleOutline
+		ExclamationCircleOutline,
+		UserOutline,
+		InfoCircleSolid
 	} from 'flowbite-svelte-icons';
 	import { useQuery, useConvexClient } from 'convex-svelte';
 	import { api } from '$convex/_generated/api';
@@ -33,6 +36,38 @@
 		api.drivers.list,
 		() => (tenantStore.tenantId ? { tenantId: tenantStore.tenantId } : 'skip')
 	);
+
+	// Query tenant for plan limits
+	const tenantQuery = useQuery(
+		api.tenants.get,
+		() => (tenantStore.tenantId ? { id: tenantStore.tenantId } : 'skip')
+	);
+
+	// Query parameters for license categories
+	const parametersQuery = useQuery(
+		api.parameters.getActive,
+		() => (tenantStore.tenantId ? { tenantId: tenantStore.tenantId } : 'skip')
+	);
+
+	const tenant = $derived(tenantQuery.data);
+	const parameters = $derived(parametersQuery.data);
+
+	// License categories from parameters or defaults
+	const defaultLicenseCategories = [
+		{ key: 'comercial_a', name: 'Comercial A' },
+		{ key: 'comercial_b', name: 'Comercial B' },
+		{ key: 'particular', name: 'Particular' }
+	];
+	const licenseCategories = $derived(
+		(parameters?.licenseCategories as { key: string; name: string; description?: string }[]) || defaultLicenseCategories
+	);
+
+	// Check if can add more drivers
+	const canAddDriver = $derived(() => {
+		if (!tenant) return false;
+		if (tenant.maxDrivers === -1) return true;
+		return drivers.length < (tenant.maxDrivers || 0);
+	});
 
 	// Modal state
 	let showModal = $state(false);
@@ -90,7 +125,7 @@
 			key: 'licenseCategory',
 			label: $t('drivers.columns.category') || 'Category',
 			sortable: true,
-			filterOptions: ['Comercial A', 'Comercial B', 'Particular']
+			filterOptions: licenseCategories.map(c => c.name)
 		},
 		{
 			key: 'licenseExpiry',
@@ -245,13 +280,29 @@
 			<h1 class="text-3xl font-bold text-gray-900 dark:text-white">{$t('drivers.title')}</h1>
 			<p class="text-gray-600 dark:text-gray-400 mt-1">
 				{$t('drivers.subtitle', { values: { count: drivers.length } })}
+				{#if tenant && tenant.maxDrivers !== -1}
+					<span class="text-sm">({drivers.length} / {tenant.maxDrivers})</span>
+				{/if}
 			</p>
 		</div>
-		<Button onclick={openCreateModal}>
+		<Button onclick={openCreateModal} disabled={!canAddDriver()}>
 			<PlusOutline class="w-4 h-4 mr-2" />
 			{$t('drivers.addDriver')}
 		</Button>
 	</div>
+
+	{#if !canAddDriver() && tenant}
+		<Alert color="red" border class="bg-red-50 dark:bg-red-900/30">
+			{#snippet icon()}
+				<InfoCircleSolid class="w-5 h-5" />
+			{/snippet}
+			<span class="font-semibold">{$t('drivers.limits.driverLimitReached')}</span>
+			<span class="ml-1">{$t('drivers.limits.upgradeToAddMore')}</span>
+			<Button size="xs" color="red" class="ml-3" href="/settings/billing">
+				{$t('settings.billing.upgrade')}
+			</Button>
+		</Alert>
+	{/if}
 
 	<Card class="max-w-none !p-6">
 		{#if isLoading}
@@ -332,75 +383,75 @@
 	<form onsubmit={(e) => { e.preventDefault(); handleSubmit(); }} class="space-y-4">
 		<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
 			<div>
-				<Label for="firstName">First Name *</Label>
-				<Input id="firstName" bind:value={formData.firstName} required placeholder="e.g., Jose" />
+				<Label for="firstName">{$t('drivers.fields.firstName')} *</Label>
+				<Input id="firstName" bind:value={formData.firstName} required placeholder={$t('drivers.fields.firstNamePlaceholder')} />
 			</div>
 			<div>
-				<Label for="lastName">Last Name *</Label>
-				<Input id="lastName" bind:value={formData.lastName} required placeholder="e.g., Hernandez" />
+				<Label for="lastName">{$t('drivers.fields.lastName')} *</Label>
+				<Input id="lastName" bind:value={formData.lastName} required placeholder={$t('drivers.fields.lastNamePlaceholder')} />
 			</div>
 		</div>
 
 		<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
 			<div>
-				<Label for="phone">Phone *</Label>
-				<Input id="phone" bind:value={formData.phone} required placeholder="+504 9999-1111" />
+				<Label for="phone">{$t('drivers.fields.phone')} *</Label>
+				<Input id="phone" bind:value={formData.phone} required placeholder={$t('drivers.fields.phonePlaceholder')} />
 			</div>
 			<div>
-				<Label for="email">Email</Label>
-				<Input id="email" type="email" bind:value={formData.email} placeholder="driver@email.com" />
+				<Label for="email">{$t('drivers.fields.email')}</Label>
+				<Input id="email" type="email" bind:value={formData.email} placeholder={$t('drivers.fields.emailPlaceholder')} />
 			</div>
 		</div>
 
 		<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
 			<div>
-				<Label for="licenseNumber">License Number *</Label>
-				<Input id="licenseNumber" bind:value={formData.licenseNumber} required placeholder="DL-2020-12345" />
+				<Label for="licenseNumber">{$t('drivers.fields.licenseNumber')} *</Label>
+				<Input id="licenseNumber" bind:value={formData.licenseNumber} required placeholder={$t('drivers.fields.licenseNumberPlaceholder')} />
 			</div>
 			<div>
-				<Label for="licenseCategory">License Category</Label>
+				<Label for="licenseCategory">{$t('drivers.fields.licenseCategory')}</Label>
 				<Select id="licenseCategory" bind:value={formData.licenseCategory}>
-					<option value="">Select category</option>
-					<option value="Comercial A">Comercial A (Buses)</option>
-					<option value="Comercial B">Comercial B (Vans)</option>
-					<option value="Particular">Particular</option>
+					<option value="">{$t('drivers.fields.licenseCategoryPlaceholder')}</option>
+					{#each licenseCategories as category}
+						<option value={category.name}>{category.name}</option>
+					{/each}
 				</Select>
 			</div>
 			<div>
-				<Label for="licenseExpiry">License Expiry *</Label>
+				<Label for="licenseExpiry">{$t('drivers.fields.licenseExpiry')} *</Label>
 				<Input id="licenseExpiry" type="date" bind:value={formData.licenseExpiry} required />
 			</div>
 		</div>
 
 		<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
 			<div>
-				<Label for="emergencyContactName">Emergency Contact Name</Label>
-				<Input id="emergencyContactName" bind:value={formData.emergencyContactName} placeholder="e.g., Maria Hernandez" />
+				<Label for="emergencyContactName">{$t('drivers.fields.emergencyContactName')}</Label>
+				<Input id="emergencyContactName" bind:value={formData.emergencyContactName} placeholder={$t('drivers.fields.emergencyContactNamePlaceholder')} />
 			</div>
 			<div>
-				<Label for="emergencyContactPhone">Emergency Contact Phone</Label>
-				<Input id="emergencyContactPhone" bind:value={formData.emergencyContactPhone} placeholder="+504 8888-2222" />
+				<Label for="emergencyContactPhone">{$t('drivers.fields.emergencyContactPhone')}</Label>
+				<Input id="emergencyContactPhone" bind:value={formData.emergencyContactPhone} placeholder={$t('drivers.fields.emergencyContactPhonePlaceholder')} />
 			</div>
 		</div>
 
 		<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
 			<div>
-				<Label for="hireDate">Hire Date</Label>
+				<Label for="hireDate">{$t('drivers.fields.hireDate')}</Label>
 				<Input id="hireDate" type="date" bind:value={formData.hireDate} />
 			</div>
 			<div>
-				<Label for="status">Status</Label>
+				<Label for="status">{$t('drivers.fields.status')}</Label>
 				<Select id="status" bind:value={formData.status}>
-					<option value="active">Active</option>
-					<option value="inactive">Inactive</option>
-					<option value="on_leave">On Leave</option>
+					<option value="active">{$t('common.active')}</option>
+					<option value="inactive">{$t('common.inactive')}</option>
+					<option value="on_leave">{$t('statuses.on_leave')}</option>
 				</Select>
 			</div>
 		</div>
 
 		<div>
-			<Label for="notes">Notes</Label>
-			<Textarea id="notes" bind:value={formData.notes} rows={3} placeholder="Additional notes about this driver..." />
+			<Label for="notes">{$t('drivers.fields.notes')}</Label>
+			<Textarea id="notes" bind:value={formData.notes} rows={3} placeholder={$t('drivers.fields.notesPlaceholder')} />
 		</div>
 	</form>
 

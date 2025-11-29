@@ -1,54 +1,117 @@
 # Repository Guidelines
 
 ## Project Structure & Module Organization
-- Source: `src/` (see `src/README.md` for details).
-- Routing/UI: `src/app/` (Next.js App Router), shared UI in `src/components/` with feature folders (e.g., `Admin/`, `Forms/`, `Map/`).
-- Logic: `src/services/` (domain services), `src/utils/` (helpers), `src/hooks/` (custom hooks), `src/types/` (TypeScript types), `src/config/` (env/config).
-- Assets: `public/`.
-- Barrel exports: prefer `index.ts` per folder for re-exports.
+
+- Source: `src/` (SvelteKit project root)
+- Routing/UI: `src/routes/` (SvelteKit file-based routing), shared UI in `src/lib/components/`
+- Logic: `src/lib/services/` (domain services), `src/lib/utils/` (helpers), `src/lib/stores/` (Svelte stores with runes), `src/lib/types/` (TypeScript types)
+- Backend: `convex/` (Convex database schema and functions)
+- Assets: `static/`
+- Barrel exports: prefer `index.ts` per folder for re-exports
 
 ## Build, Test, and Development Commands
-- `npm run dev`: Start local dev server at `http://localhost:3000`.
-- `npm run build`: Production build (Next.js).
-- `npm start`: Serve the production build.
-- `npm run lint`: Lint the codebase using ESLint. Fix issues before committing.
+
+- `npm run dev`: Start local dev server at `http://localhost:5173`
+- `npm run build`: Production build (SvelteKit)
+- `npm run preview`: Preview production build
+- `npm run check`: TypeScript and Svelte checks
+- `npm run test`: Run tests in watch mode
+- `npm run test:run`: Run tests once
+- `npm run quality`: Run type checks + tests (use before commits)
+- `npx convex dev`: Start Convex development server
 
 ## Coding Style & Naming Conventions
-- Language: TypeScript + React (Next.js 15).
-- Linting: ESLint with Next/TypeScript config; import ordering enforced. Run `npm run lint`.
-- Components/files: PascalCase for React components (e.g., `ModernPricingTable.tsx`).
-- Hooks: `use*` naming (e.g., `useGooglePlaces.ts`).
-- Types: PascalCase interfaces/types in `src/types/`.
-- Exports: Use barrel files (`index.ts`) for feature folders.
+
+- Language: TypeScript + Svelte 5 (SvelteKit 2.x)
+- UI Components: Flowbite-svelte (Tailwind-based component library)
+- Linting: ESLint with Svelte/TypeScript config. Run `npm run check`
+- Components/files: PascalCase for Svelte components (e.g., `PricingTable.svelte`)
+- Stores: Use Svelte 5 runes (`$state`, `$derived`, `$effect`)
+- Types: PascalCase interfaces/types in `src/lib/types/`
+- Exports: Use barrel files (`index.ts`) for feature folders
 
 ## Testing Guidelines
-- No test runner is configured yet. For additions, co-locate tests under `src/**/__tests__` or alongside files (`*.test.ts[x]`).
-- Prefer component tests (React Testing Library) and service-level unit tests. Keep tests deterministic and fast.
-- Follow TDD (Test-Driven Development) for core business logic. See `DEVELOPMENT.md` for detailed testing strategy.
+
+- Test runner: Vitest (compatible with Vite)
+- Tests location: `src/tests/` mirroring source structure
+- Prefer component tests (@testing-library/svelte) and service-level unit tests
+- Follow TDD (Test-Driven Development) for core business logic
+- Run `npm run quality` before committing
 
 ## Commit & Pull Request Guidelines
-- Commits: Follow Conventional Commits (e.g., `feat(form): add range slider`, `chore(project-setup): ...`).
-- PRs: Provide a clear description, link issues (e.g., `Closes #123`), and include screenshots/GIFs for UI changes.
-- Scope: Keep PRs small and focused. Ensure `npm run lint` passes.
+
+- Commits: Follow Conventional Commits (e.g., `feat(form): add range slider`, `fix(auth): session handling`)
+- PRs: Provide a clear description, link issues (e.g., `Closes #123`), and include screenshots for UI changes
+- Scope: Keep PRs small and focused. Ensure `npm run quality` passes
 
 ## Security & Configuration Tips
-- Environment: copy `.env.example` to `.env`. Set `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` and other required vars (`src/config/environment.ts`).
-- Do not commit secrets. `.env` is ignored by Git.
-- External APIs: URLs managed via `src/config/`. Keep secrets client-safe (only `NEXT_PUBLIC_*` on client).
+
+- Environment: copy `.env.example` to `.env`
+- Required vars: `PUBLIC_CONVEX_URL`, `PUBLIC_GOOGLE_MAPS_API_KEY`, WorkOS credentials
+- Do not commit secrets. `.env` is ignored by Git
+- Public vars use `PUBLIC_` prefix (accessible on client)
 
 ## Development Best Practices
-- See `DEVELOPMENT.md` for comprehensive guidelines on:
-  - Code quality standards and linting
-  - Test-Driven Development (TDD) approach
-  - Documentation standards (JSDoc, inline comments)
-  - Git workflow and commit conventions
-  - Performance optimization guidelines
-  - Code review checklist
+
+- See `CLAUDE.md` for comprehensive guidelines on:
+  - Svelte 5 runes syntax
+  - Convex integration patterns
+  - Flowbite-svelte component usage
+  - Service layer patterns
+  - Multi-tenant architecture
 
 ## Agent-Specific Instructions
-- Align changes with existing structure and barrel exports.
-- Avoid unrelated refactors; prefer incremental, well-scoped patches.
-- When adding modules, mirror naming and placement patterns shown in `src/components/`, `src/services/`, and `src/utils/`.
-- Always run `npm run lint` before committing code.
-- Document all public APIs with JSDoc comments.
-- Follow TDD for service layer and business logic.
+
+- Align changes with existing structure and barrel exports
+- Avoid unrelated refactors; prefer incremental, well-scoped patches
+- When adding modules, mirror naming and placement patterns in `src/lib/components/`, `src/lib/services/`, and `src/lib/utils/`
+- Always run `npm run quality` before committing code
+- Document all public APIs with JSDoc comments
+- Follow TDD for service layer and business logic
+- **Use Flowbite-svelte components** - prefer these over custom implementations
+
+## Flowbite-Svelte MCP Server
+
+This project has access to the **Flowbite-Svelte MCP Server** for AI-assisted UI development. The MCP server provides real-time access to component documentation, usage examples, and best practices.
+
+### Available MCP Tools
+
+When implementing UI with Flowbite-Svelte, use these tools in order:
+
+1. **findComponent** - Use FIRST to discover components by name or category
+   - Example: Find components for "modal", "form", "navigation"
+   - Returns documentation paths for matching components
+
+2. **getComponentList** - Lists all available components organized by category
+   - Categories: components, forms, typography, utilities, extend, plugins
+
+3. **getComponentDoc** - Retrieves complete documentation for a specific component
+   - Includes: props, events, slots, usage examples, best practices
+   - Use after findComponent to get full implementation details
+
+4. **searchDocs** - Full-text search across all documentation
+   - Use for specific patterns, features, or edge cases
+
+### MCP Server Configuration
+
+Server location:
+
+```text
+e:\MyDevTools\flowbite-svelte-mcp\build\server.js
+```
+
+### Recommended Workflow
+
+When building UI components:
+
+1. **Discover**: Use `findComponent` to locate relevant components
+2. **Learn**: Use `getComponentDoc` to understand props, events, and examples
+3. **Search**: Use `searchDocs` for specific patterns or advanced usage
+4. **Implement**: Follow the examples and best practices from the docs
+
+### Example MCP Queries
+
+- "Find the Modal component" → use `findComponent`
+- "What form components are available?" → use `getComponentList`
+- "Show me Dropdown documentation" → use `getComponentDoc`
+- "Search for dark mode toggle examples" → use `searchDocs`

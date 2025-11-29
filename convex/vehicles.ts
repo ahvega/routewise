@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { query, mutation } from "./_generated/server";
+import { canAddVehicle, isTenantActive } from "./lib/planLimits";
 
 // List all vehicles for a tenant
 export const list = query({
@@ -47,10 +48,13 @@ export const create = mutation({
     licensePlate: v.optional(v.string()),
     passengerCapacity: v.number(),
     fuelCapacity: v.number(),
+    fuelCapacityUnit: v.optional(v.string()),
     fuelEfficiency: v.number(),
     fuelEfficiencyUnit: v.string(),
     costPerDistance: v.number(),
+    costPerDistanceCurrency: v.optional(v.string()),
     costPerDay: v.number(),
+    costPerDayCurrency: v.optional(v.string()),
     distanceUnit: v.string(),
     ownership: v.string(),
     status: v.string(),
@@ -59,6 +63,18 @@ export const create = mutation({
     baseLocationLng: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    // Check tenant status
+    const tenantStatus = await isTenantActive(ctx, args.tenantId);
+    if (!tenantStatus.active) {
+      throw new Error(tenantStatus.message || "Account not active");
+    }
+
+    // Check plan limits
+    const limitCheck = await canAddVehicle(ctx, args.tenantId);
+    if (!limitCheck.allowed) {
+      throw new Error(limitCheck.message || "Vehicle limit reached");
+    }
+
     const now = Date.now();
     return await ctx.db.insert("vehicles", {
       ...args,
@@ -79,10 +95,13 @@ export const update = mutation({
     licensePlate: v.optional(v.string()),
     passengerCapacity: v.optional(v.number()),
     fuelCapacity: v.optional(v.number()),
+    fuelCapacityUnit: v.optional(v.string()),
     fuelEfficiency: v.optional(v.number()),
     fuelEfficiencyUnit: v.optional(v.string()),
     costPerDistance: v.optional(v.number()),
+    costPerDistanceCurrency: v.optional(v.string()),
     costPerDay: v.optional(v.number()),
+    costPerDayCurrency: v.optional(v.string()),
     distanceUnit: v.optional(v.string()),
     ownership: v.optional(v.string()),
     status: v.optional(v.string()),

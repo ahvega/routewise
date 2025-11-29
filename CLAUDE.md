@@ -326,6 +326,51 @@ vi.mock('svelte-i18n', () => ({
 2. Export from barrel file (`index.ts`)
 3. Use Flowbite-svelte base components when possible
 
+## Flowbite-Svelte MCP Server
+
+This project has access to the **Flowbite-Svelte MCP Server** which provides AI assistants with comprehensive component documentation, usage examples, and best practices.
+
+### Available MCP Tools
+
+When working with Flowbite-Svelte components, use these tools:
+
+1. **findComponent** - Use this FIRST to discover components by name or category
+   - Returns documentation paths for matching components
+   - Example: "Find the Modal component" → returns path to modal docs
+
+2. **getComponentList** - Lists all available Flowbite-Svelte components organized by category
+   - Use to explore what components are available
+   - Returns components grouped by: forms, typography, utilities, extend, etc.
+
+3. **getComponentDoc** - Retrieves complete documentation for a specific component
+   - Includes usage examples, props, events, and best practices
+   - Use after findComponent to get full details
+
+4. **searchDocs** - Performs full-text search across all documentation
+   - Useful for finding specific features or patterns
+   - Example: "Search for dark mode toggle examples"
+
+### MCP Server Location
+
+The Flowbite-Svelte MCP server is installed at:
+```
+e:\MyDevTools\flowbite-svelte-mcp\build\server.js
+```
+
+### Usage Workflow
+
+When implementing UI with Flowbite-Svelte:
+1. **First**: Use `findComponent` to locate the relevant component(s)
+2. **Then**: Use `getComponentDoc` to get detailed usage examples and props
+3. **Optionally**: Use `searchDocs` for specific patterns or edge cases
+
+### Example Queries
+
+- "What components are available for forms?"
+- "Show me how to use the Dropdown component"
+- "Search for accordion with nested items"
+- "Get documentation for the Modal component"
+
 ## Related Documentation
 
 - `PT_MIGRATION_TO_SAAS_PLAN.md` - SaaS transformation analysis

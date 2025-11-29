@@ -19,7 +19,9 @@
       "Bash(npm run dev:*)",
       "WebSearch",
       "WebFetch(domain:svelte.dev)",
-      "Bash(dir:*)"
+      "Bash(dir:*)",
+      "mcp__MCP_DOCKER__sequentialthinking",
+      "Bash(git clone:*)"
     ],
     "deny": []
   }

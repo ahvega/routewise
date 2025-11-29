@@ -2,11 +2,29 @@ import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 
 /**
- * Bootstrap functions for initial setup
- * Creates default tenant and user associations
+ * Bootstrap functions for initial setup and migration
+ *
+ * NOTE: The multi-tenant architecture no longer auto-creates a default tenant.
+ * New users must go through the onboarding flow to create their organization.
+ * These functions are kept for:
+ * 1. Legacy support during migration
+ * 2. Development/testing purposes
+ * 3. Migrating existing "default" tenant to a real organization
  */
 
-// Get or create default tenant for development
+// Get default tenant if it exists (for migration purposes)
+export const getDefaultTenant = query({
+  args: {},
+  handler: async (ctx) => {
+    return await ctx.db
+      .query("tenants")
+      .withIndex("by_slug", (q) => q.eq("slug", "default"))
+      .first();
+  },
+});
+
+// DEPRECATED: This function is kept for backwards compatibility during migration
+// New users should use tenants.createWithTrial instead
 export const getOrCreateDefaultTenant = mutation({
   args: {},
   handler: async (ctx) => {
@@ -20,7 +38,10 @@ export const getOrCreateDefaultTenant = mutation({
       return existing._id;
     }
 
-    // Create default tenant
+    // In production, we should NOT auto-create tenants
+    // This is kept for development/migration only
+    console.warn("DEPRECATED: Auto-creating default tenant. Use tenants.createWithTrial for new orgs.");
+
     const now = Date.now();
     const tenantId = await ctx.db.insert("tenants", {
       companyName: "RouteWise Demo",
@@ -39,11 +60,11 @@ export const getOrCreateDefaultTenant = mutation({
     await ctx.db.insert("parameters", {
       tenantId,
       year,
-      fuelPrice: 110.0, // HNL per gallon
-      mealCostPerDay: 250.0, // HNL
-      hotelCostPerNight: 800.0, // HNL
-      driverIncentivePerDay: 500.0, // HNL
-      exchangeRate: 24.75, // HNL per USD
+      fuelPrice: 110.0,
+      mealCostPerDay: 250.0,
+      hotelCostPerNight: 800.0,
+      driverIncentivePerDay: 500.0,
+      exchangeRate: 24.75,
       useCustomExchangeRate: false,
       preferredDistanceUnit: "km",
       preferredCurrency: "HNL",
@@ -56,18 +77,34 @@ export const getOrCreateDefaultTenant = mutation({
   },
 });
 
-// Get default tenant (query version)
-export const getDefaultTenant = query({
-  args: {},
-  handler: async (ctx) => {
-    return await ctx.db
-      .query("tenants")
-      .withIndex("by_slug", (q) => q.eq("slug", "default"))
+// Update user last login time
+export const updateUserLastLogin = mutation({
+  args: {
+    workosUserId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_workos_id", (q) => q.eq("workosUserId", args.workosUserId))
       .first();
+
+    if (user) {
+      const now = Date.now();
+      await ctx.db.patch(user._id, {
+        lastLoginAt: now,
+        updatedAt: now,
+      });
+      return { success: true, userId: user._id };
+    }
+
+    return { success: false, userId: null };
   },
 });
 
-// Ensure user exists in database and is linked to tenant
+// DEPRECATED: ensureUser is no longer needed with proper multi-tenant flow
+// Users are created via:
+// 1. tenants.createWithTrial (owner during org setup)
+// 2. invitations.accept (team member via invite)
 export const ensureUser = mutation({
   args: {
     workosUserId: v.string(),
@@ -76,33 +113,7 @@ export const ensureUser = mutation({
     avatarUrl: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    // Get or create default tenant
-    let tenant = await ctx.db
-      .query("tenants")
-      .withIndex("by_slug", (q) => q.eq("slug", "default"))
-      .first();
-
-    if (!tenant) {
-      const now = Date.now();
-      const tenantId = await ctx.db.insert("tenants", {
-        companyName: "RouteWise Demo",
-        slug: "default",
-        plan: "professional",
-        status: "active",
-        primaryContactEmail: args.email,
-        country: "HN",
-        timezone: "America/Tegucigalpa",
-        createdAt: now,
-        updatedAt: now,
-      });
-      tenant = await ctx.db.get(tenantId);
-    }
-
-    if (!tenant) {
-      throw new Error("Failed to create tenant");
-    }
-
-    // Check if user exists
+    // Check if user already exists
     const existingUser = await ctx.db
       .query("users")
       .withIndex("by_workos_id", (q) => q.eq("workosUserId", args.workosUserId))
@@ -111,7 +122,7 @@ export const ensureUser = mutation({
     const now = Date.now();
 
     if (existingUser) {
-      // Update last login
+      // Update last login for existing user
       await ctx.db.patch(existingUser._id, {
         lastLoginAt: now,
         updatedAt: now,
@@ -120,27 +131,37 @@ export const ensureUser = mutation({
         userId: existingUser._id,
         tenantId: existingUser.tenantId,
         role: existingUser.role,
+        isNew: false,
       };
     }
 
-    // Create new user
-    const userId = await ctx.db.insert("users", {
-      tenantId: tenant._id,
-      workosUserId: args.workosUserId,
-      email: args.email,
-      fullName: args.fullName,
-      avatarUrl: args.avatarUrl,
-      role: "admin", // First user is admin
-      status: "active",
-      lastLoginAt: now,
-      createdAt: now,
-      updatedAt: now,
-    });
+    // For new users, check if there's a pending invitation
+    const invitation = await ctx.db
+      .query("invitations")
+      .withIndex("by_email", (q) => q.eq("email", args.email))
+      .filter((q) => q.eq(q.field("status"), "pending"))
+      .first();
 
+    if (invitation && invitation.expiresAt > now) {
+      // User has pending invitation - they should go through invite acceptance flow
+      return {
+        userId: null,
+        tenantId: null,
+        role: null,
+        isNew: true,
+        hasInvitation: true,
+        invitationToken: invitation.token,
+      };
+    }
+
+    // New user without invitation - they need to go through onboarding
+    // Do NOT auto-create user here - redirect to onboarding
     return {
-      userId,
-      tenantId: tenant._id,
-      role: "admin",
+      userId: null,
+      tenantId: null,
+      role: null,
+      isNew: true,
+      needsOnboarding: true,
     };
   },
 });

@@ -17,6 +17,14 @@ export const handle: Handle = async ({ event, resolve }) => {
 					firstName: session.firstName,
 					lastName: session.lastName
 				};
+
+				// Add session/tenant info to locals
+				event.locals.session = {
+					tenantId: session.tenantId || null,
+					tenantSlug: session.tenantSlug || null,
+					tenantName: session.tenantName || null,
+					needsOnboarding: session.needsOnboarding || false
+				};
 			} else {
 				// Clear expired session
 				event.cookies.delete('session', { path: '/' });

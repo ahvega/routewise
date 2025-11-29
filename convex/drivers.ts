@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { query, mutation } from "./_generated/server";
+import { canAddDriver, isTenantActive } from "./lib/planLimits";
 
 // List all drivers for a tenant
 export const list = query({
@@ -51,6 +52,18 @@ export const create = mutation({
     notes: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    // Check tenant status
+    const tenantStatus = await isTenantActive(ctx, args.tenantId);
+    if (!tenantStatus.active) {
+      throw new Error(tenantStatus.message || "Account not active");
+    }
+
+    // Check plan limits
+    const limitCheck = await canAddDriver(ctx, args.tenantId);
+    if (!limitCheck.allowed) {
+      throw new Error(limitCheck.message || "Driver limit reached");
+    }
+
     const now = Date.now();
     return await ctx.db.insert("drivers", {
       ...args,

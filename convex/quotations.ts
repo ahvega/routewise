@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { query, mutation } from "./_generated/server";
+import { canCreateQuotation, isTenantActive } from "./lib/planLimits";
 
 // List all quotations for a tenant
 export const list = query({
@@ -82,6 +83,30 @@ export const create = mutation({
     departureDate: v.optional(v.number()),
     totalDistance: v.number(),
     totalTime: v.number(),
+    // Currency configuration (frozen at creation)
+    localCurrency: v.optional(v.string()), // 'HNL', 'GTQ', etc.
+    exchangeRateUsed: v.number(),
+    // Cost breakdown - local currency values
+    fuelCostLocal: v.optional(v.number()),
+    refuelingCostLocal: v.optional(v.number()),
+    driverMealsCostLocal: v.optional(v.number()),
+    driverLodgingCostLocal: v.optional(v.number()),
+    driverIncentiveCostLocal: v.optional(v.number()),
+    vehicleDistanceCostLocal: v.optional(v.number()),
+    vehicleDailyCostLocal: v.optional(v.number()),
+    tollCostLocal: v.optional(v.number()),
+    totalCostLocal: v.optional(v.number()),
+    // Cost breakdown - USD values
+    fuelCostUsd: v.optional(v.number()),
+    refuelingCostUsd: v.optional(v.number()),
+    driverMealsCostUsd: v.optional(v.number()),
+    driverLodgingCostUsd: v.optional(v.number()),
+    driverIncentiveCostUsd: v.optional(v.number()),
+    vehicleDistanceCostUsd: v.optional(v.number()),
+    vehicleDailyCostUsd: v.optional(v.number()),
+    tollCostUsd: v.optional(v.number()),
+    totalCostUsd: v.optional(v.number()),
+    // Legacy cost fields (kept for backwards compatibility)
     fuelCost: v.number(),
     refuelingCost: v.number(),
     driverMealsCost: v.number(),
@@ -91,10 +116,12 @@ export const create = mutation({
     vehicleDailyCost: v.number(),
     tollCost: v.number(),
     totalCost: v.number(),
+    // Pricing - both currencies
     selectedMarkupPercentage: v.number(),
-    salePriceHnl: v.number(),
+    salePriceLocal: v.optional(v.number()),
+    salePriceHnl: v.number(), // Legacy field
     salePriceUsd: v.number(),
-    exchangeRateUsed: v.number(),
+    // Options
     includeFuel: v.boolean(),
     includeMeals: v.boolean(),
     includeTolls: v.boolean(),
@@ -105,15 +132,48 @@ export const create = mutation({
     internalNotes: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    // Check tenant status
+    const tenantStatus = await isTenantActive(ctx, args.tenantId);
+    if (!tenantStatus.active) {
+      throw new Error(tenantStatus.message || "Account not active");
+    }
+
+    // Check plan limits
+    const limitCheck = await canCreateQuotation(ctx, args.tenantId);
+    if (!limitCheck.allowed) {
+      throw new Error(limitCheck.message || "Quotation limit reached");
+    }
+
     const now = Date.now();
     const quotationNumber = await generateQuotationNumber(ctx, args.tenantId);
 
-    return await ctx.db.insert("quotations", {
+    const quotationId = await ctx.db.insert("quotations", {
       ...args,
       quotationNumber,
       createdAt: now,
       updatedAt: now,
     });
+
+    // Increment usage counter
+    const usageRecord = await ctx.db
+      .query("usageTracking")
+      .withIndex("by_tenant", (q) => q.eq("tenantId", args.tenantId))
+      .filter((q) =>
+        q.and(
+          q.lte(q.field("periodStart"), now),
+          q.gte(q.field("periodEnd"), now)
+        )
+      )
+      .first();
+
+    if (usageRecord) {
+      await ctx.db.patch(usageRecord._id, {
+        quotationsCreated: (usageRecord.quotationsCreated || 0) + 1,
+        updatedAt: now,
+      });
+    }
+
+    return quotationId;
   },
 });
 
@@ -162,6 +222,30 @@ export const update = mutation({
     departureDate: v.optional(v.number()),
     totalDistance: v.optional(v.number()),
     totalTime: v.optional(v.number()),
+    // Currency configuration
+    localCurrency: v.optional(v.string()),
+    exchangeRateUsed: v.optional(v.number()),
+    // Cost breakdown - local currency
+    fuelCostLocal: v.optional(v.number()),
+    refuelingCostLocal: v.optional(v.number()),
+    driverMealsCostLocal: v.optional(v.number()),
+    driverLodgingCostLocal: v.optional(v.number()),
+    driverIncentiveCostLocal: v.optional(v.number()),
+    vehicleDistanceCostLocal: v.optional(v.number()),
+    vehicleDailyCostLocal: v.optional(v.number()),
+    tollCostLocal: v.optional(v.number()),
+    totalCostLocal: v.optional(v.number()),
+    // Cost breakdown - USD
+    fuelCostUsd: v.optional(v.number()),
+    refuelingCostUsd: v.optional(v.number()),
+    driverMealsCostUsd: v.optional(v.number()),
+    driverLodgingCostUsd: v.optional(v.number()),
+    driverIncentiveCostUsd: v.optional(v.number()),
+    vehicleDistanceCostUsd: v.optional(v.number()),
+    vehicleDailyCostUsd: v.optional(v.number()),
+    tollCostUsd: v.optional(v.number()),
+    totalCostUsd: v.optional(v.number()),
+    // Legacy cost fields
     fuelCost: v.optional(v.number()),
     refuelingCost: v.optional(v.number()),
     driverMealsCost: v.optional(v.number()),
@@ -171,10 +255,12 @@ export const update = mutation({
     vehicleDailyCost: v.optional(v.number()),
     tollCost: v.optional(v.number()),
     totalCost: v.optional(v.number()),
+    // Pricing
     selectedMarkupPercentage: v.optional(v.number()),
+    salePriceLocal: v.optional(v.number()),
     salePriceHnl: v.optional(v.number()),
     salePriceUsd: v.optional(v.number()),
-    exchangeRateUsed: v.optional(v.number()),
+    // Options
     includeFuel: v.optional(v.boolean()),
     includeMeals: v.optional(v.boolean()),
     includeTolls: v.optional(v.boolean()),

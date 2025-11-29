@@ -70,6 +70,24 @@ export const create = mutation({
     prepaymentDays: v.optional(v.number()),
     cancellationMinHours: v.optional(v.number()),
     cancellationPenaltyPercentage: v.optional(v.number()),
+    // Client pricing levels
+    pricingLevels: v.optional(v.array(v.object({
+      key: v.string(),
+      name: v.string(),
+      discountPercentage: v.number(),
+      isDefault: v.optional(v.boolean()),
+    }))),
+    // Driver license categories
+    licenseCategories: v.optional(v.array(v.object({
+      key: v.string(),
+      name: v.string(),
+      description: v.optional(v.string()),
+    }))),
+    // Custom vehicle makes/models (tenant-specific)
+    customVehicleMakes: v.optional(v.array(v.object({
+      make: v.string(),
+      models: v.array(v.string()),
+    }))),
     isActive: v.boolean(),
     createdBy: v.optional(v.id("users")),
   },
@@ -78,6 +96,20 @@ export const create = mutation({
 
     // Set defaults for new currency fields
     const localCurrency = args.localCurrency || 'HNL';
+
+    // Default pricing levels if not provided
+    const pricingLevels = args.pricingLevels || [
+      { key: 'standard', name: 'Estándar', discountPercentage: 0, isDefault: true },
+      { key: 'preferred', name: 'Preferencial', discountPercentage: 5 },
+      { key: 'vip', name: 'VIP', discountPercentage: 10 },
+    ];
+
+    // Default license categories if not provided
+    const licenseCategories = args.licenseCategories || [
+      { key: 'comercial_a', name: 'Comercial A', description: 'Vehículos comerciales pesados' },
+      { key: 'comercial_b', name: 'Comercial B', description: 'Vehículos comerciales livianos' },
+      { key: 'particular', name: 'Particular', description: 'Vehículos particulares' },
+    ];
 
     // If setting as active, deactivate other parameters
     if (args.isActive) {
@@ -96,6 +128,8 @@ export const create = mutation({
     return await ctx.db.insert("parameters", {
       ...args,
       localCurrency,
+      pricingLevels,
+      licenseCategories,
       fuelPriceCurrency: args.fuelPriceCurrency || localCurrency,
       mealCostCurrency: args.mealCostCurrency || localCurrency,
       hotelCostCurrency: args.hotelCostCurrency || localCurrency,
@@ -134,6 +168,24 @@ export const update = mutation({
     prepaymentDays: v.optional(v.number()),
     cancellationMinHours: v.optional(v.number()),
     cancellationPenaltyPercentage: v.optional(v.number()),
+    // Client pricing levels
+    pricingLevels: v.optional(v.array(v.object({
+      key: v.string(),
+      name: v.string(),
+      discountPercentage: v.number(),
+      isDefault: v.optional(v.boolean()),
+    }))),
+    // Driver license categories
+    licenseCategories: v.optional(v.array(v.object({
+      key: v.string(),
+      name: v.string(),
+      description: v.optional(v.string()),
+    }))),
+    // Custom vehicle makes/models (tenant-specific)
+    customVehicleMakes: v.optional(v.array(v.object({
+      make: v.string(),
+      models: v.array(v.string()),
+    }))),
     isActive: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {

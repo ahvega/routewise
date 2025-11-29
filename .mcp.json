@@ -3,6 +3,11 @@
 		"svelte": {
 			"type": "http",
 			"url": "https://mcp.svelte.dev/mcp"
+		},
+		"flowbite-svelte": {
+			"type": "stdio",
+			"command": "node",
+			"args": ["e:\\MyDevTools\\flowbite-svelte-mcp\\build\\server.js"]
 		}
 	}
 }

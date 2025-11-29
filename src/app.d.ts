@@ -10,6 +10,12 @@ declare global {
 				firstName: string | null;
 				lastName: string | null;
 			};
+			session?: {
+				tenantId: string | null;
+				tenantSlug: string | null;
+				tenantName: string | null;
+				needsOnboarding: boolean;
+			};
 		}
 		interface PageData {
 			user?: {
@@ -17,6 +23,12 @@ declare global {
 				email: string;
 				firstName: string | null;
 				lastName: string | null;
+			};
+			session?: {
+				tenantId: string | null;
+				tenantSlug: string | null;
+				tenantName: string | null;
+				needsOnboarding: boolean;
 			};
 		}
 		// interface PageState {}

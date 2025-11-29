@@ -1,6 +1,8 @@
 import { redirect, error, isRedirect, isHttpError } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { authenticateWithCode } from '$lib/auth/workos.server';
+import { getConvexClient } from '$lib/convex.server';
+import { api } from '$convex/_generated/api';
 
 export const GET: RequestHandler = async ({ url, cookies }) => {
 	const code = url.searchParams.get('code');
@@ -35,7 +37,42 @@ export const GET: RequestHandler = async ({ url, cookies }) => {
 		const session = await authenticateWithCode(code);
 		console.log('Authentication successful for:', session.user.email);
 
-		// Store session in secure HTTP-only cookie
+		// Check if user exists in Convex and get their tenant
+		const convex = getConvexClient();
+		const userWithTenant = await convex.query(api.users.getWithTenant, {
+			workosUserId: session.user.id
+		});
+
+		let tenantId: string | null = null;
+		let tenantSlug: string | null = null;
+		let tenantName: string | null = null;
+		let needsOnboarding = false;
+
+		if (userWithTenant && userWithTenant.tenant) {
+			// Existing user with tenant
+			tenantId = userWithTenant.tenant._id;
+			tenantSlug = userWithTenant.tenant.slug;
+			tenantName = userWithTenant.tenant.companyName;
+			console.log('Existing user found with tenant:', tenantSlug);
+		} else {
+			// Check for pending invitation
+			const invitation = await convex.query(api.users.checkInvitation, {
+				email: session.user.email
+			});
+
+			if (invitation && invitation.tenant) {
+				// User has invitation - redirect to accept it
+				console.log('User has pending invitation to:', invitation.tenant.companyName);
+				returnTo = `/onboarding/accept-invite?token=${invitation.invitation.token}`;
+			} else {
+				// New user without tenant - needs onboarding
+				needsOnboarding = true;
+				console.log('New user needs onboarding');
+				returnTo = '/onboarding/setup';
+			}
+		}
+
+		// Store session in secure HTTP-only cookie with tenant info
 		cookies.set('session', JSON.stringify({
 			userId: session.user.id,
 			email: session.user.email,
@@ -43,7 +80,12 @@ export const GET: RequestHandler = async ({ url, cookies }) => {
 			lastName: session.user.lastName,
 			accessToken: session.accessToken,
 			refreshToken: session.refreshToken,
-			expiresAt: session.expiresAt
+			expiresAt: session.expiresAt,
+			// Multi-tenant fields
+			tenantId,
+			tenantSlug,
+			tenantName,
+			needsOnboarding
 		}), {
 			path: '/',
 			httpOnly: true,
@@ -52,7 +94,7 @@ export const GET: RequestHandler = async ({ url, cookies }) => {
 			maxAge: 60 * 60 * 24 * 7 // 7 days
 		});
 
-		// Redirect to return URL
+		// Redirect to return URL (or onboarding if needed)
 		return new Response(null, {
 			status: 302,
 			headers: { Location: returnTo }

@@ -79,7 +79,8 @@ export const getByDriver = query({
 export const createFromItinerary = mutation({
   args: {
     itineraryId: v.id("itineraries"),
-    amountHnl: v.optional(v.number()),
+    amountLocal: v.optional(v.number()), // Amount in local currency
+    amountHnl: v.optional(v.number()), // Legacy parameter
     estimatedFuel: v.optional(v.number()),
     estimatedMeals: v.optional(v.number()),
     estimatedLodging: v.optional(v.number()),
@@ -113,8 +114,9 @@ export const createFromItinerary = mutation({
     const estimatedOther = args.estimatedOther ?? 0;
 
     const totalEstimated = estimatedFuel + estimatedMeals + estimatedLodging + estimatedTolls + estimatedOther;
-    const amountHnl = args.amountHnl ?? totalEstimated;
-    const amountUsd = amountHnl / itinerary.exchangeRateUsed;
+    // Use local currency amount, fallback to legacy HNL parameter
+    const amountLocal = args.amountLocal ?? args.amountHnl ?? totalEstimated;
+    const amountUsd = amountLocal / itinerary.exchangeRateUsed;
 
     const purpose = args.purpose || `Gastos de viaje: ${itinerary.origin} → ${itinerary.destination}`;
 
@@ -123,9 +125,13 @@ export const createFromItinerary = mutation({
       advanceNumber: generateAdvanceNumber(),
       itineraryId: args.itineraryId,
       driverId: itinerary.driverId,
-      amountHnl,
-      amountUsd,
+      // Currency configuration (from itinerary)
+      localCurrency: itinerary.localCurrency,
       exchangeRateUsed: itinerary.exchangeRateUsed,
+      // Amount in both currencies (frozen)
+      amountLocal,
+      amountHnl: amountLocal, // Legacy field
+      amountUsd,
       purpose,
       estimatedFuel,
       estimatedMeals,
@@ -148,8 +154,12 @@ export const create = mutation({
     tenantId: v.id("tenants"),
     itineraryId: v.id("itineraries"),
     driverId: v.optional(v.id("drivers")),
-    amountHnl: v.number(),
+    // Currency configuration
+    localCurrency: v.optional(v.string()),
     exchangeRateUsed: v.number(),
+    // Amount in local currency
+    amountLocal: v.optional(v.number()),
+    amountHnl: v.number(), // Legacy parameter
     purpose: v.string(),
     estimatedFuel: v.optional(v.number()),
     estimatedMeals: v.optional(v.number()),
@@ -160,12 +170,29 @@ export const create = mutation({
   },
   handler: async (ctx, args) => {
     const now = Date.now();
-    const amountUsd = args.amountHnl / args.exchangeRateUsed;
+    // Use local currency amount, fallback to legacy HNL
+    const amountLocal = args.amountLocal ?? args.amountHnl;
+    const amountUsd = amountLocal / args.exchangeRateUsed;
 
     const advanceId = await ctx.db.insert("expenseAdvances", {
-      ...args,
+      tenantId: args.tenantId,
+      itineraryId: args.itineraryId,
+      driverId: args.driverId,
       advanceNumber: generateAdvanceNumber(),
+      // Currency configuration
+      localCurrency: args.localCurrency,
+      exchangeRateUsed: args.exchangeRateUsed,
+      // Amount in both currencies (frozen)
+      amountLocal,
+      amountHnl: amountLocal, // Legacy field
       amountUsd,
+      purpose: args.purpose,
+      estimatedFuel: args.estimatedFuel,
+      estimatedMeals: args.estimatedMeals,
+      estimatedLodging: args.estimatedLodging,
+      estimatedTolls: args.estimatedTolls,
+      estimatedOther: args.estimatedOther,
+      notes: args.notes,
       status: "pending",
       createdAt: now,
       updatedAt: now,
@@ -179,7 +206,8 @@ export const create = mutation({
 export const update = mutation({
   args: {
     id: v.id("expenseAdvances"),
-    amountHnl: v.optional(v.number()),
+    amountLocal: v.optional(v.number()),
+    amountHnl: v.optional(v.number()), // Legacy parameter
     purpose: v.optional(v.string()),
     estimatedFuel: v.optional(v.number()),
     estimatedMeals: v.optional(v.number()),
@@ -190,7 +218,7 @@ export const update = mutation({
     internalNotes: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const { id, ...updates } = args;
+    const { id, amountLocal, amountHnl, ...updates } = args;
     const advance = await ctx.db.get(id);
     if (!advance) throw new Error("Expense advance not found");
 
@@ -199,13 +227,19 @@ export const update = mutation({
     }
 
     // Recalculate USD if amount changed
+    const newAmountLocal = amountLocal ?? amountHnl;
     let amountUsd = advance.amountUsd;
-    if (updates.amountHnl !== undefined) {
-      amountUsd = updates.amountHnl / advance.exchangeRateUsed;
+    let finalAmountLocal = advance.amountLocal ?? advance.amountHnl;
+
+    if (newAmountLocal !== undefined) {
+      finalAmountLocal = newAmountLocal;
+      amountUsd = newAmountLocal / advance.exchangeRateUsed;
     }
 
     await ctx.db.patch(id, {
       ...updates,
+      amountLocal: finalAmountLocal,
+      amountHnl: finalAmountLocal, // Legacy field
       amountUsd,
       updatedAt: Date.now(),
     });
@@ -285,7 +319,7 @@ export const settle = mutation({
 
     const now = Date.now();
 
-    // Calculate actual expenses
+    // Calculate actual expenses (in local currency)
     const actualFuel = args.actualFuel ?? 0;
     const actualMeals = args.actualMeals ?? 0;
     const actualLodging = args.actualLodging ?? 0;
@@ -294,7 +328,9 @@ export const settle = mutation({
     const actualExpenses = actualFuel + actualMeals + actualLodging + actualTolls + actualOther;
 
     // Calculate balance: positive = driver owes company, negative = company owes driver
-    const balanceAmount = advance.amountHnl - actualExpenses;
+    // Use local currency amount
+    const amountLocal = advance.amountLocal ?? advance.amountHnl;
+    const balanceAmount = amountLocal - actualExpenses;
 
     await ctx.db.patch(args.id, {
       status: "settled",
@@ -391,10 +427,11 @@ export const getStats = query({
     const settled = advances.filter(a => a.status === "settled");
     const unsettledBalances = settled.filter(a => !a.balanceSettled);
 
-    const totalDisbursed = disbursed.reduce((sum, a) => sum + a.amountHnl, 0) +
-                          settled.reduce((sum, a) => sum + a.amountHnl, 0);
+    // Use local currency amounts (fallback to HNL for backwards compatibility)
+    const totalDisbursed = disbursed.reduce((sum, a) => sum + (a.amountLocal ?? a.amountHnl), 0) +
+                          settled.reduce((sum, a) => sum + (a.amountLocal ?? a.amountHnl), 0);
 
-    const totalOutstanding = disbursed.reduce((sum, a) => sum + a.amountHnl, 0);
+    const totalOutstanding = disbursed.reduce((sum, a) => sum + (a.amountLocal ?? a.amountHnl), 0);
 
     const totalBalanceOwed = unsettledBalances.reduce((sum, a) => sum + (a.balanceAmount ?? 0), 0);
 
@@ -404,9 +441,9 @@ export const getStats = query({
       disbursedCount: disbursed.length,
       settledCount: settled.length,
       unsettledBalancesCount: unsettledBalances.length,
-      totalDisbursed,
-      totalOutstanding,
-      totalBalanceOwed,
+      totalDisbursed, // In local currency
+      totalOutstanding, // In local currency
+      totalBalanceOwed, // In local currency
     };
   },
 });
@@ -418,19 +455,24 @@ export const calculateSuggestedAdvance = query({
     const itinerary = await ctx.db.get(args.itineraryId);
     if (!itinerary) throw new Error("Itinerary not found");
 
-    // Try to get quotation for cost breakdown
+    // Try to get quotation for cost breakdown (use local currency values)
     let fuelCost = 0;
     let mealsCost = 0;
     let lodgingCost = 0;
     let tollCost = 0;
+    let localCurrency = itinerary.localCurrency;
 
     if (itinerary.quotationId) {
       const quotation = await ctx.db.get(itinerary.quotationId);
       if (quotation) {
-        fuelCost = quotation.fuelCost + quotation.refuelingCost;
-        mealsCost = quotation.driverMealsCost;
-        lodgingCost = quotation.driverLodgingCost;
-        tollCost = quotation.tollCost;
+        // Use local currency values if available, fallback to legacy fields
+        const fuelLocal = (quotation.fuelCostLocal ?? quotation.fuelCost) +
+                         (quotation.refuelingCostLocal ?? quotation.refuelingCost);
+        fuelCost = fuelLocal;
+        mealsCost = quotation.driverMealsCostLocal ?? quotation.driverMealsCost;
+        lodgingCost = quotation.driverLodgingCostLocal ?? quotation.driverLodgingCost;
+        tollCost = quotation.tollCostLocal ?? quotation.tollCost;
+        localCurrency = quotation.localCurrency ?? localCurrency;
       }
     }
 
@@ -442,7 +484,8 @@ export const calculateSuggestedAdvance = query({
       estimatedLodging: lodgingCost,
       estimatedTolls: tollCost,
       estimatedOther: 0,
-      totalSuggested,
+      totalSuggested, // In local currency
+      localCurrency,
       exchangeRate: itinerary.exchangeRateUsed,
     };
   },

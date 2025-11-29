@@ -76,9 +76,13 @@ export const create = mutation({
     itineraryId: v.optional(v.id("itineraries")),
     clientId: v.optional(v.id("clients")),
     description: v.string(),
-    subtotalHnl: v.number(),
-    taxPercentage: v.number(),
+    // Currency configuration (frozen at creation)
+    localCurrency: v.optional(v.string()), // 'HNL', 'GTQ', etc.
     exchangeRateUsed: v.number(),
+    // Amounts in local currency
+    subtotalLocal: v.optional(v.number()),
+    subtotalHnl: v.number(), // Legacy field
+    taxPercentage: v.number(),
     dueDate: v.number(),
     notes: v.optional(v.string()),
     additionalCharges: v.optional(v.array(v.object({
@@ -93,15 +97,22 @@ export const create = mutation({
   handler: async (ctx, args) => {
     const now = Date.now();
 
+    // Use local currency amounts if provided, otherwise use HNL (legacy)
+    const subtotalLocal = args.subtotalLocal ?? args.subtotalHnl;
+
     // Calculate additional charges and discounts
     const additionalTotal = (args.additionalCharges || []).reduce((sum, c) => sum + c.amount, 0);
     const discountTotal = (args.discounts || []).reduce((sum, d) => sum + d.amount, 0);
 
-    // Calculate tax and totals
-    const adjustedSubtotal = args.subtotalHnl + additionalTotal - discountTotal;
-    const taxAmountHnl = adjustedSubtotal * (args.taxPercentage / 100);
-    const totalHnl = adjustedSubtotal + taxAmountHnl;
-    const totalUsd = totalHnl / args.exchangeRateUsed;
+    // Calculate tax and totals in local currency
+    const adjustedSubtotalLocal = subtotalLocal + additionalTotal - discountTotal;
+    const taxAmountLocal = adjustedSubtotalLocal * (args.taxPercentage / 100);
+    const totalLocal = adjustedSubtotalLocal + taxAmountLocal;
+
+    // Calculate USD equivalents (frozen at creation)
+    const subtotalUsd = subtotalLocal / args.exchangeRateUsed;
+    const taxAmountUsd = taxAmountLocal / args.exchangeRateUsed;
+    const totalUsd = totalLocal / args.exchangeRateUsed;
 
     const invoiceId = await ctx.db.insert("invoices", {
       tenantId: args.tenantId,
@@ -110,15 +121,26 @@ export const create = mutation({
       clientId: args.clientId,
       invoiceDate: now,
       dueDate: args.dueDate,
-      description: args.description,
-      subtotalHnl: args.subtotalHnl,
-      taxPercentage: args.taxPercentage,
-      taxAmountHnl,
-      totalHnl,
-      totalUsd,
+      // Currency configuration
+      localCurrency: args.localCurrency,
       exchangeRateUsed: args.exchangeRateUsed,
+      description: args.description,
+      // Subtotal in both currencies (frozen)
+      subtotalLocal,
+      subtotalHnl: args.subtotalHnl, // Legacy field
+      subtotalUsd,
+      // Tax in both currencies (frozen)
+      taxPercentage: args.taxPercentage,
+      taxAmountLocal,
+      taxAmountHnl: taxAmountLocal, // Legacy field (uses same value)
+      taxAmountUsd,
+      // Total in both currencies (frozen)
+      totalLocal,
+      totalHnl: totalLocal, // Legacy field (uses same value)
+      totalUsd,
+      // Payment tracking (in local currency)
       amountPaid: 0,
-      amountDue: totalHnl,
+      amountDue: totalLocal,
       paymentStatus: "unpaid",
       additionalCharges: args.additionalCharges,
       discounts: args.discounts,
@@ -159,11 +181,15 @@ export const createFromItinerary = mutation({
     const paymentTermsDays = args.paymentTermsDays ?? 30;
     const dueDate = now + (paymentTermsDays * 24 * 60 * 60 * 1000);
 
-    // Calculate tax and totals
-    const subtotalHnl = itinerary.agreedPriceHnl;
-    const taxAmountHnl = subtotalHnl * (taxPercentage / 100);
-    const totalHnl = subtotalHnl + taxAmountHnl;
-    const totalUsd = totalHnl / itinerary.exchangeRateUsed;
+    // Use local currency amount from itinerary (frozen values)
+    const subtotalLocal = itinerary.agreedPriceLocal ?? itinerary.agreedPriceHnl;
+    const subtotalUsd = itinerary.agreedPriceUsd;
+
+    // Calculate tax and totals in both currencies
+    const taxAmountLocal = subtotalLocal * (taxPercentage / 100);
+    const totalLocal = subtotalLocal + taxAmountLocal;
+    const taxAmountUsd = subtotalUsd * (taxPercentage / 100);
+    const totalUsd = subtotalUsd + taxAmountUsd;
 
     // Create description from itinerary
     const description = `Servicio de transporte: ${itinerary.origin} → ${itinerary.destination}`;
@@ -175,15 +201,26 @@ export const createFromItinerary = mutation({
       clientId: itinerary.clientId,
       invoiceDate: now,
       dueDate,
-      description,
-      subtotalHnl,
-      taxPercentage,
-      taxAmountHnl,
-      totalHnl,
-      totalUsd,
+      // Currency configuration (from itinerary)
+      localCurrency: itinerary.localCurrency,
       exchangeRateUsed: itinerary.exchangeRateUsed,
+      description,
+      // Subtotal in both currencies (frozen)
+      subtotalLocal,
+      subtotalHnl: subtotalLocal, // Legacy field
+      subtotalUsd,
+      // Tax in both currencies (frozen)
+      taxPercentage,
+      taxAmountLocal,
+      taxAmountHnl: taxAmountLocal, // Legacy field
+      taxAmountUsd,
+      // Total in both currencies (frozen)
+      totalLocal,
+      totalHnl: totalLocal, // Legacy field
+      totalUsd,
+      // Payment tracking (in local currency)
       amountPaid: 0,
-      amountDue: totalHnl,
+      amountDue: totalLocal,
       paymentStatus: "unpaid",
       status: "draft",
       notes: args.notes,
@@ -217,7 +254,7 @@ export const update = mutation({
     if (!invoice) throw new Error("Invoice not found");
 
     // Recalculate totals if charges/discounts changed
-    let recalculatedFields = {};
+    let recalculatedFields: Record<string, unknown> = {};
     if (updates.additionalCharges !== undefined || updates.discounts !== undefined) {
       const additionalCharges = updates.additionalCharges ?? invoice.additionalCharges ?? [];
       const discounts = updates.discounts ?? invoice.discounts ?? [];
@@ -225,15 +262,20 @@ export const update = mutation({
       const additionalTotal = additionalCharges.reduce((sum, c) => sum + c.amount, 0);
       const discountTotal = discounts.reduce((sum, d) => sum + d.amount, 0);
 
-      const adjustedSubtotal = invoice.subtotalHnl + additionalTotal - discountTotal;
-      const taxAmountHnl = adjustedSubtotal * (invoice.taxPercentage / 100);
-      const totalHnl = adjustedSubtotal + taxAmountHnl;
-      const totalUsd = totalHnl / invoice.exchangeRateUsed;
-      const amountDue = totalHnl - invoice.amountPaid;
+      // Use local currency values
+      const subtotalLocal = invoice.subtotalLocal ?? invoice.subtotalHnl;
+      const adjustedSubtotalLocal = subtotalLocal + additionalTotal - discountTotal;
+      const taxAmountLocal = adjustedSubtotalLocal * (invoice.taxPercentage / 100);
+      const totalLocal = adjustedSubtotalLocal + taxAmountLocal;
+      const totalUsd = totalLocal / invoice.exchangeRateUsed;
+      const amountDue = totalLocal - invoice.amountPaid;
 
       recalculatedFields = {
-        taxAmountHnl,
-        totalHnl,
+        // Update local currency fields
+        taxAmountLocal,
+        taxAmountHnl: taxAmountLocal, // Legacy field
+        totalLocal,
+        totalHnl: totalLocal, // Legacy field
         totalUsd,
         amountDue,
         paymentStatus: amountDue <= 0 ? "paid" : invoice.amountPaid > 0 ? "partial" : "unpaid",
@@ -278,7 +320,7 @@ export const updateStatus = mutation({
 export const recordPayment = mutation({
   args: {
     invoiceId: v.id("invoices"),
-    amount: v.number(),
+    amount: v.number(), // Amount in local currency
     paymentMethod: v.optional(v.string()),
     referenceNumber: v.optional(v.string()),
     paymentDate: v.optional(v.number()),
@@ -303,9 +345,12 @@ export const recordPayment = mutation({
       createdAt: now,
     });
 
+    // Use local currency total
+    const totalLocal = invoice.totalLocal ?? invoice.totalHnl;
+
     // Update invoice payment totals
     const newAmountPaid = invoice.amountPaid + args.amount;
-    const newAmountDue = invoice.totalHnl - newAmountPaid;
+    const newAmountDue = totalLocal - newAmountPaid;
 
     let paymentStatus: string;
     if (newAmountDue <= 0) {
@@ -357,9 +402,12 @@ export const deletePayment = mutation({
     // Delete the payment
     await ctx.db.delete(args.paymentId);
 
+    // Use local currency total
+    const totalLocal = invoice.totalLocal ?? invoice.totalHnl;
+
     // Update invoice totals
     const newAmountPaid = invoice.amountPaid - payment.amount;
-    const newAmountDue = invoice.totalHnl - newAmountPaid;
+    const newAmountDue = totalLocal - newAmountPaid;
 
     let paymentStatus: string;
     if (newAmountDue <= 0) {
@@ -423,18 +471,19 @@ export const getStats = query({
     const overdueInvoices = unpaidInvoices.filter(i => i.dueDate < now);
     const recentInvoices = invoices.filter(i => i.createdAt > thirtyDaysAgo);
 
+    // Use local currency values (fallback to HNL for backwards compatibility)
     const totalReceivables = unpaidInvoices.reduce((sum, i) => sum + i.amountDue, 0);
     const totalRevenue = invoices
       .filter(i => i.paymentStatus === "paid")
-      .reduce((sum, i) => sum + i.totalHnl, 0);
+      .reduce((sum, i) => sum + (i.totalLocal ?? i.totalHnl), 0);
 
     return {
       totalInvoices,
       unpaidCount: unpaidInvoices.length,
       overdueCount: overdueInvoices.length,
       recentCount: recentInvoices.length,
-      totalReceivables,
-      totalRevenue,
+      totalReceivables, // In local currency
+      totalRevenue, // In local currency
     };
   },
 });

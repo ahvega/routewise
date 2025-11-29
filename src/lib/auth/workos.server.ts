@@ -12,14 +12,28 @@ const workos = new WorkOS(WORKOS_API_KEY);
 
 /**
  * Generate the authorization URL for WorkOS AuthKit
+ * @param state - Optional state to pass through the auth flow
+ * @param screenHint - Optional hint: 'sign-up' or 'sign-in' to force showing that screen
  */
-export function getAuthorizationUrl(state?: string): string {
-	return workos.userManagement.getAuthorizationUrl({
+export function getAuthorizationUrl(state?: string, screenHint?: 'sign-up' | 'sign-in'): string {
+	const params: {
+		clientId: string;
+		redirectUri: string;
+		provider: 'authkit';
+		state?: string;
+		screenHint?: 'sign-up' | 'sign-in';
+	} = {
 		clientId: WORKOS_CLIENT_ID,
 		redirectUri: WORKOS_REDIRECT_URI,
 		provider: 'authkit',
 		state
-	});
+	};
+
+	if (screenHint) {
+		params.screenHint = screenHint;
+	}
+
+	return workos.userManagement.getAuthorizationUrl(params);
 }
 
 /**

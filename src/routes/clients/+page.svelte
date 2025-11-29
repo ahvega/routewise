@@ -35,6 +35,32 @@
 		() => (tenantStore.tenantId ? { tenantId: tenantStore.tenantId } : 'skip')
 	);
 
+	// Query active parameters for pricing levels
+	const parametersQuery = useQuery(
+		api.parameters.getActive,
+		() => (tenantStore.tenantId ? { tenantId: tenantStore.tenantId } : 'skip')
+	);
+
+	// Pricing level type
+	type PricingLevel = {
+		key: string;
+		name: string;
+		discountPercentage: number;
+		isDefault?: boolean;
+	};
+
+	// Default pricing levels (fallback)
+	const defaultPricingLevels: PricingLevel[] = [
+		{ key: 'standard', name: 'Estándar', discountPercentage: 0, isDefault: true },
+		{ key: 'preferred', name: 'Preferencial', discountPercentage: 5 },
+		{ key: 'vip', name: 'VIP', discountPercentage: 10 }
+	];
+
+	// Get pricing levels from parameters or use defaults
+	const pricingLevels = $derived<PricingLevel[]>(
+		(parametersQuery.data?.pricingLevels as PricingLevel[]) || defaultPricingLevels
+	);
+
 	// Modal state
 	let showModal = $state(false);
 	let isEditing = $state(false);
@@ -50,6 +76,7 @@
 		phone: '',
 		address: '',
 		city: '',
+		state: '',
 		country: 'HN',
 		taxId: '',
 		pricingLevel: 'standard' as 'standard' | 'preferred' | 'vip',
@@ -120,6 +147,8 @@
 	function openCreateModal() {
 		isEditing = false;
 		editingId = null;
+		// Get the default pricing level from settings
+		const defaultLevel = pricingLevels.find(l => l.isDefault) || pricingLevels[0];
 		formData = {
 			type: 'company',
 			companyName: '',
@@ -129,10 +158,11 @@
 			phone: '',
 			address: '',
 			city: '',
+			state: '',
 			country: 'HN',
 			taxId: '',
-			pricingLevel: 'standard',
-			discountPercentage: 0,
+			pricingLevel: defaultLevel?.key || 'standard',
+			discountPercentage: defaultLevel?.discountPercentage || 0,
 			creditLimit: 5000,
 			paymentTerms: 0,
 			notes: '',
@@ -153,6 +183,7 @@
 			phone: clientData.phone || '',
 			address: clientData.address || '',
 			city: clientData.city || '',
+			state: clientData.state || '',
 			country: clientData.country,
 			taxId: clientData.taxId || '',
 			pricingLevel: clientData.pricingLevel,
@@ -163,6 +194,22 @@
 			status: clientData.status
 		};
 		showModal = true;
+	}
+
+	// Handle pricing level change - auto-set discount from configured levels
+	function handlePricingLevelChange(event: Event) {
+		const selectedKey = (event.target as HTMLSelectElement).value;
+		const level = pricingLevels.find(l => l.key === selectedKey);
+		if (level) {
+			formData.pricingLevel = level.key;
+			formData.discountPercentage = level.discountPercentage;
+		}
+	}
+
+	// Get display name for a pricing level key
+	function getPricingLevelName(key: string): string {
+		const level = pricingLevels.find(l => l.key === key);
+		return level?.name || key;
 	}
 
 	async function handleSubmit() {
@@ -179,6 +226,7 @@
 				phone: formData.phone || undefined,
 				address: formData.address || undefined,
 				city: formData.city || undefined,
+				state: formData.state || undefined,
 				taxId: formData.taxId || undefined,
 				notes: formData.notes || undefined
 			};
@@ -300,12 +348,12 @@
 						<StatusBadge status={clientData.type} />
 					</TableBodyCell>
 					<TableBodyCell>
-						<StatusBadge status={clientData.pricingLevel} variant="pricing" />
-						{#if clientData.discountPercentage > 0}
-							<div class="text-xs text-gray-500 mt-1">
-								{clientData.discountPercentage}% discount
-							</div>
-						{/if}
+						<div class="text-sm font-medium text-gray-900 dark:text-white">
+							{getPricingLevelName(clientData.pricingLevel)}
+						</div>
+						<div class="text-xs text-gray-500 dark:text-gray-400">
+							{clientData.discountPercentage}% {$t('clients.columns.discount').toLowerCase()}
+						</div>
 					</TableBodyCell>
 					<TableBodyCell>
 						<div class="text-sm">
@@ -313,7 +361,7 @@
 								L {clientData.creditLimit.toLocaleString()}
 							</div>
 							<div class="text-gray-500 dark:text-gray-400">
-								{clientData.paymentTerms > 0 ? `${clientData.paymentTerms} days` : 'Immediate'}
+								{clientData.paymentTerms > 0 ? $t('clients.fields.paymentTermsDays', { values: { days: clientData.paymentTerms } }) : $t('clients.fields.immediate')}
 							</div>
 						</div>
 					</TableBodyCell>
@@ -340,104 +388,110 @@
 <Modal bind:open={showModal} size="lg" title={isEditing ? $t('clients.editClient') : $t('clients.addClient')}>
 	<form onsubmit={(e) => { e.preventDefault(); handleSubmit(); }} class="space-y-4">
 		<div>
-			<Label for="type">Client Type *</Label>
+			<Label for="type">{$t('clients.fields.type')} *</Label>
 			<Select id="type" bind:value={formData.type}>
-				<option value="company">Company</option>
-				<option value="individual">Individual</option>
+				<option value="company">{$t('clients.fields.company')}</option>
+				<option value="individual">{$t('clients.fields.individual')}</option>
 			</Select>
 		</div>
 
 		{#if formData.type === 'company'}
 			<div>
-				<Label for="companyName">Company Name *</Label>
-				<Input id="companyName" bind:value={formData.companyName} required placeholder="e.g., Honduras Tours S.A." />
+				<Label for="companyName">{$t('clients.fields.companyName')} *</Label>
+				<Input id="companyName" bind:value={formData.companyName} required placeholder={$t('clients.fields.companyNamePlaceholder')} />
 			</div>
 		{:else}
 			<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
 				<div>
-					<Label for="firstName">First Name *</Label>
-					<Input id="firstName" bind:value={formData.firstName} required placeholder="e.g., Carlos" />
+					<Label for="firstName">{$t('clients.fields.firstName')} *</Label>
+					<Input id="firstName" bind:value={formData.firstName} required placeholder={$t('clients.fields.firstNamePlaceholder')} />
 				</div>
 				<div>
-					<Label for="lastName">Last Name *</Label>
-					<Input id="lastName" bind:value={formData.lastName} required placeholder="e.g., Martinez" />
+					<Label for="lastName">{$t('clients.fields.lastName')} *</Label>
+					<Input id="lastName" bind:value={formData.lastName} required placeholder={$t('clients.fields.lastNamePlaceholder')} />
 				</div>
 			</div>
 		{/if}
 
 		<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
 			<div>
-				<Label for="email">Email</Label>
-				<Input id="email" type="email" bind:value={formData.email} placeholder="email@example.com" />
+				<Label for="email">{$t('clients.fields.email')}</Label>
+				<Input id="email" type="email" bind:value={formData.email} placeholder={$t('clients.fields.emailPlaceholder')} />
 			</div>
 			<div>
-				<Label for="phone">Phone</Label>
-				<Input id="phone" bind:value={formData.phone} placeholder="+504 1234-5678" />
+				<Label for="phone">{$t('clients.fields.phone')}</Label>
+				<Input id="phone" bind:value={formData.phone} placeholder={$t('clients.fields.phonePlaceholder')} />
 			</div>
 		</div>
 
-		<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+		<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
 			<div>
-				<Label for="city">City</Label>
-				<Input id="city" bind:value={formData.city} placeholder="e.g., Tegucigalpa" />
+				<Label for="city">{$t('clients.fields.city')}</Label>
+				<Input id="city" bind:value={formData.city} placeholder={$t('clients.fields.cityPlaceholder')} />
 			</div>
 			<div>
-				<Label for="country">Country *</Label>
+				<Label for="state">{$t('clients.fields.state')}</Label>
+				<Input id="state" bind:value={formData.state} placeholder={$t('clients.fields.statePlaceholder')} />
+			</div>
+			<div>
+				<Label for="country">{$t('clients.fields.country')} *</Label>
 				<Select id="country" bind:value={formData.country}>
-					<option value="HN">Honduras</option>
-					<option value="GT">Guatemala</option>
-					<option value="SV">El Salvador</option>
-					<option value="NI">Nicaragua</option>
-					<option value="US">United States</option>
+					<option value="HN">{$t('clients.countries.HN')}</option>
+					<option value="GT">{$t('clients.countries.GT')}</option>
+					<option value="SV">{$t('clients.countries.SV')}</option>
+					<option value="NI">{$t('clients.countries.NI')}</option>
+					<option value="CR">{$t('clients.countries.CR')}</option>
+					<option value="PA">{$t('clients.countries.PA')}</option>
+					<option value="US">{$t('clients.countries.US')}</option>
 				</Select>
 			</div>
 		</div>
 
 		<div>
-			<Label for="address">Address</Label>
-			<Input id="address" bind:value={formData.address} placeholder="Street address" />
+			<Label for="address">{$t('clients.fields.address')}</Label>
+			<Input id="address" bind:value={formData.address} placeholder={$t('clients.fields.addressPlaceholder')} />
 		</div>
 
 		<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
 			<div>
-				<Label for="pricingLevel">Pricing Level</Label>
-				<Select id="pricingLevel" bind:value={formData.pricingLevel}>
-					<option value="standard">Standard</option>
-					<option value="preferred">Preferred</option>
-					<option value="vip">VIP</option>
+				<Label for="pricingLevel">{$t('clients.fields.pricingLevel')}</Label>
+				<Select id="pricingLevel" value={formData.pricingLevel} onchange={handlePricingLevelChange}>
+					{#each pricingLevels as level}
+						<option value={level.key}>{level.name} ({level.discountPercentage}%)</option>
+					{/each}
 				</Select>
 			</div>
 			<div>
-				<Label for="discountPercentage">Discount %</Label>
-				<Input id="discountPercentage" type="number" bind:value={formData.discountPercentage} min={0} max={50} />
+				<Label for="discountPercentage">{$t('clients.fields.discount')}</Label>
+				<Input id="discountPercentage" type="number" bind:value={formData.discountPercentage} min={0} max={100} />
 			</div>
 			<div>
-				<Label for="taxId">Tax ID (RTN)</Label>
-				<Input id="taxId" bind:value={formData.taxId} placeholder="e.g., 0801-1234-56789" />
+				<Label for="taxId">{$t('clients.fields.rtn')}</Label>
+				<Input id="taxId" bind:value={formData.taxId} placeholder={$t('clients.fields.rtnPlaceholder')} />
 			</div>
 		</div>
 
 		<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
 			<div>
-				<Label for="creditLimit">Credit Limit (HNL)</Label>
+				<Label for="creditLimit">{$t('clients.fields.creditLimit')}</Label>
 				<Input id="creditLimit" type="number" bind:value={formData.creditLimit} min={0} />
 			</div>
 			<div>
-				<Label for="paymentTerms">Payment Terms (days)</Label>
+				<Label for="paymentTerms">{$t('clients.fields.paymentTerms')}</Label>
 				<Input id="paymentTerms" type="number" bind:value={formData.paymentTerms} min={0} />
 			</div>
 			<div>
-				<Label for="status">Status</Label>
+				<Label for="status">{$t('clients.fields.status')}</Label>
 				<Select id="status" bind:value={formData.status}>
-					<option value="active">Active</option>
-					<option value="inactive">Inactive</option>
+					<option value="active">{$t('common.active')}</option>
+					<option value="inactive">{$t('common.inactive')}</option>
 				</Select>
 			</div>
 		</div>
 
 		<div>
-			<Label for="notes">Notes</Label>
-			<Textarea id="notes" bind:value={formData.notes} rows={3} placeholder="Additional notes about this client..." />
+			<Label for="notes">{$t('clients.fields.notes')}</Label>
+			<Textarea id="notes" bind:value={formData.notes} rows={3} placeholder={$t('clients.fields.notesPlaceholder')} />
 		</div>
 	</form>
 

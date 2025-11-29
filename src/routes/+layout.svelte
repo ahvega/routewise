@@ -22,7 +22,13 @@
 	const userName = $derived(data.user?.firstName || data.user?.email?.split('@')[0] || 'there');
 
 	// Public routes that don't require authentication
-	const isPublicRoute = $derived($page.url.pathname.startsWith('/legal') || $page.url.pathname.startsWith('/auth'));
+	const isPublicRoute = $derived(
+		$page.url.pathname.startsWith('/legal') ||
+		$page.url.pathname.startsWith('/auth')
+	);
+
+	// Onboarding routes that need special handling
+	const isOnboardingRoute = $derived($page.url.pathname.startsWith('/onboarding'));
 </script>
 
 {#if $isLoading}
@@ -37,9 +43,18 @@
 	<div class="min-h-screen bg-gray-50 dark:bg-gray-900">
 		{@render children()}
 	</div>
+{:else if isOnboardingRoute}
+	<!-- Onboarding pages for authenticated users setting up their organization -->
+	<TenantProvider user={data.user} session={data.session}>
+		{#snippet children()}
+			<div class="min-h-screen bg-gray-50 dark:bg-gray-900">
+				{@render children()}
+			</div>
+		{/snippet}
+	</TenantProvider>
 {:else}
-	<!-- Authenticated users see the main application -->
-	<TenantProvider user={data.user}>
+	<!-- Authenticated users with tenant see the main application -->
+	<TenantProvider user={data.user} session={data.session}>
 		{#snippet children()}
 			<div class="min-h-screen bg-gray-50 dark:bg-gray-900">
 				<Navbar user={data.user} />
@@ -49,7 +64,7 @@
 			</div>
 			<!-- Session timeout warning for authenticated users -->
 			<SessionTimeout />
-			<!-- Onboarding wizard for new users -->
+			<!-- Onboarding wizard for new users (feature tour, not org setup) -->
 			<OnboardingWizard {userName} />
 		{/snippet}
 	</TenantProvider>

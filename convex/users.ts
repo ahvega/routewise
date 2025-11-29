@@ -23,6 +23,52 @@ export const byEmail = query({
   },
 });
 
+// Get user with tenant info by WorkOS ID (for auth callback)
+export const getWithTenant = query({
+  args: { workosUserId: v.string() },
+  handler: async (ctx, args) => {
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_workos_id", (q) => q.eq("workosUserId", args.workosUserId))
+      .first();
+
+    if (!user) return null;
+
+    const tenant = await ctx.db.get(user.tenantId);
+
+    return {
+      user,
+      tenant,
+    };
+  },
+});
+
+// Check if email has pending invitation
+export const checkInvitation = query({
+  args: { email: v.string() },
+  handler: async (ctx, args) => {
+    const invitation = await ctx.db
+      .query("invitations")
+      .withIndex("by_email", (q) => q.eq("email", args.email))
+      .filter((q) => q.eq(q.field("status"), "pending"))
+      .first();
+
+    if (!invitation) return null;
+
+    // Check if not expired
+    if (invitation.expiresAt < Date.now()) {
+      return null;
+    }
+
+    const tenant = await ctx.db.get(invitation.tenantId);
+
+    return {
+      invitation,
+      tenant,
+    };
+  },
+});
+
 // Get user by ID
 export const get = query({
   args: { id: v.id("users") },
@@ -117,5 +163,32 @@ export const updateStatus = mutation({
       updatedAt: Date.now(),
     });
     return args.id;
+  },
+});
+
+// Remove user from tenant
+export const remove = mutation({
+  args: {
+    id: v.id("users"),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.db.get(args.id);
+    if (!user) throw new Error("User not found");
+
+    // Prevent deleting the last admin
+    const tenantUsers = await ctx.db
+      .query("users")
+      .withIndex("by_tenant", (q) => q.eq("tenantId", user.tenantId))
+      .collect();
+
+    const admins = tenantUsers.filter(u => u.role === "admin" && u._id !== args.id);
+    if (user.role === "admin" && admins.length === 0) {
+      throw new Error("Cannot remove the last admin from the tenant");
+    }
+
+    // Delete the user
+    await ctx.db.delete(args.id);
+
+    return { success: true };
   },
 });
