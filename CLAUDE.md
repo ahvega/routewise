@@ -70,6 +70,58 @@ npm run quality    # Run type checks + tests (use before commits)
 npx convex dev     # Start Convex development server
 ```
 
+## Development Server Scripts (PowerShell)
+
+Use these scripts to manage the Convex and SvelteKit development servers:
+
+### Start Servers: `start-srv.ps1`
+
+Stops existing servers, updates Convex, and starts fresh dev servers.
+
+```powershell
+# Full restart with Convex update (recommended)
+.\start-srv.ps1
+
+# Skip Convex package update
+.\start-srv.ps1 -SkipUpdate
+
+# Start only SvelteKit (skip Convex)
+.\start-srv.ps1 -SkipConvex
+
+# Start only Convex (skip SvelteKit)
+.\start-srv.ps1 -SkipSvelte
+```
+
+**What it does:**
+1. Updates Convex to latest version (`npm install convex@latest`)
+2. Kills processes on ports 3210, 5173, 5174
+3. Starts Convex dev server (port 3210) in new window
+4. Starts SvelteKit dev server (port 5173) in new window
+
+### Stop Servers: `stop-srv.ps1`
+
+Stops all development servers without restarting.
+
+```powershell
+# Stop all dev servers
+.\stop-srv.ps1
+```
+
+**What it does:**
+- Kills processes on ports 3210 (Convex), 5173, 5174 (SvelteKit)
+- Verifies ports are free
+
+### When to Use
+
+| Scenario | Command |
+|----------|---------|
+| Start fresh dev session | `.\start-srv.ps1` |
+| Restart after Convex schema changes | `.\start-srv.ps1` |
+| Update Convex and restart | `.\start-srv.ps1` |
+| Quick restart (no update) | `.\start-srv.ps1 -SkipUpdate` |
+| Stop everything | `.\stop-srv.ps1` |
+| Port conflict issues | `.\stop-srv.ps1` then `.\start-srv.ps1` |
+
 ## Environment Setup
 
 1. Copy `.env.example` to `.env` and configure:
@@ -275,7 +327,7 @@ Before committing major features:
 1. **Type Check**: `npm run check` - Ensure no TypeScript errors
 2. **Run Tests**: `npm run test:run` - All tests must pass
 3. **Quick Check**: `npm run quality` - Combined type + test check
-4. **Manual Test**: Verify feature works in browser
+4. **Browser Test**: Use Puppeteer MCP tools for visual verification (see "Puppeteer MCP Server" section)
 
 ### 4. Commit Workflow
 ```bash
@@ -326,50 +378,512 @@ vi.mock('svelte-i18n', () => ({
 2. Export from barrel file (`index.ts`)
 3. Use Flowbite-svelte base components when possible
 
+## Svelte MCP Server (Official Documentation)
+
+This project has access to the **Official Svelte MCP Server** (`https://mcp.svelte.dev/mcp`) which provides up-to-date Svelte 5 and SvelteKit documentation directly from svelte.dev. **Use this MCP server when writing Svelte code** to ensure correct syntax and best practices.
+
+### Why Use the Svelte MCP Server
+
+- **Up-to-date documentation**: Direct access to official svelte.dev/docs content
+- **Code validation**: Static analysis to catch issues before delivery
+- **Best practices**: Guidance on Svelte 5 runes, SvelteKit patterns, and more
+- **Playground links**: Generate shareable code examples
+
+### Available Tools
+
+| Tool | Description | When to Use |
+|------|-------------|-------------|
+| `list-sections` | List available documentation sections | First call to discover what docs are available |
+| `get-documentation` | Retrieve full documentation for sections | Get detailed docs on specific topics |
+| `svelte-autofixer` | Analyze code and suggest fixes | **ALWAYS** run before delivering code |
+| `playground-link` | Generate Svelte Playground link | Share code examples (user confirmation required) |
+
+### Required Workflow for Writing Svelte Code
+
+**IMPORTANT**: Follow this workflow when writing Svelte/SvelteKit code:
+
+```
+Step 1: Discover relevant docs
+        list-sections → Find documentation for your task
+
+Step 2: Get detailed documentation
+        get-documentation → Retrieve docs for specific sections
+        (e.g., "svelte/runes", "kit/routing", "kit/form-actions")
+
+Step 3: Write the code
+        Implement using patterns from the documentation
+
+Step 4: Validate with autofixer (REQUIRED)
+        svelte-autofixer → Analyze your code
+        Fix any issues reported
+        Repeat until no issues remain
+
+Step 5: Deliver the code
+        Only after autofixer passes with no issues
+```
+
+### Documentation Sections
+
+The Svelte MCP server provides documentation across these categories:
+
+**Svelte 5 Core**
+- Runes (`$state`, `$derived`, `$effect`, `$props`, `$bindable`)
+- Template syntax (control flow, bindings, actions)
+- Component lifecycle and composition
+- Styling and CSS
+
+**SvelteKit**
+- Routing (pages, layouts, groups, params)
+- Loading data (`load` functions, `+page.server.ts`)
+- Form actions and progressive enhancement
+- Hooks and middleware
+- Deployment adapters
+
+**CLI Tools**
+- `sv` commands for project management
+- Adding integrations (`sv add`)
+
+### Example: Using Svelte MCP for a New Feature
+
+**Task**: Create a form with server-side validation
+
+```
+1. list-sections
+   → Find: "kit/form-actions", "kit/load", "svelte/bindings"
+
+2. get-documentation → sections: ["kit/form-actions", "kit/load"]
+   → Get complete docs on SvelteKit forms and data loading
+
+3. Write the code following the documented patterns
+
+4. svelte-autofixer → code: "<your generated code>"
+   → Returns: [{ issue: "...", suggestion: "..." }]
+   → Fix issues and run again until clean
+
+5. Deliver validated code to user
+```
+
+### Svelte Autofixer Usage
+
+The `svelte-autofixer` tool uses static analysis to identify:
+
+- Incorrect runes syntax
+- Deprecated patterns (Svelte 4 → Svelte 5)
+- SvelteKit routing issues
+- Component prop misuse
+- Accessibility concerns
+
+**Example autofixer loop:**
+```
+Run 1: svelte-autofixer → 3 issues found
+       Fix: Change `export let` to `$props()`
+       Fix: Change `on:click` to `onclick`
+       Fix: Add missing type annotation
+
+Run 2: svelte-autofixer → 0 issues found
+       ✓ Code is ready to deliver
+```
+
+### MCP Server Configuration
+
+Located in `.claude/.mcp.json`:
+```json
+{
+  "mcpServers": {
+    "svelte": {
+      "type": "http",
+      "url": "https://mcp.svelte.dev/mcp"
+    }
+  }
+}
+```
+
+### Quick Reference: Common Documentation Sections
+
+| Task | Documentation Section |
+|------|----------------------|
+| State management | `svelte/runes` |
+| Component props | `svelte/component-fundamentals` |
+| Event handling | `svelte/event-handlers` |
+| Two-way binding | `svelte/bindings` |
+| Routing | `kit/routing` |
+| Data loading | `kit/load` |
+| Form handling | `kit/form-actions` |
+| Server hooks | `kit/hooks` |
+| Error handling | `kit/errors` |
+
+## Convex MCP Server (Database Operations)
+
+This project has access to the **Convex MCP Server** which allows AI agents to interact directly with your Convex deployment. **Use this when working with database operations, debugging functions, or managing environment variables.**
+
+### Why Use the Convex MCP Server
+
+- **Live data access**: Query and browse actual database contents
+- **Function execution**: Run deployed Convex functions with arguments
+- **Debugging**: Access function execution logs
+- **Schema inspection**: View table structures and inferred schemas
+- **Environment management**: Manage deployment environment variables
+
+### Available Tools
+
+| Tool | Description | Use Case |
+|------|-------------|----------|
+| `status` | Get available deployments | **First call** to get deployment selector |
+| `tables` | List all tables with schemas | Discover database structure |
+| `data` | Browse documents in a table | Inspect actual data records |
+| `runOneoffQuery` | Execute read-only JS queries | Custom data analysis |
+| `functionSpec` | Get function metadata | Understand function interfaces |
+| `run` | Execute deployed functions | Trigger backend operations |
+| `logs` | Get recent function logs | Debug function execution |
+| `envList` | List environment variables | View all env vars |
+| `envGet` | Get specific env var value | Check configuration |
+| `envSet` | Create/update env var | Configure deployment |
+| `envRemove` | Delete env var | Remove configuration |
+
+### Required Workflow
+
+**IMPORTANT**: Always start with `status` to get a deployment selector:
+
+```
+Step 1: status
+        → Returns deployment selector for use with other tools
+
+Step 2: Use other tools with the deployment selector
+        → tables, data, functionSpec, run, logs, etc.
+```
+
+### Tool Categories
+
+**Data Inspection**
+```
+status → Get deployment selector
+tables → View all tables and schemas
+data → Browse documents (with pagination)
+runOneoffQuery → Execute custom read-only queries
+```
+
+**Function Operations**
+```
+functionSpec → Get function metadata (type, visibility, interface)
+run → Execute function with arguments
+logs → View recent execution logs (structured objects)
+```
+
+**Environment Management**
+```
+envList → List all environment variables
+envGet → Get specific variable value
+envSet → Create or update variable
+envRemove → Delete variable
+```
+
+### Example: Debugging a Function
+
+```
+1. status → Get deployment selector
+
+2. functionSpec → name: "api.vehicles.list"
+   → Returns: type, visibility, arguments, return type
+
+3. run → function: "api.vehicles.list", args: { tenantId: "..." }
+   → Execute and see results
+
+4. logs → View recent execution logs for debugging
+```
+
+### Example: Inspecting Data
+
+```
+1. status → Get deployment selector
+
+2. tables → List all tables
+   → Returns: vehicles, clients, quotations, etc. with schemas
+
+3. data → table: "vehicles"
+   → Browse vehicle documents with pagination
+
+4. runOneoffQuery → query: "db.query('vehicles').filter(...)"
+   → Custom read-only query (cannot modify data)
+```
+
+### Limitations
+
+- `runOneoffQuery` is **read-only** - cannot modify database
+- All tools require a deployment selector from `status`
+- `run` executes deployed functions only (not local/uncommitted code)
+
+### MCP Server Configuration
+
+Located in `.claude/.mcp.json`:
+```json
+{
+  "mcpServers": {
+    "convex": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["convex", "mcp", "start"]
+    }
+  }
+}
+```
+
+### Quick Reference
+
+| Task | Tool(s) |
+|------|---------|
+| View database schema | `status` → `tables` |
+| Browse table data | `status` → `data` |
+| Custom data query | `status` → `runOneoffQuery` |
+| Run a function | `status` → `run` |
+| Debug function | `status` → `logs` |
+| Check env vars | `status` → `envList` / `envGet` |
+| Set env var | `status` → `envSet` |
+
 ## Flowbite-Svelte MCP Server
 
-This project has access to the **Flowbite-Svelte MCP Server** which provides AI assistants with comprehensive component documentation, usage examples, and best practices.
+This project has access to the **Flowbite-Svelte MCP Server** which provides AI assistants with comprehensive component documentation, usage examples, and best practices. **ALWAYS use this MCP server when implementing UI components** to ensure you're using the correct, up-to-date syntax.
+
+### Why Use the MCP Server
+
+- **Up-to-date documentation**: Local copy of official LLM-optimized docs from flowbite-svelte.com
+- **Correct Svelte 5 syntax**: Examples use runes (`$state`, `$derived`, `$props`) not legacy syntax
+- **Proper imports**: Get exact import statements for each component
+- **Props and events**: Complete prop definitions with TypeScript types
+- **Best practices**: Semantic usage guidelines and accessibility considerations
 
 ### Available MCP Tools
 
-When working with Flowbite-Svelte components, use these tools:
+| Tool | Description | Parameters |
+|------|-------------|------------|
+| `findComponent` | Find component by name/term | `query` (e.g., "Button", "form checkbox") |
+| `getComponentDoc` | Get full documentation | `component` (doc path from findComponent) |
+| `getComponentList` | List all available docs | None |
+| `searchDocs` | Full-text search in docs | `query` (search term) |
 
-1. **findComponent** - Use this FIRST to discover components by name or category
-   - Returns documentation paths for matching components
-   - Example: "Find the Modal component" → returns path to modal docs
+### Tool Usage Workflow
 
-2. **getComponentList** - Lists all available Flowbite-Svelte components organized by category
-   - Use to explore what components are available
-   - Returns components grouped by: forms, typography, utilities, extend, etc.
+**IMPORTANT**: Always follow this workflow when implementing Flowbite-Svelte components:
 
-3. **getComponentDoc** - Retrieves complete documentation for a specific component
-   - Includes usage examples, props, events, and best practices
-   - Use after findComponent to get full details
-
-4. **searchDocs** - Performs full-text search across all documentation
-   - Useful for finding specific features or patterns
-   - Example: "Search for dark mode toggle examples"
-
-### MCP Server Location
-
-The Flowbite-Svelte MCP server is installed at:
 ```
-e:\MyDevTools\flowbite-svelte-mcp\build\server.js
+Step 1: findComponent → query: "button"
+        Returns: { match: "buttons", category: "components", docUrl: "buttons", components: ["Button", "GradientButton"] }
+
+Step 2: getComponentDoc → component: "buttons"
+        Returns: Full markdown documentation with:
+        - Import statements
+        - Code examples with Svelte 5 syntax
+        - Props table
+        - Events and slots
+        - Best practices
+
+Step 3: Implement using the documented syntax
 ```
 
-### Usage Workflow
+### Component Categories
 
-When implementing UI with Flowbite-Svelte:
-1. **First**: Use `findComponent` to locate the relevant component(s)
-2. **Then**: Use `getComponentDoc` to get detailed usage examples and props
-3. **Optionally**: Use `searchDocs` for specific patterns or edge cases
+The MCP server provides documentation for 75+ components across these categories:
 
-### Example Queries
+**Components (40+)**
+- Layout: Navbar, Sidebar, Footer, Drawer, Modal, Dialog
+- Data Display: Table, Card, Badge, Avatar, Timeline, Rating
+- Feedback: Alert, Toast, Spinner, Progress, Skeleton
+- Navigation: Breadcrumb, Pagination, Tabs, BottomNav, MegaMenu
+- Overlays: Dropdown, Popover, Tooltip, SpeedDial
+- Media: Carousel, Gallery, Video, DeviceMockup
 
-- "What components are available for forms?"
-- "Show me how to use the Dropdown component"
-- "Search for accordion with nested items"
-- "Get documentation for the Modal component"
+**Forms (15+)**
+- Input, Textarea, Select, MultiSelect, Checkbox, Radio, Toggle
+- FloatingLabelInput, Range, Search, Fileupload, Dropzone
+- Datepicker, Timepicker, PhoneInput, Tags
+
+**Typography**
+- Heading, P (Paragraph), A (Link), List, Blockquote, Hr, Img, Mark, Span
+
+**Extended Components**
+- CommandPalette, KanbanBoard, StepIndicator, Tour, SplitPane
+- VirtualList, VirtualMasonry, ScrollSpy, ClipboardManager
+
+### Example: Implementing a Button
+
+**Step 1**: Find the component
+```
+findComponent → query: "button"
+```
+
+**Step 2**: Get documentation
+```
+getComponentDoc → component: "buttons"
+```
+
+**Step 3**: Implementation (from docs)
+```svelte
+<script lang="ts">
+  import { Button } from "flowbite-svelte";
+</script>
+
+<Button>Default</Button>
+<Button color="alternative">Alternative</Button>
+<Button color="red">Delete</Button>
+<Button pill>Rounded</Button>
+<Button href="/path">Link Button</Button>
+```
+
+### Example: Implementing a Form
+
+**Step 1**: Find form components
+```
+findComponent → query: "input"
+findComponent → query: "select"
+```
+
+**Step 2**: Get documentation for each
+```
+getComponentDoc → component: "forms/input-field"
+getComponentDoc → component: "forms/select"
+```
+
+**Step 3**: Implementation (from docs)
+```svelte
+<script lang="ts">
+  import { Input, Label, Select, Button } from "flowbite-svelte";
+
+  let name = $state("");
+  let country = $state("");
+
+  const countries = [
+    { value: "hn", name: "Honduras" },
+    { value: "us", name: "United States" }
+  ];
+</script>
+
+<Label for="name">Name</Label>
+<Input id="name" bind:value={name} placeholder="Enter name" />
+
+<Label for="country">Country</Label>
+<Select id="country" bind:value={country} items={countries} />
+
+<Button type="submit">Submit</Button>
+```
+
+### Ensuring Up-to-Date Syntax
+
+**CRITICAL**: Flowbite-Svelte 1.x uses Svelte 5 runes syntax. Always verify:
+
+| Old Syntax (Svelte 4) | New Syntax (Svelte 5) |
+|-----------------------|-----------------------|
+| `export let value` | `let { value } = $props()` |
+| `let count = 0` | `let count = $state(0)` |
+| `$: doubled = count * 2` | `let doubled = $derived(count * 2)` |
+| `on:click={handler}` | `onclick={handler}` |
+| `bind:value` | `bind:value` (unchanged) |
+
+### MCP Server Configuration
+
+Located in `.claude/.mcp.json`:
+```json
+{
+  "mcpServers": {
+    "flowbite-svelte": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["e:\\MyDevTools\\flowbite-svelte-mcp\\build\\server.js"]
+    }
+  }
+}
+```
+
+### Quick Reference Queries
+
+| Need | Tool | Query |
+|------|------|-------|
+| Modal dialog | findComponent | "modal" or "dialog" |
+| Form inputs | findComponent | "input", "select", "checkbox" |
+| Data table | findComponent | "table" |
+| Navigation | findComponent | "navbar", "sidebar", "breadcrumb" |
+| Notifications | findComponent | "toast", "alert" |
+| Loading states | findComponent | "spinner", "skeleton" |
+| Dark mode toggle | findComponent | "darkmode" |
+| Date selection | findComponent | "datepicker" |
+
+## Puppeteer MCP Server (Browser Testing)
+
+This project has access to the **Puppeteer MCP Server** via Docker MCP for browser automation and visual testing. Use it to verify UI features after completing implementation tasks.
+
+### Available Puppeteer Tools
+
+| Tool | Description | Parameters |
+|------|-------------|------------|
+| `puppeteer_navigate` | Navigate to a URL | `url` (required), `launchOptions` (optional) |
+| `puppeteer_screenshot` | Take a screenshot | `name` (required), `selector`, `width`, `height` |
+| `puppeteer_click` | Click an element | `selector` (CSS selector) |
+| `puppeteer_fill` | Fill an input field | `selector`, `value` |
+| `puppeteer_select` | Select from dropdown | `selector`, `value` |
+| `puppeteer_hover` | Hover over element | `selector` |
+| `puppeteer_evaluate` | Execute JavaScript | `script` (JS code string) |
+
+### Browser Testing Workflow
+
+After completing UI features, use Puppeteer to verify the implementation:
+
+```
+1. Start dev server: npm run dev (ensure it's running on localhost:5173)
+2. Navigate to the page: puppeteer_navigate → url: "http://localhost:5173/your-route"
+3. Take screenshot: puppeteer_screenshot → name: "feature-verification"
+4. Interact with elements: puppeteer_click, puppeteer_fill, etc.
+5. Verify results: Take another screenshot or use puppeteer_evaluate
+```
+
+### Example Testing Scenarios
+
+**Testing a form submission:**
+```
+1. puppeteer_navigate → url: "http://localhost:5173/clients/new"
+2. puppeteer_fill → selector: "#name", value: "Test Client"
+3. puppeteer_fill → selector: "#email", value: "test@example.com"
+4. puppeteer_click → selector: "button[type='submit']"
+5. puppeteer_screenshot → name: "form-submitted"
+```
+
+**Testing navigation and layout:**
+```
+1. puppeteer_navigate → url: "http://localhost:5173"
+2. puppeteer_screenshot → name: "dashboard-initial"
+3. puppeteer_click → selector: "[data-testid='sidebar-vehicles']"
+4. puppeteer_screenshot → name: "vehicles-page"
+```
+
+**Testing responsive design:**
+```
+1. puppeteer_navigate → url: "http://localhost:5173", launchOptions: { defaultViewport: { width: 375, height: 667 } }
+2. puppeteer_screenshot → name: "mobile-view", width: 375, height: 667
+```
+
+### When to Use Puppeteer Testing
+
+Use Puppeteer MCP tools in these scenarios:
+
+1. **After completing UI features** - Verify visual appearance and interactions
+2. **Testing user flows** - Multi-step processes like form submissions, navigation
+3. **Debugging layout issues** - Take screenshots to inspect CSS/styling problems
+4. **Verifying responsive design** - Test different viewport sizes
+5. **Before committing UI changes** - Quick visual regression check
+
+### Integration with TDD Flow
+
+Puppeteer browser testing complements the existing TDD workflow:
+
+```
+TDD Flow (Enhanced)
+├── 1. Write unit/component tests (vitest + @testing-library/svelte)
+├── 2. Implement the feature
+├── 3. Run npm run quality (type check + unit tests)
+├── 4. Browser verification with Puppeteer MCP tools
+│   ├── Navigate to the feature page
+│   ├── Take screenshots for visual verification
+│   ├── Test user interactions (clicks, forms, navigation)
+│   └── Verify expected behavior
+└── 5. Commit with conventional commit message
+```
 
 ## Related Documentation
 

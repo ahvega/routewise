@@ -3,6 +3,17 @@
 	"mcpServers": {
 		"svelte": {
 			"url": "https://mcp.svelte.dev/mcp"
+		},
+		"flowbite-svelte": {
+			"type": "stdio",
+			"command": "node",
+			"args": ["e:\\MyDevTools\\flowbite-svelte-mcp\\build\\server.js"]
+		},
+		"convex": {
+			"type": "stdio",
+			"command": "npx",
+			"args": ["convex", "mcp", "start"]
 		}
 	}
 }
+
