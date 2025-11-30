@@ -609,7 +609,7 @@
 	<p class="text-gray-500 dark:text-gray-400">
 		{$t('expenses.confirmApprove')}
 	</p>
-	<svelte:fragment slot="footer">
+	{#snippet footer()}
 		<div class="flex gap-2 justify-end w-full">
 			<Button color="light" onclick={() => (showApproveModal = false)}>{$t('common.cancel')}</Button>
 			<Button color="green" onclick={approveAdvance} disabled={isSubmitting}>
@@ -619,7 +619,7 @@
 				{$t('expenses.actions.approve')}
 			</Button>
 		</div>
-	</svelte:fragment>
+	{/snippet}
 </Modal>
 
 <!-- Disburse Modal -->
@@ -634,7 +634,7 @@
 			<Input id="reference" bind:value={disbursementReference} placeholder={$t('expenses.disbursementReferencePlaceholder')} />
 		</div>
 	</div>
-	<svelte:fragment slot="footer">
+	{#snippet footer()}
 		<div class="flex gap-2 justify-end w-full">
 			<Button color="light" onclick={() => (showDisburseModal = false)}>{$t('common.cancel')}</Button>
 			<Button color="primary" onclick={disburseAdvance} disabled={isSubmitting}>
@@ -644,7 +644,7 @@
 				{$t('expenses.actions.disburse')}
 			</Button>
 		</div>
-	</svelte:fragment>
+	{/snippet}
 </Modal>
 
 <!-- Settle Modal -->
@@ -705,7 +705,7 @@
 			<Textarea id="settlementNotes" bind:value={settlementNotes} rows={3} />
 		</div>
 	</div>
-	<svelte:fragment slot="footer">
+	{#snippet footer()}
 		<div class="flex gap-2 justify-end w-full">
 			<Button color="light" onclick={() => (showSettleModal = false)}>{$t('common.cancel')}</Button>
 			<Button color="green" onclick={settleAdvance} disabled={isSubmitting}>
@@ -715,7 +715,7 @@
 				{$t('expenses.actions.settle')}
 			</Button>
 		</div>
-	</svelte:fragment>
+	{/snippet}
 </Modal>
 
 <!-- Cancel Modal -->
@@ -727,7 +727,7 @@
 			<Textarea id="cancelReason" bind:value={cancelReason} rows={3} />
 		</div>
 	</div>
-	<svelte:fragment slot="footer">
+	{#snippet footer()}
 		<div class="flex gap-2 justify-end w-full">
 			<Button color="light" onclick={() => (showCancelModal = false)}>{$t('common.cancel')}</Button>
 			<Button color="red" onclick={cancelAdvance} disabled={isSubmitting}>
@@ -737,5 +737,5 @@
 				{$t('expenses.actions.cancel')}
 			</Button>
 		</div>
-	</svelte:fragment>
+	{/snippet}
 </Modal>

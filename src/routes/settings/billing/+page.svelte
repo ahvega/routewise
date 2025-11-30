@@ -367,7 +367,9 @@
 		<!-- Trial Warning -->
 		{#if currentPlan === 'trial' && tenant.trialEndsAt}
 			<Alert color="yellow">
-				<ExclamationCircleOutline slot="icon" class="w-5 h-5" />
+				{#snippet icon()}
+					<ExclamationCircleOutline class="w-5 h-5" />
+				{/snippet}
 				<span class="font-medium">{$t('settings.billing.trialEnding')}</span>
 				{$t('settings.billing.trialEndsOn')} {formatDate(tenant.trialEndsAt)}.
 				<Button size="xs" color="yellow" class="ml-2" onclick={handleUpgrade}>
@@ -377,7 +379,9 @@
 		{/if}
 	{:else}
 		<Alert color="red">
-			<ExclamationCircleOutline slot="icon" class="w-5 h-5" />
+			{#snippet icon()}
+				<ExclamationCircleOutline class="w-5 h-5" />
+			{/snippet}
 			{$t('settings.billing.noTenantError')}
 		</Alert>
 	{/if}

@@ -671,7 +671,7 @@
 			{/each}
 		</Select>
 	</div>
-	<svelte:fragment slot="footer">
+	{#snippet footer()}
 		<div class="flex justify-end gap-2">
 			<Button color="alternative" onclick={() => (showAssignDriverModal = false)}>
 				{$t('common.cancel')}
@@ -680,7 +680,7 @@
 				{$t('itineraries.assignDriver')}
 			</Button>
 		</div>
-	</svelte:fragment>
+	{/snippet}
 </Modal>
 
 <!-- Assign Vehicle Modal -->
@@ -693,7 +693,7 @@
 			{/each}
 		</Select>
 	</div>
-	<svelte:fragment slot="footer">
+	{#snippet footer()}
 		<div class="flex justify-end gap-2">
 			<Button color="alternative" onclick={() => (showAssignVehicleModal = false)}>
 				{$t('common.cancel')}
@@ -702,7 +702,7 @@
 				{$t('itineraries.assignVehicle')}
 			</Button>
 		</div>
-	</svelte:fragment>
+	{/snippet}
 </Modal>
 
 <!-- Generate Invoice Modal -->
@@ -739,7 +739,7 @@
 			<p class="text-xs text-gray-500 dark:text-gray-400 mt-1">{$t('common.days')}</p>
 		</div>
 	</div>
-	<svelte:fragment slot="footer">
+	{#snippet footer()}
 		<div class="flex justify-end gap-2">
 			<Button color="alternative" onclick={() => (showInvoiceModal = false)}>
 				{$t('common.cancel')}
@@ -749,7 +749,7 @@
 				{$t('invoices.generateInvoice')}
 			</Button>
 		</div>
-	</svelte:fragment>
+	{/snippet}
 </Modal>
 
 <!-- Create Expense Advance Modal -->
@@ -826,7 +826,7 @@
 			<p class="text-2xl font-bold text-amber-700 dark:text-amber-300">{formatCurrency(totalAdvanceAmount)}</p>
 		</div>
 	</div>
-	<svelte:fragment slot="footer">
+	{#snippet footer()}
 		<div class="flex justify-end gap-2">
 			<Button color="alternative" onclick={() => (showAdvanceModal = false)}>
 				{$t('common.cancel')}
@@ -836,19 +836,19 @@
 				{$t('expenses.createAdvance')}
 			</Button>
 		</div>
-	</svelte:fragment>
+	{/snippet}
 </Modal>
 
 <!-- Toast notifications -->
 {#if showToast}
 	<Toast class="fixed bottom-4 right-4" color={toastType === 'success' ? 'green' : 'red'}>
-		<svelte:fragment slot="icon">
+		{#snippet icon()}
 			{#if toastType === 'success'}
 				<CheckCircleOutline class="w-5 h-5" />
 			{:else}
 				<CloseCircleOutline class="w-5 h-5" />
 			{/if}
-		</svelte:fragment>
+		{/snippet}
 		{toastMessage}
 	</Toast>
 {/if}

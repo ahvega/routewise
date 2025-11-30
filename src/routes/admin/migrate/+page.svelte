@@ -156,7 +156,9 @@
 		{:else if !hasDefaultTenant}
 			<!-- No Default Tenant -->
 			<Alert color="yellow">
-				<ExclamationCircleOutline slot="icon" class="w-5 h-5" />
+				{#snippet icon()}
+					<ExclamationCircleOutline class="w-5 h-5" />
+				{/snippet}
 				<span class="font-medium">No default tenant found.</span>
 				The default tenant has already been migrated or doesn't exist.
 				<Button size="xs" color="yellow" class="ml-2" href="/">Go to Dashboard</Button>
@@ -288,7 +290,9 @@
 						</div>
 
 						<Alert color="blue">
-							<ExclamationCircleOutline slot="icon" class="w-5 h-5" />
+							{#snippet icon()}
+								<ExclamationCircleOutline class="w-5 h-5" />
+							{/snippet}
 							<span class="font-medium">Important:</span> This action will convert the default tenant to your organization.
 							All existing data (vehicles, drivers, clients, quotations) will be preserved.
 						</Alert>
@@ -315,13 +319,13 @@
 <!-- Toast notifications -->
 {#if showToast}
 	<Toast class="fixed bottom-4 right-4" color={toastType === 'success' ? 'green' : 'red'}>
-		<svelte:fragment slot="icon">
+		{#snippet icon()}
 			{#if toastType === 'success'}
 				<CheckCircleOutline class="w-5 h-5" />
 			{:else}
 				<CloseCircleOutline class="w-5 h-5" />
 			{/if}
-		</svelte:fragment>
+		{/snippet}
 		{toastMessage}
 	</Toast>
 {/if}

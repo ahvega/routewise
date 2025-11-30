@@ -427,13 +427,13 @@
 				</Button>
 
 				{#if invoice.status === 'draft'}
-					<Button color="blue" on:click={() => updateStatus('sent')}>
+					<Button color="blue" onclick={() => updateStatus('sent')}>
 						<PaperPlaneSolid class="w-4 h-4 mr-2" />
 						{$t('invoices.actions.send')}
 					</Button>
 				{/if}
 				{#if invoice.paymentStatus !== 'paid'}
-					<Button color="green" on:click={openPaymentModal}>
+					<Button color="green" onclick={openPaymentModal}>
 						<CashOutline class="w-4 h-4 mr-2" />
 						{$t('invoices.actions.recordPayment')}
 					</Button>
@@ -553,7 +553,7 @@
 					<div class="flex items-center justify-between mb-4">
 						<h3 class="text-lg font-semibold text-gray-900 dark:text-white">{$t('invoices.paymentHistory')}</h3>
 						{#if invoice.paymentStatus !== 'paid'}
-							<Button size="xs" color="light" on:click={openPaymentModal}>
+							<Button size="xs" color="light" onclick={openPaymentModal}>
 								<PlusOutline class="w-4 h-4 mr-1" />
 								{$t('invoices.actions.addPayment')}
 							</Button>
@@ -583,7 +583,7 @@
 									<Button
 										size="xs"
 										color="light"
-										on:click={() => {
+										onclick={() => {
 											selectedPaymentId = payment._id;
 											showDeletePaymentModal = true;
 										}}
@@ -630,13 +630,13 @@
 					<h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">{$t('common.actions')}</h3>
 					<div class="space-y-2">
 						{#if invoice.status === 'draft'}
-							<Button color="blue" class="w-full" on:click={() => updateStatus('sent')}>
+							<Button color="blue" class="w-full" onclick={() => updateStatus('sent')}>
 								<PaperPlaneSolid class="w-4 h-4 mr-2" />
 								{$t('invoices.actions.markSent')}
 							</Button>
 						{/if}
 						{#if invoice.status !== 'cancelled' && invoice.status !== 'paid'}
-							<Button color="light" class="w-full" on:click={() => updateStatus('cancelled')}>
+							<Button color="light" class="w-full" onclick={() => updateStatus('cancelled')}>
 								<CloseCircleSolid class="w-4 h-4 mr-2" />
 								{$t('invoices.actions.cancel')}
 							</Button>
@@ -681,29 +681,29 @@
 			<Textarea id="paymentNotes" bind:value={paymentNotes} rows={2} />
 		</div>
 	</div>
-	<svelte:fragment slot="footer">
+	{#snippet footer()}
 		<div class="flex gap-2 justify-end w-full">
-			<Button color="light" on:click={() => (showPaymentModal = false)}>{$t('common.cancel')}</Button>
-			<Button color="green" on:click={recordPayment} disabled={paymentAmount <= 0}>
+			<Button color="light" onclick={() => (showPaymentModal = false)}>{$t('common.cancel')}</Button>
+			<Button color="green" onclick={recordPayment} disabled={paymentAmount <= 0}>
 				<CheckCircleSolid class="w-4 h-4 mr-2" />
 				{$t('invoices.actions.recordPayment')}
 			</Button>
 		</div>
-	</svelte:fragment>
+	{/snippet}
 </Modal>
 
 <!-- Delete Payment Confirmation -->
 <Modal bind:open={showDeletePaymentModal} size="sm" title={$t('invoices.deletePayment')}>
 	<p class="text-gray-500 dark:text-gray-400">{$t('invoices.deletePaymentConfirm')}</p>
-	<svelte:fragment slot="footer">
+	{#snippet footer()}
 		<div class="flex gap-2 justify-end w-full">
-			<Button color="light" on:click={() => (showDeletePaymentModal = false)}>{$t('common.cancel')}</Button>
-			<Button color="red" on:click={deletePayment}>
+			<Button color="light" onclick={() => (showDeletePaymentModal = false)}>{$t('common.cancel')}</Button>
+			<Button color="red" onclick={deletePayment}>
 				<TrashBinOutline class="w-4 h-4 mr-2" />
 				{$t('common.delete')}
 			</Button>
 		</div>
-	</svelte:fragment>
+	{/snippet}
 </Modal>
 
 <!-- Email Modal -->
@@ -739,7 +739,7 @@
 			</div>
 		{/if}
 	</div>
-	<svelte:fragment slot="footer">
+	{#snippet footer()}
 		<div class="flex justify-end gap-2">
 			<Button color="alternative" onclick={() => (showEmailModal = false)} disabled={isSendingEmail}>
 				{$t('common.cancel')}
@@ -753,7 +753,7 @@
 				{$t('common.send')}
 			</Button>
 		</div>
-	</svelte:fragment>
+	{/snippet}
 </Modal>
 
 <!-- Toast Notifications -->
@@ -762,7 +762,7 @@
 		color={toastType === 'success' ? 'green' : 'red'}
 		position="top-right"
 		class="fixed top-4 right-4 z-50"
-		on:close={() => (showToast = false)}
+		onclose={() => (showToast = false)}
 	>
 		{toastMessage}
 	</Toast>

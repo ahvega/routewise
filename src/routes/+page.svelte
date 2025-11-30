@@ -127,7 +127,9 @@
 		<div class="space-y-2">
 			{#each dangerAlerts.slice(0, 3) as alert}
 				<Alert color="red" class="!bg-red-50 dark:!bg-red-900/20">
-					<ExclamationCircleOutline slot="icon" class="w-5 h-5" />
+					{#snippet icon()}
+						<ExclamationCircleOutline class="w-5 h-5" />
+					{/snippet}
 					<span class="font-medium">{alert.title}:</span>
 					{alert.message}
 				</Alert>

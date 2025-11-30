@@ -195,8 +195,11 @@
 					type="text"
 					placeholder={$t('common.search')}
 					bind:value={searchQuery}
+					class="ps-10"
 				>
-					<SearchOutline slot="left" class="w-5 h-5 text-gray-500" />
+					{#snippet left()}
+						<SearchOutline class="w-5 h-5 text-gray-500" />
+					{/snippet}
 				</Input>
 			</div>
 			<div class="w-full md:w-48">

@@ -500,7 +500,9 @@
 
 	{#if mapsError}
 		<Alert color="red">
-			<ExclamationCircleOutline slot="icon" class="w-5 h-5" />
+			{#snippet icon()}
+				<ExclamationCircleOutline class="w-5 h-5" />
+			{/snippet}
 			{mapsError}
 		</Alert>
 	{/if}
@@ -583,7 +585,9 @@
 
 					{#if needsDeadhead && selectedVehicle}
 						<Alert color="blue" class="mt-4">
-							<MapPinOutline slot="icon" class="w-5 h-5" />
+							{#snippet icon()}
+								<MapPinOutline class="w-5 h-5" />
+							{/snippet}
 							<span class="font-medium">{$t('quotations.new.repositioning')}:</span>
 							{$t('quotations.new.deadheadAlert')}
 						</Alert>
@@ -799,7 +803,9 @@
 					</div>
 				{:else if routeError}
 					<Alert color="red" class="mb-4">
-						<ExclamationCircleOutline slot="icon" class="w-4 h-4" />
+						{#snippet icon()}
+							<ExclamationCircleOutline class="w-4 h-4" />
+						{/snippet}
 						{routeError}
 					</Alert>
 				{:else if routeResult}
@@ -1030,19 +1036,19 @@
 <!-- Toast notifications -->
 {#if showToast}
 	<Toast class="fixed bottom-4 right-4" color={toastType === 'success' ? 'green' : 'red'}>
-		<svelte:fragment slot="icon">
+		{#snippet icon()}
 			{#if toastType === 'success'}
 				<CheckCircleOutline class="w-5 h-5" />
 			{:else}
 				<CloseCircleOutline class="w-5 h-5" />
 			{/if}
-		</svelte:fragment>
+		{/snippet}
 		{toastMessage}
 	</Toast>
 {/if}
 
 <!-- Map Modal -->
-<Modal bind:open={showMapModal} size="xl" title={$t('quotations.new.routeMap')} on:close={closeMapModal}>
+<Modal bind:open={showMapModal} size="xl" title={$t('quotations.new.routeMap')} onclose={closeMapModal}>
 	<div class="space-y-4">
 		<div class="flex items-center gap-4 text-sm text-gray-600 dark:text-gray-400">
 			<div class="flex items-center gap-1">
@@ -1066,7 +1072,7 @@
 			</div>
 		{/if}
 	</div>
-	<svelte:fragment slot="footer">
+	{#snippet footer()}
 		<Button color="alternative" onclick={closeMapModal}>{$t('common.close')}</Button>
-	</svelte:fragment>
+	{/snippet}
 </Modal>

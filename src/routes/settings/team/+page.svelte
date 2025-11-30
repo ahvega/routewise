@@ -386,7 +386,7 @@
 		</div>
 	</form>
 
-	<svelte:fragment slot="footer">
+	{#snippet footer()}
 		<Button color="light" onclick={() => (showInviteModal = false)}>
 			{$t('common.cancel')}
 		</Button>
@@ -397,19 +397,19 @@
 			<EnvelopeOutline class="w-4 h-4 mr-2" />
 			{$t('settings.team.sendInvite')}
 		</Button>
-	</svelte:fragment>
+	{/snippet}
 </Modal>
 
 <!-- Toast notifications -->
 {#if showToast}
 	<Toast class="fixed bottom-4 right-4" color={toastType === 'success' ? 'green' : 'red'}>
-		<svelte:fragment slot="icon">
+		{#snippet icon()}
 			{#if toastType === 'success'}
 				<CheckCircleOutline class="w-5 h-5" />
 			{:else}
 				<CloseCircleOutline class="w-5 h-5" />
 			{/if}
-		</svelte:fragment>
+		{/snippet}
 		{toastMessage}
 	</Toast>
 {/if}
