@@ -449,14 +449,33 @@ export const getStats = query({
 });
 
 // Calculate suggested advance from quotation costs
+// IMPORTANT: For fuel, we only include the EXTRA fuel needed beyond the vehicle's tank capacity
+// The vehicle starts with a full tank, so we only need to advance money for refueling stops
 export const calculateSuggestedAdvance = query({
   args: { itineraryId: v.id("itineraries") },
   handler: async (ctx, args) => {
     const itinerary = await ctx.db.get(args.itineraryId);
     if (!itinerary) throw new Error("Itinerary not found");
 
+    // Get the vehicle for tank capacity and fuel efficiency
+    let vehicle = null;
+    if (itinerary.vehicleId) {
+      vehicle = await ctx.db.get(itinerary.vehicleId);
+    }
+
+    // Get active parameters for fuel price
+    let fuelPrice = 0;
+    const parameters = await ctx.db
+      .query("parameters")
+      .withIndex("by_tenant", (q) => q.eq("tenantId", itinerary.tenantId))
+      .filter((q) => q.eq(q.field("isActive"), true))
+      .first();
+    if (parameters) {
+      fuelPrice = parameters.fuelPrice;
+    }
+
     // Try to get quotation for cost breakdown (use local currency values)
-    let fuelCost = 0;
+    let totalFuelCost = 0;
     let mealsCost = 0;
     let lodgingCost = 0;
     let tollCost = 0;
@@ -468,7 +487,7 @@ export const calculateSuggestedAdvance = query({
         // Use local currency values if available, fallback to legacy fields
         const fuelLocal = (quotation.fuelCostLocal ?? quotation.fuelCost) +
                          (quotation.refuelingCostLocal ?? quotation.refuelingCost);
-        fuelCost = fuelLocal;
+        totalFuelCost = fuelLocal;
         mealsCost = quotation.driverMealsCostLocal ?? quotation.driverMealsCost;
         lodgingCost = quotation.driverLodgingCostLocal ?? quotation.driverLodgingCost;
         tollCost = quotation.tollCostLocal ?? quotation.tollCost;
@@ -476,15 +495,74 @@ export const calculateSuggestedAdvance = query({
       }
     }
 
-    const totalSuggested = fuelCost + mealsCost + lodgingCost + tollCost;
+    // Calculate fuel advance: only the EXTRA fuel beyond tank capacity
+    // The vehicle starts with a full tank, so we only need to advance for refueling
+    let fuelAdvance = 0;
+    let tankRange = 0;
+    let safeRange = 0;
+    let extraFuelNeeded = 0;
+
+    if (vehicle && vehicle.fuelCapacity && vehicle.fuelEfficiency) {
+      // Tank capacity with safety threshold (10-15% less than full)
+      const safetyThreshold = 0.85; // Use 85% of tank capacity for safety
+      const safeTankCapacity = vehicle.fuelCapacity * safetyThreshold;
+
+      // Calculate range on a safe tank
+      // fuelEfficiency is in km/gal or km/L depending on fuelEfficiencyUnit
+      let fuelEfficiencyKmPerGallon = vehicle.fuelEfficiency;
+      if (vehicle.fuelEfficiencyUnit === 'kpl') {
+        // Convert km/L to km/gal (1 gal = 3.78541 L)
+        fuelEfficiencyKmPerGallon = vehicle.fuelEfficiency * 3.78541;
+      }
+
+      // Tank capacity unit (gallons or liters)
+      let tankCapacityGallons = vehicle.fuelCapacity;
+      if (vehicle.fuelCapacityUnit === 'liters') {
+        // Convert liters to gallons
+        tankCapacityGallons = vehicle.fuelCapacity / 3.78541;
+      }
+
+      // Full tank range
+      tankRange = tankCapacityGallons * fuelEfficiencyKmPerGallon;
+      // Safe range (with threshold)
+      safeRange = (tankCapacityGallons * safetyThreshold) * fuelEfficiencyKmPerGallon;
+
+      // Total trip distance
+      const tripDistance = itinerary.totalDistance;
+
+      // Extra fuel needed (if trip is longer than safe range)
+      if (tripDistance > safeRange) {
+        // Calculate how much extra distance beyond safe range
+        const extraDistance = tripDistance - safeRange;
+        // Calculate extra fuel needed (in gallons)
+        const extraGallons = extraDistance / fuelEfficiencyKmPerGallon;
+        // Calculate cost of extra fuel
+        fuelAdvance = extraGallons * fuelPrice;
+        extraFuelNeeded = extraGallons;
+      }
+      // If trip is within safe range, no fuel advance needed (starts with full tank)
+    } else {
+      // No vehicle info available, fall back to total fuel cost
+      fuelAdvance = totalFuelCost;
+    }
+
+    const totalSuggested = fuelAdvance + mealsCost + lodgingCost + tollCost;
 
     return {
-      estimatedFuel: fuelCost,
+      // Fuel breakdown
+      estimatedFuel: Math.round(fuelAdvance),
+      totalFuelCost: Math.round(totalFuelCost), // Total fuel cost for reference
+      tankRange: Math.round(tankRange),
+      safeRange: Math.round(safeRange),
+      extraFuelNeeded: Math.round(extraFuelNeeded * 100) / 100, // Gallons with 2 decimals
+      tripDistance: itinerary.totalDistance,
+      fuelAdvanceNeeded: fuelAdvance > 0, // Flag to indicate if fuel advance is needed
+      // Other costs
       estimatedMeals: mealsCost,
       estimatedLodging: lodgingCost,
       estimatedTolls: tollCost,
       estimatedOther: 0,
-      totalSuggested, // In local currency
+      totalSuggested: Math.round(totalSuggested), // In local currency
       localCurrency,
       exchangeRate: itinerary.exchangeRateUsed,
     };

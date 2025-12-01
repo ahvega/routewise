@@ -1067,7 +1067,7 @@
 </Modal>
 
 <!-- Create Expense Advance Modal -->
-<Modal bind:open={showAdvanceModal} title={$t('expenses.createAdvance')} size="md">
+<Modal bind:open={showAdvanceModal} title={$t('expenses.createAdvance')} size="lg">
 	<div class="space-y-4">
 		<p class="text-sm text-gray-500 dark:text-gray-400">
 			{$t('expenses.createAdvanceHint')}
@@ -1082,9 +1082,52 @@
 			/>
 		</div>
 
+		<!-- Fuel Calculation Info Box -->
+		{#if suggestedAdvance}
+			<div class="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+				<p class="text-sm font-medium text-blue-800 dark:text-blue-200 mb-2">{$t('expenses.fuelCalculation')}</p>
+				<div class="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+					<span class="text-blue-600 dark:text-blue-400">{$t('expenses.tripDistance')}:</span>
+					<span class="text-blue-800 dark:text-blue-200 font-medium">{suggestedAdvance.tripDistance?.toLocaleString()} km</span>
+
+					<span class="text-blue-600 dark:text-blue-400">{$t('expenses.vehicleRange')}:</span>
+					<span class="text-blue-800 dark:text-blue-200 font-medium">{suggestedAdvance.tankRange?.toLocaleString()} km</span>
+
+					<span class="text-blue-600 dark:text-blue-400">{$t('expenses.safeRange')} (85%):</span>
+					<span class="text-blue-800 dark:text-blue-200 font-medium">{suggestedAdvance.safeRange?.toLocaleString()} km</span>
+
+					{#if suggestedAdvance.fuelAdvanceNeeded}
+						<span class="text-blue-600 dark:text-blue-400">{$t('expenses.extraFuelNeeded')}:</span>
+						<span class="text-blue-800 dark:text-blue-200 font-medium">{suggestedAdvance.extraFuelNeeded} gal</span>
+					{/if}
+				</div>
+
+				{#if suggestedAdvance.fuelAdvanceNeeded}
+					<p class="text-xs text-blue-600 dark:text-blue-400 mt-2 pt-2 border-t border-blue-200 dark:border-blue-700">
+						{$t('expenses.fuelAdvanceExplanation')}
+					</p>
+				{:else}
+					<p class="text-xs text-green-600 dark:text-green-400 mt-2 pt-2 border-t border-blue-200 dark:border-blue-700">
+						{$t('expenses.noFuelAdvanceNeeded')}
+					</p>
+				{/if}
+
+				{#if suggestedAdvance.totalFuelCost > 0}
+					<p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+						{$t('expenses.totalTripFuelCost')}: {formatCurrency(suggestedAdvance.totalFuelCost)}
+					</p>
+				{/if}
+			</div>
+		{/if}
+
 		<div class="grid grid-cols-2 gap-4">
 			<div>
-				<Label for="advanceFuel">{$t('expenses.fields.fuel')}</Label>
+				<Label for="advanceFuel" class="flex items-center gap-2">
+					{$t('expenses.fields.fuel')}
+					{#if suggestedAdvance && !suggestedAdvance.fuelAdvanceNeeded}
+						<Badge color="green" class="text-xs">{$t('expenses.notRequired')}</Badge>
+					{/if}
+				</Label>
 				<Input
 					id="advanceFuel"
 					type="number"
