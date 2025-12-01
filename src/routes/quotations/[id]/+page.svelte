@@ -9,7 +9,9 @@
 		Modal,
 		Select,
 		Label,
-		Input
+		Input,
+		Accordion,
+		AccordionItem
 	} from 'flowbite-svelte';
 	import {
 		ArrowLeftOutline,
@@ -142,6 +144,19 @@
 			currency: 'HNL',
 			minimumFractionDigits: 0
 		}).format(value);
+	}
+
+	function formatUsd(value: number): string {
+		return new Intl.NumberFormat('en-US', {
+			style: 'currency',
+			currency: 'USD',
+			minimumFractionDigits: 2
+		}).format(value);
+	}
+
+	// Calculate USD value from HNL
+	function toUsd(hnl: number, exchangeRate: number): number {
+		return hnl / exchangeRate;
 	}
 
 	function formatDate(timestamp: number): string {
@@ -611,55 +626,139 @@
 				<Card class="max-w-none !p-6">
 					<h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">{$t('quotations.new.costEstimate')}</h3>
 
-					<div class="space-y-3">
-						{#if quotation.includeFuel}
-							<div class="flex justify-between py-2 border-b border-gray-100 dark:border-gray-700">
-								<span class="text-gray-600 dark:text-gray-400">{$t('quotations.new.fuelCost')}</span>
-								<span class="font-medium text-gray-900 dark:text-white">{formatCurrency(quotation.fuelCost)}</span>
-							</div>
-						{/if}
-						{#if quotation.includeMeals}
-							<div class="flex justify-between py-2 border-b border-gray-100 dark:border-gray-700">
-								<span class="text-gray-600 dark:text-gray-400">{$t('quotations.new.mealsCost')}</span>
-								<span class="font-medium text-gray-900 dark:text-white">{formatCurrency(quotation.driverMealsCost)}</span>
-							</div>
-							{#if quotation.driverLodgingCost > 0}
-								<div class="flex justify-between py-2 border-b border-gray-100 dark:border-gray-700">
-									<span class="text-gray-600 dark:text-gray-400">{$t('settings.fields.hotelCost')}</span>
-									<span class="font-medium text-gray-900 dark:text-white">{formatCurrency(quotation.driverLodgingCost)}</span>
-								</div>
+					<div class="space-y-1">
+						<Accordion flush class="divide-y-0">
+							{#if quotation.includeFuel}
+								<AccordionItem class="!py-1">
+									{#snippet header()}
+										<div class="flex justify-between w-full pr-2">
+											<span class="text-gray-700 dark:text-gray-300 font-medium">{$t('quotations.new.fuelCost')}</span>
+											<span class="text-gray-900 dark:text-white font-medium">
+												{formatCurrency(quotation.fuelCost)}
+												<span class="text-gray-500 text-xs ml-2">{formatUsd(toUsd(quotation.fuelCost, quotation.exchangeRateUsed))}</span>
+											</span>
+										</div>
+									{/snippet}
+									<div class="pl-2 space-y-1 text-xs text-gray-500 dark:text-gray-400 pb-2">
+										<div class="flex justify-between">
+											<span>{$t('quotations.costDetails.totalDistance')}:</span>
+											<span>{quotation.totalDistance.toLocaleString()} km</span>
+										</div>
+										{#if vehicle}
+											<div class="flex justify-between">
+												<span>{$t('quotations.costDetails.fuelEfficiency')}:</span>
+												<span>{vehicle.fuelEfficiency} {vehicle.fuelEfficiencyUnit === 'kpl' ? 'km/L' : vehicle.fuelEfficiencyUnit}</span>
+											</div>
+										{/if}
+									</div>
+								</AccordionItem>
 							{/if}
-						{/if}
-						{#if quotation.includeDriverIncentive && quotation.driverIncentiveCost > 0}
-							<div class="flex justify-between py-2 border-b border-gray-100 dark:border-gray-700">
-								<span class="text-gray-600 dark:text-gray-400">{$t('settings.fields.driverIncentive')}</span>
-								<span class="font-medium text-gray-900 dark:text-white">{formatCurrency(quotation.driverIncentiveCost)}</span>
-							</div>
-						{/if}
-						<div class="flex justify-between py-2 border-b border-gray-100 dark:border-gray-700">
-							<span class="text-gray-600 dark:text-gray-400">{$t('quotations.new.vehicleCost')} (km)</span>
-							<span class="font-medium text-gray-900 dark:text-white">{formatCurrency(quotation.vehicleDistanceCost)}</span>
-						</div>
-						<div class="flex justify-between py-2 border-b border-gray-100 dark:border-gray-700">
-							<span class="text-gray-600 dark:text-gray-400">{$t('quotations.new.vehicleCost')} ({$t('units.days')})</span>
-							<span class="font-medium text-gray-900 dark:text-white">{formatCurrency(quotation.vehicleDailyCost)}</span>
-						</div>
-						{#if quotation.tollCost > 0}
-							<div class="flex justify-between py-2 border-b border-gray-100 dark:border-gray-700">
-								<span class="text-gray-600 dark:text-gray-400">{$t('quotations.new.tollCost')}</span>
-								<span class="font-medium text-gray-900 dark:text-white">{formatCurrency(quotation.tollCost)}</span>
-							</div>
-						{/if}
 
-						<div class="flex justify-between py-3 border-t-2 border-gray-200 dark:border-gray-600">
+							{#if quotation.includeMeals}
+								<AccordionItem class="!py-1">
+									{#snippet header()}
+										<div class="flex justify-between w-full pr-2">
+											<span class="text-gray-700 dark:text-gray-300 font-medium">{$t('quotations.costDetails.viaticos')}</span>
+											<span class="text-gray-900 dark:text-white font-medium">
+												{formatCurrency(quotation.driverMealsCost + quotation.driverLodgingCost)}
+												<span class="text-gray-500 text-xs ml-2">{formatUsd(toUsd(quotation.driverMealsCost + quotation.driverLodgingCost, quotation.exchangeRateUsed))}</span>
+											</span>
+										</div>
+									{/snippet}
+									<div class="pl-2 space-y-1 text-xs text-gray-500 dark:text-gray-400 pb-2">
+										<div class="flex justify-between">
+											<span>{$t('quotations.costDetails.meals')} ({quotation.estimatedDays} {$t('units.days')}):</span>
+											<span>{formatCurrency(quotation.driverMealsCost)}</span>
+										</div>
+										{#if quotation.driverLodgingCost > 0}
+											<div class="flex justify-between">
+												<span>{$t('quotations.costDetails.lodging')}:</span>
+												<span>{formatCurrency(quotation.driverLodgingCost)}</span>
+											</div>
+										{/if}
+									</div>
+								</AccordionItem>
+							{/if}
+
+							{#if quotation.includeDriverIncentive && quotation.driverIncentiveCost > 0}
+								<AccordionItem class="!py-1">
+									{#snippet header()}
+										<div class="flex justify-between w-full pr-2">
+											<span class="text-gray-700 dark:text-gray-300 font-medium">{$t('quotations.costDetails.driverIncentive')}</span>
+											<span class="text-gray-900 dark:text-white font-medium">
+												{formatCurrency(quotation.driverIncentiveCost)}
+												<span class="text-gray-500 text-xs ml-2">{formatUsd(toUsd(quotation.driverIncentiveCost, quotation.exchangeRateUsed))}</span>
+											</span>
+										</div>
+									{/snippet}
+									<div class="pl-2 space-y-1 text-xs text-gray-500 dark:text-gray-400 pb-2">
+										<div class="flex justify-between">
+											<span>{quotation.estimatedDays} {$t('units.days')}:</span>
+											<span>{formatCurrency(quotation.driverIncentiveCost)}</span>
+										</div>
+										<p class="text-xs text-gray-400 dark:text-gray-500 italic mt-1">
+											{$t('quotations.costDetails.driverIncentiveHint')}
+										</p>
+									</div>
+								</AccordionItem>
+							{/if}
+
+							<AccordionItem class="!py-1">
+								{#snippet header()}
+									<div class="flex justify-between w-full pr-2">
+										<span class="text-gray-700 dark:text-gray-300 font-medium">{$t('quotations.new.vehicleCost')}</span>
+										<span class="text-gray-900 dark:text-white font-medium">
+											{formatCurrency(quotation.vehicleDistanceCost + quotation.vehicleDailyCost)}
+											<span class="text-gray-500 text-xs ml-2">{formatUsd(toUsd(quotation.vehicleDistanceCost + quotation.vehicleDailyCost, quotation.exchangeRateUsed))}</span>
+										</span>
+									</div>
+								{/snippet}
+								<div class="pl-2 space-y-1 text-xs text-gray-500 dark:text-gray-400 pb-2">
+									<div class="flex justify-between">
+										<span>{$t('quotations.costDetails.perDistance')} ({quotation.totalDistance.toLocaleString()} km):</span>
+										<span>{formatCurrency(quotation.vehicleDistanceCost)}</span>
+									</div>
+									<div class="flex justify-between">
+										<span>{$t('quotations.costDetails.perDay')} ({quotation.estimatedDays} {$t('units.days')}):</span>
+										<span>{formatCurrency(quotation.vehicleDailyCost)}</span>
+									</div>
+								</div>
+							</AccordionItem>
+
+							{#if quotation.tollCost > 0}
+								<AccordionItem class="!py-1">
+									{#snippet header()}
+										<div class="flex justify-between w-full pr-2">
+											<span class="text-gray-700 dark:text-gray-300 font-medium">{$t('quotations.new.tollCost')}</span>
+											<span class="text-gray-900 dark:text-white font-medium">
+												{formatCurrency(quotation.tollCost)}
+												<span class="text-gray-500 text-xs ml-2">{formatUsd(toUsd(quotation.tollCost, quotation.exchangeRateUsed))}</span>
+											</span>
+										</div>
+									{/snippet}
+									<div class="pl-2 space-y-1 text-xs text-gray-500 dark:text-gray-400 pb-2">
+										<div class="flex justify-between">
+											<span>{$t('quotations.new.tollCost')}:</span>
+											<span>{formatCurrency(quotation.tollCost)}</span>
+										</div>
+									</div>
+								</AccordionItem>
+							{/if}
+						</Accordion>
+
+						<div class="flex justify-between py-3 border-t-2 border-gray-200 dark:border-gray-600 mt-2">
 							<span class="font-semibold text-gray-700 dark:text-gray-300">{$t('quotations.new.subtotal')}</span>
-							<span class="font-semibold text-gray-900 dark:text-white">{formatCurrency(quotation.totalCost)}</span>
+							<span class="font-semibold text-gray-900 dark:text-white">
+								{formatCurrency(quotation.totalCost)}
+								<span class="text-gray-500 text-xs ml-2">{formatUsd(toUsd(quotation.totalCost, quotation.exchangeRateUsed))}</span>
+							</span>
 						</div>
 
 						<div class="flex justify-between py-2">
 							<span class="text-gray-600 dark:text-gray-400">{$t('quotations.new.margin')} ({quotation.selectedMarkupPercentage}%)</span>
 							<span class="font-medium text-gray-900 dark:text-white">
 								+{formatCurrency(quotation.salePriceHnl - quotation.totalCost)}
+								<span class="text-gray-500 text-xs ml-2">+{formatUsd(toUsd(quotation.salePriceHnl - quotation.totalCost, quotation.exchangeRateUsed))}</span>
 							</span>
 						</div>
 					</div>
@@ -741,10 +840,10 @@
 							<span class="text-gray-600 dark:text-gray-400">{$t('common.create')}</span>
 							<span class="text-gray-900 dark:text-white">{formatDateTime(quotation.createdAt)}</span>
 						</div>
-						{#if quotation.validUntil}
+						{#if quotation.validUntil && quotation.status !== 'approved'}
 							<div class="flex justify-between">
-								<span class="text-gray-600 dark:text-gray-400">{$t('common.expired')}</span>
-								<span class="text-gray-900 dark:text-white">{formatDate(quotation.validUntil)}</span>
+								<span class="text-gray-600 dark:text-gray-400">{$t('common.expires')}</span>
+								<span class="text-gray-900 dark:text-white">{formatDateTime(quotation.validUntil)}</span>
 							</div>
 						{/if}
 						{#if quotation.sentAt}

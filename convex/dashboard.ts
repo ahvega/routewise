@@ -434,3 +434,149 @@ export const getUpcomingItineraries = query({
     return enriched;
   },
 });
+
+// Get revenue history for charts
+export const getRevenueHistory = query({
+  args: {
+    tenantId: v.id("tenants"),
+    days: v.optional(v.number()), // 7, 30, 90
+  },
+  handler: async (ctx, args) => {
+    const days = args.days || 30;
+    const now = Date.now();
+    const startDate = now - days * 24 * 60 * 60 * 1000;
+
+    const quotations = await ctx.db
+      .query("quotations")
+      .withIndex("by_tenant", q => q.eq("tenantId", args.tenantId))
+      .collect();
+
+    // Filter approved quotations within the date range
+    const approvedQuotations = quotations.filter(
+      q => q.status === "approved" && q.approvedAt && q.approvedAt >= startDate
+    );
+
+    // Group by date (day or week depending on range)
+    const groupByWeek = days > 30;
+    const dataPoints: Map<string, number> = new Map();
+
+    // Initialize all dates with 0
+    for (let i = 0; i < days; i++) {
+      const date = new Date(now - (days - 1 - i) * 24 * 60 * 60 * 1000);
+      const key = groupByWeek
+        ? getWeekKey(date)
+        : date.toISOString().split('T')[0];
+      if (!dataPoints.has(key)) {
+        dataPoints.set(key, 0);
+      }
+    }
+
+    // Add approved quotation values
+    for (const q of approvedQuotations) {
+      const date = new Date(q.approvedAt!);
+      const key = groupByWeek
+        ? getWeekKey(date)
+        : date.toISOString().split('T')[0];
+      dataPoints.set(key, (dataPoints.get(key) || 0) + q.salePriceHnl);
+    }
+
+    // Convert to array sorted by date
+    const result = Array.from(dataPoints.entries())
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([date, value]) => ({ date, value }));
+
+    return result;
+  },
+});
+
+// Helper function to get week key
+function getWeekKey(date: Date): string {
+  const startOfWeek = new Date(date);
+  startOfWeek.setDate(date.getDate() - date.getDay());
+  return startOfWeek.toISOString().split('T')[0];
+}
+
+// Get quotation pipeline distribution
+export const getPipelineStats = query({
+  args: { tenantId: v.id("tenants") },
+  handler: async (ctx, args) => {
+    const quotations = await ctx.db
+      .query("quotations")
+      .withIndex("by_tenant", q => q.eq("tenantId", args.tenantId))
+      .collect();
+
+    const now = Date.now();
+
+    // Check for expired quotations (validUntil passed and not approved)
+    const pipeline = {
+      draft: quotations.filter(q => q.status === "draft").length,
+      sent: quotations.filter(q =>
+        q.status === "sent" && (!q.validUntil || q.validUntil > now)
+      ).length,
+      approved: quotations.filter(q => q.status === "approved").length,
+      rejected: quotations.filter(q => q.status === "rejected").length,
+      expired: quotations.filter(q =>
+        (q.status === "sent" && q.validUntil && q.validUntil < now) ||
+        q.status === "expired"
+      ).length,
+      total: quotations.length,
+    };
+
+    return pipeline;
+  },
+});
+
+// Get fleet utilization metrics
+export const getFleetUtilization = query({
+  args: { tenantId: v.id("tenants") },
+  handler: async (ctx, args) => {
+    const now = Date.now();
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayStart = today.getTime();
+    const todayEnd = todayStart + 24 * 60 * 60 * 1000;
+
+    const [vehicles, drivers, itineraries] = await Promise.all([
+      ctx.db.query("vehicles").withIndex("by_tenant", q => q.eq("tenantId", args.tenantId)).collect(),
+      ctx.db.query("drivers").withIndex("by_tenant", q => q.eq("tenantId", args.tenantId)).collect(),
+      ctx.db.query("itineraries").withIndex("by_tenant", q => q.eq("tenantId", args.tenantId)).collect(),
+    ]);
+
+    // Active itineraries (in progress or scheduled for today)
+    const activeItineraries = itineraries.filter(i =>
+      i.status === "in_progress" ||
+      (i.status === "scheduled" && i.startDate >= todayStart && i.startDate < todayEnd)
+    );
+
+    // Get IDs of vehicles and drivers currently in use
+    const vehiclesInUse = new Set(activeItineraries.map(i => i.vehicleId).filter(Boolean));
+    const driversInUse = new Set(activeItineraries.map(i => i.driverId).filter(Boolean));
+
+    // Calculate utilization
+    const activeVehicles = vehicles.filter(v => v.status === "active");
+    const activeDrivers = drivers.filter(d => d.status === "active");
+
+    return {
+      vehicles: {
+        total: vehicles.length,
+        active: activeVehicles.length,
+        inUse: vehiclesInUse.size,
+        available: activeVehicles.length - vehiclesInUse.size,
+        utilization: activeVehicles.length > 0
+          ? Math.round((vehiclesInUse.size / activeVehicles.length) * 100)
+          : 0,
+        maintenance: vehicles.filter(v => v.status === "maintenance").length,
+      },
+      drivers: {
+        total: drivers.length,
+        active: activeDrivers.length,
+        inUse: driversInUse.size,
+        available: activeDrivers.length - driversInUse.size,
+        utilization: activeDrivers.length > 0
+          ? Math.round((driversInUse.size / activeDrivers.length) * 100)
+          : 0,
+        onLeave: drivers.filter(d => d.status === "on_leave").length,
+      },
+    };
+  },
+});

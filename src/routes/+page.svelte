@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Button, Card, Spinner, Alert } from 'flowbite-svelte';
+	import { Button, Card, Spinner, Alert, Progressbar, Select } from 'flowbite-svelte';
 	import {
 		FileLinesOutline,
 		UsersOutline,
@@ -13,17 +13,25 @@
 		ExclamationCircleOutline,
 		ClockOutline,
 		CheckCircleOutline,
-		InfoCircleOutline
+		InfoCircleOutline,
+		PlayOutline,
+		EyeOutline,
+		FilterOutline
 	} from 'flowbite-svelte-icons';
-	import { useQuery } from 'convex-svelte';
+	import { useQuery, useConvexClient } from 'convex-svelte';
 	import { api } from '$convex/_generated/api';
 	import { tenantStore } from '$lib/stores';
 	import { StatusBadge } from '$lib/components/ui';
 	import { t } from '$lib/i18n';
+	import { Chart } from '@flowbite-svelte-plugins/chart';
+	import type { ApexOptions } from 'apexcharts';
+	import type { Id } from '$convex/_generated/dataModel';
+	import { goto } from '$app/navigation';
 
 	let { data } = $props();
+	const client = useConvexClient();
 
-	// Use the new dashboard queries
+	// Use the dashboard queries
 	const statsQuery = useQuery(
 		api.dashboard.getStats,
 		() => (tenantStore.tenantId ? { tenantId: tenantStore.tenantId } : 'skip')
@@ -41,10 +49,28 @@
 		() => (tenantStore.tenantId ? { tenantId: tenantStore.tenantId, limit: 5 } : 'skip')
 	);
 
+	// Chart data queries
+	let revenueDays = $state(7);
+	const revenueQuery = useQuery(
+		api.dashboard.getRevenueHistory,
+		() => (tenantStore.tenantId ? { tenantId: tenantStore.tenantId, days: revenueDays } : 'skip')
+	);
+	const pipelineQuery = useQuery(
+		api.dashboard.getPipelineStats,
+		() => (tenantStore.tenantId ? { tenantId: tenantStore.tenantId } : 'skip')
+	);
+	const fleetQuery = useQuery(
+		api.dashboard.getFleetUtilization,
+		() => (tenantStore.tenantId ? { tenantId: tenantStore.tenantId } : 'skip')
+	);
+
 	const stats = $derived(statsQuery.data);
 	const alerts = $derived(alertsQuery.data || []);
 	const activities = $derived(activityQuery.data || []);
 	const upcomingItineraries = $derived(upcomingQuery.data || []);
+	const revenueData = $derived(revenueQuery.data || []);
+	const pipelineData = $derived(pipelineQuery.data);
+	const fleetData = $derived(fleetQuery.data);
 
 	const isLoading = $derived(statsQuery.isLoading);
 
@@ -52,6 +78,110 @@
 	const dangerAlerts = $derived(alerts.filter((a) => a.type === 'danger'));
 	const warningAlerts = $derived(alerts.filter((a) => a.type === 'warning'));
 	const infoAlerts = $derived(alerts.filter((a) => a.type === 'info'));
+
+	// Revenue Chart Options
+	const revenueChartOptions = $derived<ApexOptions>({
+		chart: {
+			type: 'area',
+			height: 200,
+			fontFamily: 'Inter, sans-serif',
+			toolbar: { show: false },
+			zoom: { enabled: false },
+			sparkline: { enabled: false }
+		},
+		series: [{
+			name: $t('dashboard.revenue') || 'Revenue',
+			data: revenueData.map(d => d.value)
+		}],
+		colors: ['#0ea5e9'],
+		fill: {
+			type: 'gradient',
+			gradient: {
+				shadeIntensity: 1,
+				opacityFrom: 0.45,
+				opacityTo: 0.05,
+				stops: [0, 100]
+			}
+		},
+		stroke: {
+			curve: 'smooth',
+			width: 2
+		},
+		xaxis: {
+			categories: revenueData.map(d => {
+				const date = new Date(d.date);
+				return date.toLocaleDateString('es-HN', { month: 'short', day: 'numeric' });
+			}),
+			labels: {
+				show: true,
+				style: { colors: '#9ca3af', fontSize: '10px' }
+			},
+			axisBorder: { show: false },
+			axisTicks: { show: false }
+		},
+		yaxis: {
+			show: false
+		},
+		grid: {
+			show: false,
+			padding: { left: 0, right: 0 }
+		},
+		tooltip: {
+			enabled: true,
+			y: {
+				formatter: (value: number) => formatCurrency(value)
+			}
+		},
+		dataLabels: { enabled: false }
+	});
+
+	// Pipeline Donut Chart Options
+	const pipelineChartOptions = $derived<ApexOptions>({
+		chart: {
+			type: 'donut',
+			height: 200,
+			fontFamily: 'Inter, sans-serif'
+		},
+		series: pipelineData ? [
+			pipelineData.draft,
+			pipelineData.sent,
+			pipelineData.approved,
+			pipelineData.rejected,
+			pipelineData.expired
+		] : [],
+		colors: ['#9ca3af', '#3b82f6', '#10b981', '#ef4444', '#f59e0b'],
+		labels: [
+			$t('statuses.draft') || 'Draft',
+			$t('statuses.sent') || 'Sent',
+			$t('statuses.approved') || 'Approved',
+			$t('statuses.rejected') || 'Rejected',
+			$t('statuses.expired') || 'Expired'
+		],
+		legend: {
+			position: 'right',
+			fontSize: '12px',
+			labels: { colors: '#9ca3af' }
+		},
+		dataLabels: { enabled: false },
+		plotOptions: {
+			pie: {
+				donut: {
+					size: '70%',
+					labels: {
+						show: true,
+						name: { show: true },
+						value: { show: true, fontSize: '16px', fontWeight: 600 },
+						total: {
+							show: true,
+							label: 'Total',
+							fontSize: '12px',
+							color: '#9ca3af'
+						}
+					}
+				}
+			}
+		}
+	});
 
 	function formatCurrency(value: number): string {
 		return new Intl.NumberFormat('es-HN', {
@@ -103,6 +233,18 @@
 		invoice: { icon: CashOutline, color: 'text-emerald-500' },
 		advance: { icon: CashOutline, color: 'text-amber-500' }
 	};
+
+	// Start trip action
+	async function startTrip(itineraryId: Id<'itineraries'>) {
+		try {
+			await client.mutation(api.itineraries.updateStatus, {
+				id: itineraryId,
+				status: 'in_progress'
+			});
+		} catch (error) {
+			console.error('Failed to start trip:', error);
+		}
+	}
 </script>
 
 <div class="space-y-6">
@@ -142,7 +284,7 @@
 			<Spinner size="8" />
 		</div>
 	{:else if stats}
-		<!-- Main Stats Grid -->
+		<!-- Main Stats Grid with Dual Actions -->
 		<div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
 			<!-- Quotations -->
 			<Card class="max-w-none !p-4 flex flex-col h-full">
@@ -162,8 +304,12 @@
 					<span class="text-amber-600 dark:text-amber-400">{stats.quotations.draft} {$t('statuses.draft').toLowerCase()}</span>
 					<span class="text-emerald-600 dark:text-emerald-400">{stats.quotations.approved} {$t('statuses.approved').toLowerCase()}</span>
 				</div>
-				<div class="mt-auto pt-3">
-					<Button href="/quotations" size="xs" color="light" class="w-full">
+				<div class="mt-auto pt-3 flex gap-2">
+					<Button href="/quotations/new" size="xs" color="primary" class="flex-1">
+						<PlusOutline class="w-3 h-3 mr-1" />
+						{$t('common.new')}
+					</Button>
+					<Button href="/quotations" size="xs" color="light" class="flex-1">
 						{$t('common.view')}
 						<ArrowRightOutline class="w-3 h-3 ml-1" />
 					</Button>
@@ -188,8 +334,12 @@
 					<span class="text-sky-600 dark:text-sky-400">{stats.itineraries.scheduled} {$t('dashboard.scheduled')}</span>
 					<span class="text-emerald-600 dark:text-emerald-400">{stats.itineraries.completed} {$t('statuses.completed').toLowerCase()}</span>
 				</div>
-				<div class="mt-auto pt-3">
-					<Button href="/itineraries" size="xs" color="light" class="w-full">
+				<div class="mt-auto pt-3 flex gap-2">
+					<Button href="/quotations?status=approved" size="xs" color="primary" class="flex-1">
+						<PlusOutline class="w-3 h-3 mr-1" />
+						{$t('common.new')}
+					</Button>
+					<Button href="/itineraries" size="xs" color="light" class="flex-1">
 						{$t('common.view')}
 						<ArrowRightOutline class="w-3 h-3 ml-1" />
 					</Button>
@@ -216,8 +366,12 @@
 					<span class="text-rose-600 dark:text-rose-400">{stats.invoices.unpaid} {$t('statuses.unpaid').toLowerCase()}</span>
 					<span class="text-emerald-600 dark:text-emerald-400">{stats.invoices.paid} {$t('statuses.paid').toLowerCase()}</span>
 				</div>
-				<div class="mt-auto pt-3">
-					<Button href="/invoices" size="xs" color="light" class="w-full">
+				<div class="mt-auto pt-3 flex gap-2">
+					<Button href="/invoices?status=unpaid" size="xs" color="primary" class="flex-1">
+						<FilterOutline class="w-3 h-3 mr-1" />
+						{$t('statuses.unpaid')}
+					</Button>
+					<Button href="/invoices" size="xs" color="light" class="flex-1">
 						{$t('common.view')}
 						<ArrowRightOutline class="w-3 h-3 ml-1" />
 					</Button>
@@ -244,8 +398,12 @@
 					<span class="text-sky-600 dark:text-sky-400">{stats.advances.disbursed} {$t('statuses.disbursed').toLowerCase()}</span>
 					<span class="text-emerald-600 dark:text-emerald-400">{stats.advances.settled} {$t('statuses.settled').toLowerCase()}</span>
 				</div>
-				<div class="mt-auto pt-3">
-					<Button href="/expenses" size="xs" color="light" class="w-full">
+				<div class="mt-auto pt-3 flex gap-2">
+					<Button href="/expenses?status=pending" size="xs" color="primary" class="flex-1">
+						<FilterOutline class="w-3 h-3 mr-1" />
+						{$t('statuses.pending')}
+					</Button>
+					<Button href="/expenses" size="xs" color="light" class="flex-1">
 						{$t('common.view')}
 						<ArrowRightOutline class="w-3 h-3 ml-1" />
 					</Button>
@@ -302,195 +460,422 @@
 			</Card>
 		</div>
 
-		<!-- Main Content Grid -->
-		<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-			<!-- Left Column: Activity & Alerts -->
-			<div class="lg:col-span-2 space-y-6">
-				<!-- Recent Activity -->
-				<Card class="max-w-none !p-6">
-					<div class="flex items-center justify-between mb-4">
-						<h3 class="text-lg font-semibold text-gray-900 dark:text-white">
-							{$t('dashboard.recentActivity') || 'Recent Activity'}
-						</h3>
+		<!-- Charts Row -->
+		<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+			<!-- Revenue Trend Chart -->
+			<Card class="max-w-none !p-6">
+				<div class="flex items-center justify-between mb-4">
+					<h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+						{$t('dashboard.revenueOverview') || 'Revenue Overview'}
+					</h3>
+					<Select bind:value={revenueDays} class="w-32" size="sm">
+						<option value={7}>{$t('dashboard.last7Days') || 'Last 7 Days'}</option>
+						<option value={30}>{$t('dashboard.last30Days') || 'Last 30 Days'}</option>
+						<option value={90}>{$t('dashboard.last90Days') || 'Last 90 Days'}</option>
+					</Select>
+				</div>
+				{#if revenueData.length > 0}
+					<Chart options={revenueChartOptions} />
+				{:else}
+					<div class="flex items-center justify-center h-48 text-gray-500 dark:text-gray-400">
+						{$t('common.noData')}
 					</div>
-					{#if activities.length > 0}
-						<div class="space-y-3">
-							{#each activities.slice(0, 8) as activity}
-								{@const config = activityConfig[activity.type] || activityConfig.quotation}
-								<div class="flex items-start gap-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
-									<div class="p-2 bg-white dark:bg-gray-900 rounded-lg shadow-sm">
-										<svelte:component this={config.icon} class="w-4 h-4 {config.color}" />
-									</div>
-									<div class="flex-1 min-w-0">
-										<div class="flex items-center gap-2">
-											<span class="font-medium text-gray-900 dark:text-white text-sm">{activity.title}</span>
-											<StatusBadge status={activity.action} size="sm" />
-										</div>
-										<p class="text-xs text-gray-500 dark:text-gray-400 truncate">{activity.description}</p>
-									</div>
-									<span class="text-xs text-gray-400 dark:text-gray-500 whitespace-nowrap">
-										{formatRelativeTime(activity.timestamp)}
-									</span>
-								</div>
-							{/each}
-						</div>
-					{:else}
-						<p class="text-center text-gray-500 dark:text-gray-400 py-8">
-							{$t('common.noData')}
-						</p>
-					{/if}
-				</Card>
-
-				<!-- Warnings & Info Alerts -->
-				{#if warningAlerts.length > 0 || infoAlerts.length > 0}
-					<Card class="max-w-none !p-6">
-						<div class="flex items-center gap-2 mb-4">
-							<ExclamationCircleOutline class="w-5 h-5 text-amber-500" />
-							<h3 class="text-lg font-semibold text-gray-900 dark:text-white">
-								{$t('dashboard.alerts') || 'Alerts'}
-							</h3>
-						</div>
-						<div class="space-y-2">
-							{#each warningAlerts.slice(0, 5) as alert}
-								<div class="flex items-start gap-3 p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-800">
-									<ExclamationCircleOutline class="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
-									<div>
-										<p class="font-medium text-amber-800 dark:text-amber-200 text-sm">{alert.title}</p>
-										<p class="text-xs text-amber-600 dark:text-amber-400">{alert.message}</p>
-									</div>
-								</div>
-							{/each}
-							{#each infoAlerts.slice(0, 3) as alert}
-								<div class="flex items-start gap-3 p-3 bg-sky-50 dark:bg-sky-900/20 rounded-lg border border-sky-200 dark:border-sky-800">
-									<InfoCircleOutline class="w-5 h-5 text-sky-500 flex-shrink-0 mt-0.5" />
-									<div>
-										<p class="font-medium text-sky-800 dark:text-sky-200 text-sm">{alert.title}</p>
-										<p class="text-xs text-sky-600 dark:text-sky-400">{alert.message}</p>
-									</div>
-								</div>
-							{/each}
-						</div>
-					</Card>
 				{/if}
-			</div>
+			</Card>
 
-			<!-- Right Column: Upcoming & Quick Actions -->
-			<div class="space-y-6">
-				<!-- Upcoming Itineraries -->
-				<Card class="max-w-none !p-6">
-					<div class="flex items-center justify-between mb-4">
-						<h3 class="text-lg font-semibold text-gray-900 dark:text-white">
-							{$t('dashboard.upcomingTrips') || 'Upcoming Trips'}
-						</h3>
-						<Button href="/itineraries" size="xs" color="light">
-							{$t('common.view')}
-							<ArrowRightOutline class="w-3 h-3 ml-1" />
+			<!-- Quotation Pipeline Donut -->
+			<Card class="max-w-none !p-6">
+				<div class="flex items-center justify-between mb-4">
+					<h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+						{$t('dashboard.quotationPipeline') || 'Quotation Pipeline'}
+					</h3>
+					<Button href="/quotations" size="xs" color="light">
+						{$t('common.view')}
+						<ArrowRightOutline class="w-3 h-3 ml-1" />
+					</Button>
+				</div>
+				{#if pipelineData && pipelineData.total > 0}
+					<Chart options={pipelineChartOptions} />
+				{:else}
+					<div class="flex items-center justify-center h-48 text-gray-500 dark:text-gray-400">
+						{$t('common.noData')}
+					</div>
+				{/if}
+			</Card>
+		</div>
+
+		<!-- Fleet & Activity Row -->
+		<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+			<!-- Fleet Utilization -->
+			<Card class="max-w-none !p-6">
+				<div class="flex items-center justify-between mb-4">
+					<h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+						{$t('dashboard.fleetStatus') || 'Fleet Status'}
+					</h3>
+					<Button href="/vehicles" size="xs" color="light">
+						{$t('dashboard.manageFleet') || 'Manage'}
+						<ArrowRightOutline class="w-3 h-3 ml-1" />
+					</Button>
+				</div>
+				{#if fleetData}
+					<div class="space-y-4">
+						<!-- Vehicles -->
+						<div>
+							<div class="flex items-center justify-between mb-2">
+								<div class="flex items-center gap-2">
+									<TruckOutline class="w-4 h-4 text-purple-600 dark:text-purple-400" />
+									<span class="text-sm font-medium text-gray-700 dark:text-gray-300">{$t('vehicles.title')}</span>
+								</div>
+								<span class="text-sm text-gray-600 dark:text-gray-400">
+									{fleetData.vehicles.inUse} / {fleetData.vehicles.active}
+								</span>
+							</div>
+							<Progressbar
+								progress={fleetData.vehicles.utilization}
+								color="purple"
+								size="h-2"
+							/>
+							<div class="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-1">
+								<span>{fleetData.vehicles.available} {$t('dashboard.available') || 'available'}</span>
+								{#if fleetData.vehicles.maintenance > 0}
+									<span class="text-amber-600 dark:text-amber-400">
+										{fleetData.vehicles.maintenance} {$t('statuses.maintenance').toLowerCase()}
+									</span>
+								{/if}
+							</div>
+						</div>
+
+						<!-- Drivers -->
+						<div>
+							<div class="flex items-center justify-between mb-2">
+								<div class="flex items-center gap-2">
+									<UserOutline class="w-4 h-4 text-green-600 dark:text-green-400" />
+									<span class="text-sm font-medium text-gray-700 dark:text-gray-300">{$t('drivers.title')}</span>
+								</div>
+								<span class="text-sm text-gray-600 dark:text-gray-400">
+									{fleetData.drivers.inUse} / {fleetData.drivers.active}
+								</span>
+							</div>
+							<Progressbar
+								progress={fleetData.drivers.utilization}
+								color="green"
+								size="h-2"
+							/>
+							<div class="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-1">
+								<span>{fleetData.drivers.available} {$t('dashboard.available') || 'available'}</span>
+								{#if fleetData.drivers.onLeave > 0}
+									<span class="text-violet-600 dark:text-violet-400">
+										{fleetData.drivers.onLeave} {$t('statuses.on_leave').toLowerCase()}
+									</span>
+								{/if}
+							</div>
+						</div>
+					</div>
+
+					<!-- Quick Fleet Actions -->
+					<div class="flex gap-2 mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+						<Button href="/vehicles?action=new" size="xs" color="light" class="flex-1">
+							<PlusOutline class="w-3 h-3 mr-1" />
+							{$t('vehicles.addVehicle')}
+						</Button>
+						<Button href="/drivers?action=new" size="xs" color="light" class="flex-1">
+							<PlusOutline class="w-3 h-3 mr-1" />
+							{$t('drivers.addDriver')}
 						</Button>
 					</div>
-					{#if upcomingItineraries.length > 0}
-						<div class="space-y-3">
-							{#each upcomingItineraries as itinerary}
-								<a
-									href="/itineraries/{itinerary._id}"
-									class="block p-3 bg-gray-50 dark:bg-gray-800 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-								>
-									<div class="flex items-center justify-between mb-1">
-										<span class="font-medium text-gray-900 dark:text-white text-sm">{itinerary.itineraryNumber}</span>
-										<span class="text-xs text-gray-500 dark:text-gray-400">
-											{formatDate(itinerary.startDate)}
-										</span>
-									</div>
-									<p class="text-xs text-gray-500 dark:text-gray-400 truncate">
-										{itinerary.origin} → {itinerary.destination}
-									</p>
-									<div class="flex items-center gap-2 mt-2 text-xs">
-										{#if itinerary.driverName}
-											<span class="text-emerald-600 dark:text-emerald-400">
-												<UserOutline class="w-3 h-3 inline" />
-												{itinerary.driverName}
-											</span>
-										{:else}
-											<span class="text-amber-600 dark:text-amber-400">{$t('itineraries.noDriverAssigned')}</span>
-										{/if}
-										{#if itinerary.vehicleName}
-											<span class="text-purple-600 dark:text-purple-400">
-												<TruckOutline class="w-3 h-3 inline" />
-												{itinerary.vehicleName}
-											</span>
-										{:else}
-											<span class="text-amber-600 dark:text-amber-400">{$t('itineraries.noVehicleAssigned')}</span>
-										{/if}
-									</div>
-								</a>
-							{/each}
-						</div>
-					{:else}
-						<p class="text-center text-gray-500 dark:text-gray-400 py-4 text-sm">
-							{$t('dashboard.noUpcomingTrips') || 'No upcoming trips scheduled'}
-						</p>
-					{/if}
-				</Card>
-
-				<!-- Quick Actions -->
-				<Card class="max-w-none !p-6">
-					<div class="flex items-center gap-2 mb-4">
-						<ChartPieOutline class="w-5 h-5 text-gray-500 dark:text-gray-400" />
-						<h3 class="text-lg font-semibold text-gray-900 dark:text-white">{$t('dashboard.quickActions')}</h3>
+				{:else}
+					<div class="flex items-center justify-center h-32 text-gray-500 dark:text-gray-400">
+						<Spinner size="4" />
 					</div>
-					<div class="space-y-2">
-						<a
-							href="/quotations/new"
-							class="flex items-center justify-between p-3 bg-primary-50 dark:bg-primary-900/20 rounded-lg hover:bg-primary-100 dark:hover:bg-primary-900/30 transition-colors"
-						>
-							<div class="flex items-center gap-3">
-								<FileLinesOutline class="w-5 h-5 text-primary-600 dark:text-primary-400" />
-								<span class="font-medium text-gray-900 dark:text-white text-sm">{$t('dashboard.createNewQuotation')}</span>
+				{/if}
+			</Card>
+
+			<!-- Recent Activity -->
+			<Card class="max-w-none !p-6 lg:col-span-2">
+				<div class="flex items-center justify-between mb-4">
+					<h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+						{$t('dashboard.recentActivity') || 'Recent Activity'}
+					</h3>
+				</div>
+				{#if activities.length > 0}
+					<div class="space-y-3">
+						{#each activities.slice(0, 8) as activity}
+							{@const config = activityConfig[activity.type] || activityConfig.quotation}
+							{@const entityUrl = activity.type === 'quotation' ? `/quotations/${activity.entityId}`
+								: activity.type === 'itinerary' ? `/itineraries/${activity.entityId}`
+								: activity.type === 'invoice' ? `/invoices/${activity.entityId}`
+								: `/expenses`}
+							<a
+								href={entityUrl}
+								class="flex items-start gap-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+							>
+								<div class="p-2 bg-white dark:bg-gray-900 rounded-lg shadow-sm">
+									<svelte:component this={config.icon} class="w-4 h-4 {config.color}" />
+								</div>
+								<div class="flex-1 min-w-0">
+									<div class="flex items-center gap-2">
+										<span class="font-medium text-gray-900 dark:text-white text-sm">{activity.title}</span>
+										<StatusBadge status={activity.action} size="sm" />
+									</div>
+									<p class="text-xs text-gray-500 dark:text-gray-400 truncate">{activity.description}</p>
+								</div>
+								<span class="text-xs text-gray-400 dark:text-gray-500 whitespace-nowrap">
+									{formatRelativeTime(activity.timestamp)}
+								</span>
+							</a>
+						{/each}
+					</div>
+				{:else}
+					<p class="text-center text-gray-500 dark:text-gray-400 py-8">
+						{$t('common.noData')}
+					</p>
+				{/if}
+			</Card>
+		</div>
+
+		<!-- Upcoming & Quick Actions Row -->
+		<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+			<!-- Upcoming Itineraries with Actions -->
+			<Card class="max-w-none !p-6 lg:col-span-2">
+				<div class="flex items-center justify-between mb-4">
+					<h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+						{$t('dashboard.upcomingTrips') || 'Upcoming Trips'}
+					</h3>
+					<Button href="/itineraries" size="xs" color="light">
+						{$t('common.view')}
+						<ArrowRightOutline class="w-3 h-3 ml-1" />
+					</Button>
+				</div>
+				{#if upcomingItineraries.length > 0}
+					<div class="space-y-3">
+						{#each upcomingItineraries as itinerary}
+							<div class="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+								<div class="flex items-start justify-between gap-4">
+									<div class="flex-1 min-w-0">
+										<div class="flex items-center justify-between mb-1">
+											<span class="font-medium text-gray-900 dark:text-white text-sm">{itinerary.itineraryNumber}</span>
+											<span class="text-xs text-gray-500 dark:text-gray-400">
+												{formatDate(itinerary.startDate)}
+											</span>
+										</div>
+										<p class="text-xs text-gray-500 dark:text-gray-400 truncate mb-2">
+											{itinerary.origin} → {itinerary.destination}
+										</p>
+										<div class="flex items-center gap-3 text-xs flex-wrap">
+											{#if itinerary.driverName}
+												<span class="text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+													<UserOutline class="w-3 h-3" />
+													{itinerary.driverName}
+												</span>
+											{:else}
+												<span class="text-amber-600 dark:text-amber-400">{$t('itineraries.noDriverAssigned')}</span>
+											{/if}
+											{#if itinerary.vehicleName}
+												<span class="text-purple-600 dark:text-purple-400 flex items-center gap-1">
+													<TruckOutline class="w-3 h-3" />
+													{itinerary.vehicleName}
+												</span>
+											{:else}
+												<span class="text-amber-600 dark:text-amber-400">{$t('itineraries.noVehicleAssigned')}</span>
+											{/if}
+										</div>
+									</div>
+								</div>
+								<!-- Action Buttons -->
+								<div class="flex gap-2 mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+									{#if itinerary.driverId && itinerary.vehicleId}
+										<Button
+											size="xs"
+											color="green"
+											onclick={() => startTrip(itinerary._id)}
+											class="flex-1"
+										>
+											<PlayOutline class="w-3 h-3 mr-1" />
+											{$t('itineraries.startTrip') || 'Start Trip'}
+										</Button>
+									{:else}
+										<Button
+											href="/itineraries/{itinerary._id}"
+											size="xs"
+											color="amber"
+											class="flex-1"
+										>
+											<UserOutline class="w-3 h-3 mr-1" />
+											{$t('itineraries.assignResources') || 'Assign'}
+										</Button>
+									{/if}
+									<Button
+										href="/itineraries/{itinerary._id}"
+										size="xs"
+										color="light"
+										class="flex-1"
+									>
+										<EyeOutline class="w-3 h-3 mr-1" />
+										{$t('common.viewDetails') || 'View'}
+									</Button>
+								</div>
 							</div>
-							<ArrowRightOutline class="w-4 h-4 text-gray-400" />
-						</a>
-						<a
-							href="/clients?action=new"
-							class="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-						>
-							<div class="flex items-center gap-3">
-								<UsersOutline class="w-5 h-5 text-green-600 dark:text-green-400" />
-								<span class="font-medium text-gray-900 dark:text-white text-sm">{$t('clients.addClient')}</span>
-							</div>
-							<ArrowRightOutline class="w-4 h-4 text-gray-400" />
-						</a>
-						<a
-							href="/vehicles?action=new"
-							class="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-						>
-							<div class="flex items-center gap-3">
-								<TruckOutline class="w-5 h-5 text-purple-600 dark:text-purple-400" />
-								<span class="font-medium text-gray-900 dark:text-white text-sm">{$t('vehicles.addVehicle')}</span>
-							</div>
-							<ArrowRightOutline class="w-4 h-4 text-gray-400" />
-						</a>
-						<a
-							href="/invoices"
-							class="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-						>
-							<div class="flex items-center gap-3">
-								<CashOutline class="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
-								<span class="font-medium text-gray-900 dark:text-white text-sm">{$t('invoices.title')}</span>
-							</div>
-							<ArrowRightOutline class="w-4 h-4 text-gray-400" />
-						</a>
+						{/each}
+					</div>
+				{:else}
+					<p class="text-center text-gray-500 dark:text-gray-400 py-4 text-sm">
+						{$t('dashboard.noUpcomingTrips') || 'No upcoming trips scheduled'}
+					</p>
+				{/if}
+			</Card>
+
+			<!-- Quick Actions (Organized by Category) -->
+			<Card class="max-w-none !p-6">
+				<div class="flex items-center gap-2 mb-4">
+					<ChartPieOutline class="w-5 h-5 text-gray-500 dark:text-gray-400" />
+					<h3 class="text-lg font-semibold text-gray-900 dark:text-white">{$t('dashboard.quickActions')}</h3>
+				</div>
+				<div class="space-y-4">
+					<!-- Quotations Section -->
+					<div>
+						<p class="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">
+							{$t('dashboard.quotations')}
+						</p>
+						<div class="space-y-1">
+							<a
+								href="/quotations/new"
+								class="flex items-center justify-between p-2 bg-primary-50 dark:bg-primary-900/20 rounded-lg hover:bg-primary-100 dark:hover:bg-primary-900/30 transition-colors"
+							>
+								<div class="flex items-center gap-2">
+									<PlusOutline class="w-4 h-4 text-primary-600 dark:text-primary-400" />
+									<span class="text-sm text-gray-900 dark:text-white">{$t('dashboard.createNewQuotation')}</span>
+								</div>
+							</a>
+							<a
+								href="/quotations?status=sent"
+								class="flex items-center justify-between p-2 bg-gray-50 dark:bg-gray-800 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+							>
+								<div class="flex items-center gap-2">
+									<FilterOutline class="w-4 h-4 text-blue-600 dark:text-blue-400" />
+									<span class="text-sm text-gray-900 dark:text-white">{$t('dashboard.viewPending') || 'View Pending'}</span>
+								</div>
+							</a>
+						</div>
+					</div>
+
+					<!-- Itineraries Section -->
+					<div>
+						<p class="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">
+							{$t('dashboard.itineraries')}
+						</p>
+						<div class="space-y-1">
+							<a
+								href="/itineraries?filter=today"
+								class="flex items-center justify-between p-2 bg-gray-50 dark:bg-gray-800 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+							>
+								<div class="flex items-center gap-2">
+									<CalendarMonthOutline class="w-4 h-4 text-cyan-600 dark:text-cyan-400" />
+									<span class="text-sm text-gray-900 dark:text-white">{$t('dashboard.todaysTrips') || "Today's Trips"}</span>
+								</div>
+							</a>
+							<a
+								href="/itineraries?filter=unassigned"
+								class="flex items-center justify-between p-2 bg-gray-50 dark:bg-gray-800 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+							>
+								<div class="flex items-center gap-2">
+									<ExclamationCircleOutline class="w-4 h-4 text-amber-600 dark:text-amber-400" />
+									<span class="text-sm text-gray-900 dark:text-white">{$t('dashboard.unassigned') || 'Unassigned'}</span>
+								</div>
+							</a>
+						</div>
+					</div>
+
+					<!-- Invoices Section -->
+					<div>
+						<p class="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">
+							{$t('invoices.title')}
+						</p>
+						<div class="space-y-1">
+							<a
+								href="/invoices?status=unpaid"
+								class="flex items-center justify-between p-2 bg-gray-50 dark:bg-gray-800 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+							>
+								<div class="flex items-center gap-2">
+									<CashOutline class="w-4 h-4 text-rose-600 dark:text-rose-400" />
+									<span class="text-sm text-gray-900 dark:text-white">{$t('statuses.unpaid')}</span>
+								</div>
+							</a>
+							<a
+								href="/invoices?status=overdue"
+								class="flex items-center justify-between p-2 bg-gray-50 dark:bg-gray-800 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+							>
+								<div class="flex items-center gap-2">
+									<ExclamationCircleOutline class="w-4 h-4 text-red-600 dark:text-red-400" />
+									<span class="text-sm text-gray-900 dark:text-white">{$t('statuses.overdue')}</span>
+								</div>
+							</a>
+						</div>
+					</div>
+
+					<!-- Clients Section -->
+					<div>
+						<p class="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">
+							{$t('clients.title')}
+						</p>
+						<div class="space-y-1">
+							<a
+								href="/clients?action=new"
+								class="flex items-center justify-between p-2 bg-gray-50 dark:bg-gray-800 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+							>
+								<div class="flex items-center gap-2">
+									<UsersOutline class="w-4 h-4 text-green-600 dark:text-green-400" />
+									<span class="text-sm text-gray-900 dark:text-white">{$t('clients.addClient')}</span>
+								</div>
+							</a>
+						</div>
+					</div>
+
+					<!-- Settings -->
+					<div class="pt-2 border-t border-gray-200 dark:border-gray-700">
 						<a
 							href="/settings"
-							class="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+							class="flex items-center justify-between p-2 bg-gray-50 dark:bg-gray-800 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
 						>
-							<div class="flex items-center gap-3">
-								<CalendarMonthOutline class="w-5 h-5 text-gray-600 dark:text-gray-400" />
-								<span class="font-medium text-gray-900 dark:text-white text-sm">{$t('dashboard.systemParameters')}</span>
+							<div class="flex items-center gap-2">
+								<ChartPieOutline class="w-4 h-4 text-gray-600 dark:text-gray-400" />
+								<span class="text-sm text-gray-900 dark:text-white">{$t('dashboard.systemParameters')}</span>
 							</div>
-							<ArrowRightOutline class="w-4 h-4 text-gray-400" />
 						</a>
 					</div>
-				</Card>
-			</div>
+				</div>
+			</Card>
 		</div>
+
+		<!-- Warnings & Info Alerts -->
+		{#if warningAlerts.length > 0 || infoAlerts.length > 0}
+			<Card class="max-w-none !p-6">
+				<div class="flex items-center gap-2 mb-4">
+					<ExclamationCircleOutline class="w-5 h-5 text-amber-500" />
+					<h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+						{$t('dashboard.alerts') || 'Alerts'}
+					</h3>
+				</div>
+				<div class="space-y-2">
+					{#each warningAlerts.slice(0, 5) as alert}
+						<div class="flex items-start gap-3 p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-800">
+							<ExclamationCircleOutline class="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
+							<div>
+								<p class="font-medium text-amber-800 dark:text-amber-200 text-sm">{alert.title}</p>
+								<p class="text-xs text-amber-600 dark:text-amber-400">{alert.message}</p>
+							</div>
+						</div>
+					{/each}
+					{#each infoAlerts.slice(0, 3) as alert}
+						<div class="flex items-start gap-3 p-3 bg-sky-50 dark:bg-sky-900/20 rounded-lg border border-sky-200 dark:border-sky-800">
+							<InfoCircleOutline class="w-5 h-5 text-sky-500 flex-shrink-0 mt-0.5" />
+							<div>
+								<p class="font-medium text-sky-800 dark:text-sky-200 text-sm">{alert.title}</p>
+								<p class="text-xs text-sky-600 dark:text-sky-400">{alert.message}</p>
+							</div>
+						</div>
+					{/each}
+				</div>
+			</Card>
+		{/if}
 	{/if}
 </div>

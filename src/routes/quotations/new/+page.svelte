@@ -10,7 +10,9 @@
 		Alert,
 		Select,
 		Toast,
-		Modal
+		Modal,
+		AccordionItem,
+		Accordion
 	} from 'flowbite-svelte';
 	import {
 		ArrowLeftOutline,
@@ -305,6 +307,30 @@
 		}).format(value);
 	}
 
+	// Format currency with 2 decimal places for precise rates (cost per km, cost per day)
+	function formatCurrencyPrecise(value: number): string {
+		return new Intl.NumberFormat('es-HN', {
+			style: 'currency',
+			currency: 'HNL',
+			minimumFractionDigits: 2,
+			maximumFractionDigits: 2
+		}).format(value);
+	}
+
+	function formatUsd(value: number): string {
+		return new Intl.NumberFormat('en-US', {
+			style: 'currency',
+			currency: 'USD',
+			minimumFractionDigits: 0,
+			maximumFractionDigits: 0
+		}).format(value);
+	}
+
+	// Format both currencies
+	function formatDualCurrency(local: number, usd: number): string {
+		return `${formatCurrency(local)} / ${formatUsd(usd)}`;
+	}
+
 	// Round to nearest value (e.g., round to nearest 50)
 	function roundToNearest(value: number, nearest: number): number {
 		if (nearest <= 0) return Math.round(value);
@@ -324,30 +350,52 @@
 		// Include extra km in total distance calculation
 		const distance = routeResult.totalDistance + extraKm;
 		const days = estimatedDays;
+		const exchangeRate = parameters.exchangeRate || 24.5;
 
-		// Fuel costs
+		// ============ FUEL CALCULATION WITH TANK AUTONOMY ============
 		const fuelEfficiencyKpg = selectedVehicle.fuelEfficiencyUnit === 'kpl'
 			? selectedVehicle.fuelEfficiency * 3.78541 // Convert km/L to km/gal
 			: selectedVehicle.fuelEfficiency;
-		const fuelConsumption = distance / fuelEfficiencyKpg;
+		const fuelConsumption = distance / fuelEfficiencyKpg; // Total gallons needed
 		const fuelCost = fuelConsumption * parameters.fuelPrice;
 
-		// Driver costs
-		const mealCost = days * parameters.mealCostPerDay;
-		const lodgingCost = days > 1 ? (days - 1) * parameters.hotelCostPerNight : 0;
-		const incentiveCost = days * parameters.driverIncentivePerDay;
+		// Tank autonomy calculation (for expense advance reference)
+		let tankCapacityGallons = selectedVehicle.fuelCapacity || 0;
+		if (selectedVehicle.fuelCapacityUnit === 'liters') {
+			tankCapacityGallons = selectedVehicle.fuelCapacity / 3.78541;
+		}
+		const tankRange = tankCapacityGallons * fuelEfficiencyKpg; // Full tank range in km
+		const safetyThreshold = 0.85;
+		const safeRange = tankRange * safetyThreshold; // Safe range (85% of tank)
+		const extraFuelNeeded = distance > safeRange ? (distance - safeRange) / fuelEfficiencyKpg : 0;
+		const fuelAdvanceCost = extraFuelNeeded * parameters.fuelPrice;
 
-		// Vehicle costs
-		const vehicleDistanceCost = distance * selectedVehicle.costPerDistance;
-		const vehicleDailyCost = days * selectedVehicle.costPerDay;
+		// ============ VIÁTICOS (MEALS + LODGING) ============
+		const mealCostPerDay = parameters.mealCostPerDay;
+		const mealCost = days * mealCostPerDay;
+		const lodgingNights = days > 1 ? days - 1 : 0;
+		const hotelCostPerNight = parameters.hotelCostPerNight;
+		const lodgingCost = lodgingNights * hotelCostPerNight;
+		const viaticosTotalCost = mealCost + lodgingCost;
 
+		// ============ DRIVER INCENTIVE (FREELANCER COMPENSATION) ============
+		const incentivePerDay = parameters.driverIncentivePerDay;
+		const incentiveCost = days * incentivePerDay;
+
+		// ============ VEHICLE COSTS ============
+		const costPerKm = selectedVehicle.costPerDistance;
+		const costPerDay = selectedVehicle.costPerDay;
+		const vehicleDistanceCost = distance * costPerKm;
+		const vehicleDailyCost = days * costPerDay;
+		const vehicleTotalCost = vehicleDistanceCost + vehicleDailyCost;
+
+		// ============ TOTALS ============
 		// Total base cost (all items calculated regardless of toggles)
 		const baseCost =
 			(includeFuel ? fuelCost : 0) +
-			(includeMeals ? mealCost + lodgingCost : 0) +
+			(includeMeals ? viaticosTotalCost : 0) +
 			(includeDriverIncentive ? incentiveCost : 0) +
-			vehicleDistanceCost +
-			vehicleDailyCost;
+			vehicleTotalCost;
 
 		// Apply markup
 		const markupMultiplier = 1 + (selectedMarkup / 100);
@@ -362,7 +410,6 @@
 		const roundingUsd = parameters.roundingUsd || 5;
 
 		// Calculate USD price
-		const exchangeRate = parameters.exchangeRate || 24.5;
 		const priceUsd = priceAfterDiscount / exchangeRate;
 
 		// Apply rounding
@@ -370,13 +417,48 @@
 		const finalPriceUsd = roundToNearest(priceUsd, roundingUsd);
 
 		return {
+			// Fuel details
 			fuel: Math.round(fuelCost),
+			fuelUsd: Math.round(fuelCost / exchangeRate),
+			fuelConsumption: Math.round(fuelConsumption * 100) / 100, // gallons
+			fuelPrice: parameters.fuelPrice,
+			fuelEfficiency: fuelEfficiencyKpg,
+			tankCapacity: tankCapacityGallons,
+			tankRange: Math.round(tankRange),
+			safeRange: Math.round(safeRange),
+			extraFuelNeeded: Math.round(extraFuelNeeded * 100) / 100,
+			fuelAdvanceCost: Math.round(fuelAdvanceCost),
+			fuelAdvanceNeeded: extraFuelNeeded > 0,
+
+			// Viáticos details
 			meals: Math.round(mealCost),
+			mealsUsd: Math.round(mealCost / exchangeRate),
+			mealCostPerDay,
 			lodging: Math.round(lodgingCost),
+			lodgingUsd: Math.round(lodgingCost / exchangeRate),
+			lodgingNights,
+			hotelCostPerNight,
+			viaticosTotal: Math.round(viaticosTotalCost),
+			viaticosUsd: Math.round(viaticosTotalCost / exchangeRate),
+
+			// Driver incentive details
 			incentive: Math.round(incentiveCost),
+			incentiveUsd: Math.round(incentiveCost / exchangeRate),
+			incentivePerDay,
+
+			// Vehicle cost details
 			vehicleDistance: Math.round(vehicleDistanceCost),
+			vehicleDistanceUsd: Math.round(vehicleDistanceCost / exchangeRate),
+			costPerKm,
 			vehicleDaily: Math.round(vehicleDailyCost),
+			vehicleDailyUsd: Math.round(vehicleDailyCost / exchangeRate),
+			costPerDay,
+			vehicleTotal: Math.round(vehicleTotalCost),
+			vehicleTotalUsd: Math.round(vehicleTotalCost / exchangeRate),
+
+			// Totals
 			baseCost: Math.round(baseCost),
+			baseCostUsd: Math.round(baseCost / exchangeRate),
 			markup: selectedMarkup,
 			priceBeforeDiscount: Math.round(priceBeforeDiscount),
 			discount: clientDiscount,
@@ -387,7 +469,8 @@
 			roundingHnl,
 			roundingUsd,
 			totalDistance: distance,
-			extraKm
+			extraKm,
+			days
 		};
 	});
 
@@ -752,11 +835,11 @@
 										</div>
 										<div class="flex items-center gap-2 mt-1">
 											<span class="text-xs font-medium text-gray-700 dark:text-gray-300">
-												{formatCurrency(vehicle.costPerDay)}/day
+												{formatCurrencyPrecise(vehicle.costPerDay)}/{$t('units.day')}
 											</span>
 											<span class="text-gray-300 dark:text-gray-600">•</span>
 											<span class="text-xs font-medium text-gray-700 dark:text-gray-300">
-												{formatCurrency(vehicle.costPerDistance)}/{vehicle.distanceUnit}
+												{formatCurrencyPrecise(vehicle.costPerDistance)}/{vehicle.distanceUnit}
 											</span>
 										</div>
 									</div>
@@ -835,7 +918,7 @@
 									{formatDistance(routeResult.totalDistance + extraKm)}
 								</p>
 								{#if extraKm > 0}
-									<p class="text-xs text-amber-600 dark:text-amber-400">+{formatDistance(extraKm)} extra</p>
+									<p class="text-xs text-amber-600 dark:text-amber-400">Incluye {formatDistance(extraKm)} extra</p>
 								{/if}
 							</div>
 							<div class="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
@@ -846,28 +929,38 @@
 							</div>
 						</div>
 
-						<!-- Route breakdown -->
+						<!-- Route breakdown with per-leg duration -->
 						<div class="space-y-2 text-sm">
 							{#if routeResult.deadheadDistance > 0}
 								<div class="p-2 bg-blue-50 dark:bg-blue-900/20 rounded border border-blue-200 dark:border-blue-800">
 									<p class="text-xs text-blue-600 dark:text-blue-400 font-medium mb-1">{$t('quotations.new.repositioning')}</p>
 									{#if routeResult.baseToOrigin > 0}
+										{@const baseToOriginSegment = routeResult.segments[0]}
 										<div class="flex justify-between text-blue-700 dark:text-blue-300">
 											<span>Base → {$t('quotations.new.origin')}</span>
-											<span>{formatDistance(routeResult.baseToOrigin)}</span>
+											<span class="flex items-center gap-2">
+												<span class="text-blue-500 text-xs">{formatDuration(baseToOriginSegment.duration)}</span>
+												<span>{formatDistance(routeResult.baseToOrigin)}</span>
+											</span>
 										</div>
 									{/if}
 									{#if isRoundTrip && routeResult.originToBase > 0}
-										<!-- Round trip: vehicle returns to base from origin after dropping passengers back -->
+										{@const returnSegment = routeResult.segments[routeResult.segments.length - 1]}
 										<div class="flex justify-between text-blue-700 dark:text-blue-300">
 											<span>{$t('quotations.new.origin')} → Base</span>
-											<span>{formatDistance(routeResult.originToBase)}</span>
+											<span class="flex items-center gap-2">
+												<span class="text-blue-500 text-xs">{formatDuration(returnSegment.duration)}</span>
+												<span>{formatDistance(routeResult.originToBase)}</span>
+											</span>
 										</div>
 									{:else if !isRoundTrip && routeResult.destinationToBase > 0}
-										<!-- One-way: vehicle returns to base from destination -->
+										{@const returnSegment = routeResult.segments[routeResult.segments.length - 1]}
 										<div class="flex justify-between text-blue-700 dark:text-blue-300">
 											<span>{$t('quotations.new.destination')} → Base</span>
-											<span>{formatDistance(routeResult.destinationToBase)}</span>
+											<span class="flex items-center gap-2">
+												<span class="text-blue-500 text-xs">{formatDuration(returnSegment.duration)}</span>
+												<span>{formatDistance(routeResult.destinationToBase)}</span>
+											</span>
 										</div>
 									{/if}
 									<div class="flex justify-between font-medium text-blue-800 dark:text-blue-200 pt-1 border-t border-blue-200 dark:border-blue-700 mt-1">
@@ -881,14 +974,32 @@
 								<p class="text-xs text-emerald-600 dark:text-emerald-400 font-medium mb-1">
 									{isRoundTrip ? $t('quotations.new.roundTrip') : $t('quotations.new.oneWay')}
 								</p>
-								<div class="flex justify-between text-emerald-700 dark:text-emerald-300">
-									<span>{$t('quotations.new.origin')} → {$t('quotations.new.destination')}</span>
-									<span>{formatDistance(routeResult.originToDestination)}</span>
-								</div>
-								{#if isRoundTrip}
+								<!-- Origin to Destination segment -->
+								{#if routeResult.segments}
+									{@const mainSegmentIndex = routeResult.baseToOrigin > 0 ? 1 : 0}
+									{@const mainSegment = routeResult.segments[mainSegmentIndex]}
 									<div class="flex justify-between text-emerald-700 dark:text-emerald-300">
-										<span>{$t('quotations.new.destination')} → {$t('quotations.new.origin')}</span>
-										<span>{formatDistance(routeResult.destinationToOrigin)}</span>
+										<span>{origin.split(',')[0]} → {destination.split(',')[0]}</span>
+										<span class="flex items-center gap-2">
+											{#if mainSegment}
+												<span class="text-emerald-500 text-xs">{formatDuration(mainSegment.duration)}</span>
+											{/if}
+											<span>{formatDistance(routeResult.originToDestination)}</span>
+										</span>
+									</div>
+								{/if}
+								{#if isRoundTrip && routeResult.segments}
+									<!-- Destination to Origin return segment -->
+									{@const returnSegmentIndex = routeResult.baseToOrigin > 0 ? 2 : 1}
+									{@const returnSegment = routeResult.segments[returnSegmentIndex]}
+									<div class="flex justify-between text-emerald-700 dark:text-emerald-300">
+										<span>{destination.split(',')[0]} → {origin.split(',')[0]}</span>
+										<span class="flex items-center gap-2">
+											{#if returnSegment}
+												<span class="text-emerald-500 text-xs">{formatDuration(returnSegment.duration)}</span>
+											{/if}
+											<span>{formatDistance(routeResult.destinationToOrigin)}</span>
+										</span>
 									</div>
 								{/if}
 								<div class="flex justify-between font-medium text-emerald-800 dark:text-emerald-200 pt-1 border-t border-emerald-200 dark:border-emerald-700 mt-1">
@@ -901,7 +1012,7 @@
 								<div class="p-2 bg-amber-50 dark:bg-amber-900/20 rounded border border-amber-200 dark:border-amber-800">
 									<p class="text-xs text-amber-600 dark:text-amber-400 font-medium mb-1">{$t('quotations.new.extraKm')}</p>
 									<div class="flex justify-between text-amber-700 dark:text-amber-300">
-										<span>{$t('quotations.new.extraKmHelp')}</span>
+										<span>{$t('quotations.new.extraKmIncludes')}</span>
 										<span>{formatDistance(extraKm)}</span>
 									</div>
 								</div>
@@ -940,44 +1051,137 @@
 							</div>
 						</div>
 
-						<!-- Cost breakdown -->
-						<div class="border-t border-gray-200 dark:border-gray-700 pt-3 space-y-2 text-sm">
-							{#if includeFuel}
-								<div class="flex justify-between">
-									<span class="text-gray-600 dark:text-gray-400">{$t('quotations.new.fuelCost')}</span>
-									<span class="text-gray-900 dark:text-white">{formatCurrency(costs.fuel)}</span>
-								</div>
-							{/if}
-							{#if includeMeals}
-								<div class="flex justify-between">
-									<span class="text-gray-600 dark:text-gray-400">{$t('quotations.new.mealsCost')}</span>
-									<span class="text-gray-900 dark:text-white">{formatCurrency(costs.meals)}</span>
-								</div>
-								{#if costs.lodging > 0}
-									<div class="flex justify-between">
-										<span class="text-gray-600 dark:text-gray-400">{$t('settings.fields.hotelCost')}</span>
-										<span class="text-gray-900 dark:text-white">{formatCurrency(costs.lodging)}</span>
-									</div>
+						<!-- Cost breakdown with detailed accordions -->
+						<div class="border-t border-gray-200 dark:border-gray-700 pt-3 space-y-1 text-sm">
+							<Accordion flush class="divide-y-0">
+								<!-- FUEL COST -->
+								{#if includeFuel}
+									<AccordionItem class="!py-1">
+										{#snippet header()}
+											<div class="flex justify-between w-full pr-2">
+												<span class="text-gray-700 dark:text-gray-300 font-medium">{$t('quotations.new.fuelCost')}</span>
+												<span class="text-gray-900 dark:text-white font-medium">{formatCurrency(costs.fuel)} <span class="text-gray-500 text-xs">/ {formatUsd(costs.fuelUsd)}</span></span>
+											</div>
+										{/snippet}
+										<div class="pl-2 space-y-1 text-xs text-gray-500 dark:text-gray-400 pb-2">
+											<div class="flex justify-between">
+												<span>{$t('quotations.costDetails.totalDistance')}:</span>
+												<span>{costs.totalDistance.toLocaleString()} km</span>
+											</div>
+											<div class="flex justify-between">
+												<span>{$t('quotations.costDetails.fuelEfficiency')}:</span>
+												<span>{costs.fuelEfficiency.toFixed(1)} km/gal</span>
+											</div>
+											<div class="flex justify-between">
+												<span>{$t('quotations.costDetails.fuelConsumption')}:</span>
+												<span>{costs.fuelConsumption} gal</span>
+											</div>
+											<div class="flex justify-between">
+												<span>{$t('quotations.costDetails.fuelPrice')}:</span>
+												<span>{formatCurrency(costs.fuelPrice)}/gal</span>
+											</div>
+											<div class="border-t border-gray-200 dark:border-gray-700 pt-1 mt-1">
+												<div class="flex justify-between">
+													<span>{$t('quotations.costDetails.tankCapacity')}:</span>
+													<span>{costs.tankCapacity.toFixed(0)} gal</span>
+												</div>
+												<div class="flex justify-between">
+													<span>{$t('quotations.costDetails.tankRange')}:</span>
+													<span>{costs.tankRange.toLocaleString()} km</span>
+												</div>
+												<div class="flex justify-between">
+													<span>{$t('quotations.costDetails.safeRange')} (85%):</span>
+													<span>{costs.safeRange.toLocaleString()} km</span>
+												</div>
+												{#if costs.fuelAdvanceNeeded}
+													<div class="flex justify-between text-amber-600 dark:text-amber-400 font-medium">
+														<span>{$t('quotations.costDetails.fuelAdvance')}:</span>
+														<span>{formatCurrency(costs.fuelAdvanceCost)} ({costs.extraFuelNeeded} gal)</span>
+													</div>
+												{:else}
+													<div class="text-green-600 dark:text-green-400 text-xs mt-1">
+														{$t('quotations.costDetails.noFuelAdvance')}
+													</div>
+												{/if}
+											</div>
+										</div>
+									</AccordionItem>
 								{/if}
-							{/if}
-							{#if includeDriverIncentive && costs.incentive > 0}
-								<div class="flex justify-between">
-									<span class="text-gray-600 dark:text-gray-400">{$t('settings.fields.driverIncentive')}</span>
-									<span class="text-gray-900 dark:text-white">{formatCurrency(costs.incentive)}</span>
-								</div>
-							{/if}
-							<div class="flex justify-between">
-								<span class="text-gray-600 dark:text-gray-400">{$t('quotations.new.vehicleCost')}</span>
-								<span class="text-gray-900 dark:text-white">{formatCurrency(costs.vehicleDistance)}</span>
-							</div>
-							<div class="flex justify-between">
-								<span class="text-gray-600 dark:text-gray-400">{$t('quotations.new.vehicleCost')} ({$t('units.days')})</span>
-								<span class="text-gray-900 dark:text-white">{formatCurrency(costs.vehicleDaily)}</span>
-							</div>
 
-							<div class="flex justify-between font-semibold pt-2 border-t border-gray-200 dark:border-gray-700">
+								<!-- VIÁTICOS (MEALS + LODGING) -->
+								{#if includeMeals}
+									<AccordionItem class="!py-1">
+										{#snippet header()}
+											<div class="flex justify-between w-full pr-2">
+												<span class="text-gray-700 dark:text-gray-300 font-medium">{$t('quotations.costDetails.viaticos')}</span>
+												<span class="text-gray-900 dark:text-white font-medium">{formatCurrency(costs.viaticosTotal)} <span class="text-gray-500 text-xs">/ {formatUsd(costs.viaticosUsd)}</span></span>
+											</div>
+										{/snippet}
+										<div class="pl-2 space-y-1 text-xs text-gray-500 dark:text-gray-400 pb-2">
+											<div class="font-medium text-gray-600 dark:text-gray-300">{$t('quotations.costDetails.meals')}:</div>
+											<div class="flex justify-between pl-2">
+												<span>{costs.days} {$t('units.days')} × {formatCurrency(costs.mealCostPerDay)}/{$t('units.day')}</span>
+												<span>{formatCurrency(costs.meals)}</span>
+											</div>
+											{#if costs.lodgingNights > 0}
+												<div class="font-medium text-gray-600 dark:text-gray-300 mt-1">{$t('quotations.costDetails.lodging')}:</div>
+												<div class="flex justify-between pl-2">
+													<span>{costs.lodgingNights} {$t('units.nights')} × {formatCurrency(costs.hotelCostPerNight)}/{$t('units.night')}</span>
+													<span>{formatCurrency(costs.lodging)}</span>
+												</div>
+											{/if}
+										</div>
+									</AccordionItem>
+								{/if}
+
+								<!-- DRIVER INCENTIVE (FREELANCER) -->
+								{#if includeDriverIncentive && costs.incentive > 0}
+									<AccordionItem class="!py-1">
+										{#snippet header()}
+											<div class="flex justify-between w-full pr-2">
+												<span class="text-gray-700 dark:text-gray-300 font-medium">{$t('quotations.costDetails.driverIncentive')}</span>
+												<span class="text-gray-900 dark:text-white font-medium">{formatCurrency(costs.incentive)} <span class="text-gray-500 text-xs">/ {formatUsd(costs.incentiveUsd)}</span></span>
+											</div>
+										{/snippet}
+										<div class="pl-2 space-y-1 text-xs text-gray-500 dark:text-gray-400 pb-2">
+											<div class="flex justify-between">
+												<span>{costs.days} {$t('units.days')} × {formatCurrency(costs.incentivePerDay)}/{$t('units.day')}</span>
+												<span>{formatCurrency(costs.incentive)}</span>
+											</div>
+											<p class="text-xs text-gray-400 dark:text-gray-500 italic mt-1">
+												{$t('quotations.costDetails.driverIncentiveHint')}
+											</p>
+										</div>
+									</AccordionItem>
+								{/if}
+
+								<!-- VEHICLE COSTS -->
+								<AccordionItem class="!py-1">
+									{#snippet header()}
+										<div class="flex justify-between w-full pr-2">
+											<span class="text-gray-700 dark:text-gray-300 font-medium">{$t('quotations.new.vehicleCost')}</span>
+											<span class="text-gray-900 dark:text-white font-medium">{formatCurrency(costs.vehicleTotal)} <span class="text-gray-500 text-xs">/ {formatUsd(costs.vehicleTotalUsd)}</span></span>
+										</div>
+									{/snippet}
+									<div class="pl-2 space-y-1 text-xs text-gray-500 dark:text-gray-400 pb-2">
+										<div class="font-medium text-gray-600 dark:text-gray-300">{$t('quotations.costDetails.perDistance')}:</div>
+										<div class="flex justify-between pl-2">
+											<span>{costs.totalDistance.toLocaleString()} km × {formatCurrencyPrecise(costs.costPerKm)}/km</span>
+											<span>{formatCurrency(costs.vehicleDistance)}</span>
+										</div>
+										<div class="font-medium text-gray-600 dark:text-gray-300 mt-1">{$t('quotations.costDetails.perDay')}:</div>
+										<div class="flex justify-between pl-2">
+											<span>{costs.days} {$t('units.days')} × {formatCurrencyPrecise(costs.costPerDay)}/{$t('units.day')}</span>
+											<span>{formatCurrency(costs.vehicleDaily)}</span>
+										</div>
+									</div>
+								</AccordionItem>
+							</Accordion>
+
+							<!-- SUBTOTAL -->
+							<div class="flex justify-between font-semibold pt-2 border-t border-gray-200 dark:border-gray-700 mt-2">
 								<span class="text-gray-700 dark:text-gray-300">{$t('quotations.new.subtotal')}</span>
-								<span class="text-gray-900 dark:text-white">{formatCurrency(costs.baseCost)}</span>
+								<span class="text-gray-900 dark:text-white">{formatCurrency(costs.baseCost)} <span class="text-gray-500 text-xs font-normal">/ {formatUsd(costs.baseCostUsd)}</span></span>
 							</div>
 						</div>
 
@@ -1009,8 +1213,14 @@
 							</div>
 						{/if}
 
-						<!-- Final Price -->
-						<div class="p-4 bg-primary-50 dark:bg-primary-900/20 rounded-lg border border-primary-200 dark:border-primary-800">
+						<!-- Total line (matching final price) -->
+						<div class="flex justify-between font-bold text-lg pt-3 mt-2 border-t-2 border-gray-300 dark:border-gray-600">
+							<span class="text-gray-900 dark:text-white">{$t('quotations.costDetails.total')}</span>
+							<span class="text-primary-600 dark:text-primary-400">{formatCurrency(costs.finalPriceHnl)} <span class="text-gray-500 text-sm font-normal">/ {formatUsd(costs.finalPriceUsd)}</span></span>
+						</div>
+
+						<!-- Final Price Card -->
+						<div class="p-4 bg-primary-50 dark:bg-primary-900/20 rounded-lg border border-primary-200 dark:border-primary-800 mt-4">
 							<div class="flex justify-between items-center">
 								<div>
 									<p class="text-sm text-gray-600 dark:text-gray-400">{$t('quotations.new.total')} ({selectedMarkup}% {$t('quotations.new.margin').toLowerCase()})</p>
@@ -1082,23 +1292,47 @@
 <!-- Map Modal -->
 <Modal bind:open={showMapModal} size="xl" title={$t('quotations.new.routeMap')} onclose={closeMapModal}>
 	<div class="space-y-4">
-		<div class="flex items-center gap-4 text-sm text-gray-600 dark:text-gray-400">
-			<div class="flex items-center gap-1">
-				<MapPinOutline class="w-4 h-4 text-green-500" />
-				<span>{origin}</span>
-			</div>
-			<span class="text-gray-400">→</span>
-			<div class="flex items-center gap-1">
-				<MapPinOutline class="w-4 h-4 text-red-500" />
-				<span>{destination}</span>
-			</div>
+		<div class="relative">
+			<div
+				bind:this={mapContainer}
+				class="w-full h-[500px] rounded-lg border border-gray-200 dark:border-gray-700"
+			></div>
+			<!-- Trip Info Box Overlay -->
+			{#if routeResult}
+				<div class="absolute top-4 left-4 bg-white dark:bg-gray-800 rounded-lg shadow-lg p-4 max-w-sm border border-gray-200 dark:border-gray-700">
+					<div class="space-y-2 text-sm">
+						<div>
+							<span class="text-gray-500 dark:text-gray-400">Desde (A): </span>
+							<span class="font-medium text-gray-900 dark:text-white">{origin}</span>
+						</div>
+						<div>
+							<span class="text-gray-500 dark:text-gray-400">Hacia (B): </span>
+							<span class="font-medium text-gray-900 dark:text-white">{destination}</span>
+						</div>
+						<div>
+							<span class="text-gray-500 dark:text-gray-400">Distancia: </span>
+							<span class="font-semibold text-gray-900 dark:text-white">{routeResult.originToDestination} Kms</span>
+						</div>
+						<div>
+							<span class="text-gray-500 dark:text-gray-400">Duración: </span>
+							<span class="font-semibold text-gray-900 dark:text-white">{formatDuration(routeResult.segments[routeResult.baseToOrigin > 0 ? 1 : 0]?.duration || 0)}</span>
+						</div>
+						{#if isRoundTrip}
+							<div class="pt-2 mt-2 border-t border-gray-200 dark:border-gray-700">
+								<span class="text-xs text-emerald-600 dark:text-emerald-400 font-medium">{$t('quotations.new.roundTrip')}</span>
+							</div>
+						{/if}
+						{#if extraKm > 0}
+							<div class="text-xs text-amber-600 dark:text-amber-400">
+								Incluye {formatDistance(extraKm)} extra
+							</div>
+						{/if}
+					</div>
+				</div>
+			{/if}
 		</div>
-		<div
-			bind:this={mapContainer}
-			class="w-full h-96 rounded-lg border border-gray-200 dark:border-gray-700"
-		></div>
 		{#if routeResult}
-			<div class="flex items-center justify-between text-sm">
+			<div class="flex items-center justify-between text-sm bg-gray-50 dark:bg-gray-800 p-3 rounded-lg">
 				<span class="text-gray-600 dark:text-gray-400">{$t('quotations.new.totalDistance')}: <strong class="text-gray-900 dark:text-white">{formatDistance(routeResult.totalDistance + extraKm)}</strong></span>
 				<span class="text-gray-600 dark:text-gray-400">{$t('quotations.new.estimatedTime')}: <strong class="text-gray-900 dark:text-white">{formatDuration(routeResult.totalTime)}</strong></span>
 			</div>

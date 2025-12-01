@@ -30,13 +30,15 @@
 	let showDropdown = $state(false);
 	let highlightedIndex = $state(-1);
 	let inputValue = $state(value);
+	let showAllOptions = $state(false); // Show all options on focus, filter on type
 
 	// Filter options based on input
 	const filteredOptions = $derived(() => {
 		if (!options || options.length === 0) return [];
-		if (!inputValue.trim()) return options.slice(0, 10);
+		// Show all options when first focused (showAllOptions) or when input is empty
+		if (showAllOptions || !inputValue.trim()) return options.slice(0, 20);
 		const search = inputValue.toLowerCase().trim();
-		return options.filter(opt => opt.toLowerCase().includes(search)).slice(0, 10);
+		return options.filter(opt => opt.toLowerCase().includes(search)).slice(0, 20);
 	});
 
 	// Check if current input is a new value (not in options)
@@ -50,11 +52,13 @@
 		const target = e.target as HTMLInputElement;
 		inputValue = target.value;
 		showDropdown = true;
+		showAllOptions = false; // Start filtering after user types
 		highlightedIndex = -1;
 	}
 
 	function handleFocus() {
 		showDropdown = true;
+		showAllOptions = true; // Show all options when first focused
 	}
 
 	function handleBlur(e: FocusEvent) {

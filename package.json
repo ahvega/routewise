@@ -33,10 +33,12 @@
 		"vitest": "^4.0.14"
 	},
 	"dependencies": {
+		"@flowbite-svelte-plugins/chart": "^0.2.4",
 		"@googlemaps/js-api-loader": "^2.0.2",
 		"@types/qrcode": "^1.5.6",
 		"@workos-inc/authkit-js": "^0.16.0",
 		"@workos-inc/node": "^7.74.2",
+		"apexcharts": "^5.3.6",
 		"convex": "^1.29.3",
 		"convex-svelte": "^0.0.12",
 		"flowbite": "^4.0.1",
