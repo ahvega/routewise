@@ -40,6 +40,9 @@ export default defineSchema({
       advancedReports: v.boolean(),
       multiCurrency: v.boolean(),
     })),
+    // Fiscal document configuration (country-specific)
+    fiscalDocumentName: v.optional(v.string()), // "RTN" in Honduras, "NIT" in Guatemala, etc.
+    fiscalDocumentNumber: v.optional(v.string()), // Company's fiscal document number
     // Owner reference
     ownerId: v.optional(v.id("users")),
     createdAt: v.number(),
@@ -149,6 +152,25 @@ export default defineSchema({
     prepaymentDays: v.optional(v.number()), // e.g., 3 days before trip
     cancellationMinHours: v.optional(v.number()), // e.g., 48 hours before
     cancellationPenaltyPercentage: v.optional(v.number()), // e.g., 50%
+
+    // Tax Configuration
+    taxName: v.optional(v.string()), // "ISV", "IVA", etc.
+    taxPercentage: v.optional(v.number()), // 15, 12, 0, etc.
+    isTransportTaxable: v.optional(v.boolean()), // Whether transportation services are taxed
+    alwaysShowTaxLine: v.optional(v.boolean()), // Show 0% tax line when exempt (default: true)
+
+    // Workflow Configuration
+    autoCreateItinerary: v.optional(v.boolean()), // Auto-create itinerary on quotation approval
+    autoCreateInvoice: v.optional(v.boolean()), // Auto-create invoice on quotation approval (prepayment)
+
+    // Reminder Configuration
+    quotationReminderDays: v.optional(v.array(v.number())), // Days after sent to remind staff, e.g., [3, 7, 14]
+    invoiceReminderDays: v.optional(v.array(v.number())), // Days after due date to remind, e.g., [3, 7]
+
+    // WhatsApp Settings (premium feature)
+    whatsappEnabled: v.optional(v.boolean()),
+    whatsappPhoneNumberId: v.optional(v.string()), // Twilio WhatsApp number
+
     isActive: v.boolean(),
     createdBy: v.optional(v.id("users")),
     createdAt: v.number(),
@@ -217,10 +239,13 @@ export default defineSchema({
     groupSize: v.number(),
     extraMileage: v.number(),
     estimatedDays: v.number(),
+    isRoundTrip: v.optional(v.boolean()), // true = round trip, false = one-way (defaults to true for backwards compat)
     departureDate: v.optional(v.number()), // Planned departure date
     // Route info
     totalDistance: v.number(),
     totalTime: v.number(),
+    deadheadDistance: v.optional(v.number()), // Repositioning distance (base->origin + return to base)
+    mainTripDistance: v.optional(v.number()), // Client trip distance (origin->destination, with or without return)
     // Currency used for this quotation (frozen at creation)
     localCurrency: v.optional(v.string()), // 'HNL', 'GTQ', etc. - defaults to HNL for backwards compatibility
     exchangeRateUsed: v.number(), // Exchange rate at time of creation
@@ -300,17 +325,52 @@ export default defineSchema({
     groupSize: v.number(),
     totalDistance: v.number(),
     totalTime: v.number(),
+    isRoundTrip: v.optional(v.boolean()), // true = round trip, false = one-way
     // Schedule
     startDate: v.number(),
     endDate: v.optional(v.number()),
     estimatedDays: v.number(),
-    // Pickup/Dropoff details
-    pickupLocation: v.optional(v.string()),
+    // Trip Leader Information (SPOC - Single Point of Contact)
+    tripLeaderName: v.optional(v.string()),
+    tripLeaderPhone: v.optional(v.string()),
+    tripLeaderEmail: v.optional(v.string()),
+
+    // Pickup details
+    pickupLocation: v.optional(v.string()), // General pickup area
     pickupTime: v.optional(v.string()),
     pickupNotes: v.optional(v.string()),
-    dropoffLocation: v.optional(v.string()),
+    // Exact pickup location (collected before trip via client portal)
+    pickupExactAddress: v.optional(v.string()),
+    pickupCoordinates: v.optional(v.object({
+      lat: v.number(),
+      lng: v.number(),
+    })),
+    pickupGoogleMapsUrl: v.optional(v.string()),
+    pickupWazeUrl: v.optional(v.string()),
+    pickupQrCodeDataUrl: v.optional(v.string()), // Base64 QR code for universal link
+
+    // Dropoff details
+    dropoffLocation: v.optional(v.string()), // General dropoff area
     dropoffTime: v.optional(v.string()),
     dropoffNotes: v.optional(v.string()),
+    // Exact dropoff location (collected before trip via client portal)
+    dropoffExactAddress: v.optional(v.string()),
+    dropoffCoordinates: v.optional(v.object({
+      lat: v.number(),
+      lng: v.number(),
+    })),
+    dropoffGoogleMapsUrl: v.optional(v.string()),
+    dropoffWazeUrl: v.optional(v.string()),
+    dropoffQrCodeDataUrl: v.optional(v.string()), // Base64 QR code for universal link
+
+    // Client Portal (magic link for collecting trip details)
+    clientAccessToken: v.optional(v.string()), // Secure token for magic link
+    clientAccessExpiresAt: v.optional(v.number()), // Token expiry timestamp
+    detailsCompletedAt: v.optional(v.number()), // When client filled in trip details
+    detailsCompletedBy: v.optional(v.string()), // 'client' | 'staff'
+
+    // Linked Invoice (direct reference for quick access)
+    invoiceId: v.optional(v.id("invoices")),
     // Pricing (from quotation) - frozen at creation
     localCurrency: v.optional(v.string()), // 'HNL', 'GTQ', etc.
     agreedPriceLocal: v.optional(v.number()), // Price in local currency
@@ -324,6 +384,12 @@ export default defineSchema({
     // Notes
     notes: v.optional(v.string()),
     internalNotes: v.optional(v.string()),
+    // Activity log / timeline notes
+    activityNotes: v.optional(v.array(v.object({
+      timestamp: v.number(),
+      note: v.string(),
+      createdBy: v.optional(v.string()), // User name or 'system'
+    }))),
     // Timestamps
     startedAt: v.optional(v.number()),
     completedAt: v.optional(v.number()),
@@ -343,6 +409,7 @@ export default defineSchema({
   invoices: defineTable({
     tenantId: v.id("tenants"),
     invoiceNumber: v.string(),
+    quotationId: v.optional(v.id("quotations")), // Reference to source quotation
     itineraryId: v.optional(v.id("itineraries")),
     clientId: v.optional(v.id("clients")),
     createdBy: v.optional(v.id("users")),
@@ -352,8 +419,22 @@ export default defineSchema({
     // Currency used for this invoice (frozen at creation)
     localCurrency: v.optional(v.string()), // 'HNL', 'GTQ', etc.
     exchangeRateUsed: v.number(),
-    // Line items (services rendered)
-    description: v.string(), // Trip description
+
+    // Line items (structured service breakdown)
+    lineItems: v.optional(v.array(v.object({
+      description: v.string(), // Service description line
+      quantity: v.number(), // Usually 1 for transport services
+      unitPriceLocal: v.number(), // Price in local currency
+      unitPriceUsd: v.optional(v.number()), // Price in USD
+      totalLocal: v.number(), // quantity * unitPriceLocal
+      totalUsd: v.optional(v.number()), // quantity * unitPriceUsd
+    }))),
+
+    // Natural language service description (generated from quotation/itinerary)
+    serviceDescription: v.optional(v.string()), // Full prose description of service
+
+    // Legacy field (for backwards compatibility)
+    description: v.string(), // Simple trip description
     // Subtotal in both currencies (frozen at creation)
     subtotalLocal: v.optional(v.number()), // Subtotal in local currency
     subtotalHnl: v.number(), // Legacy field
@@ -386,6 +467,13 @@ export default defineSchema({
     // Status
     status: v.string(), // 'draft' | 'sent' | 'paid' | 'cancelled' | 'void'
     notes: v.optional(v.string()),
+    internalNotes: v.optional(v.string()), // Staff-only notes
+    // Activity log / timeline notes
+    activityNotes: v.optional(v.array(v.object({
+      timestamp: v.number(),
+      note: v.string(),
+      createdBy: v.optional(v.string()), // User name or 'system'
+    }))),
     // Timestamps
     sentAt: v.optional(v.number()),
     paidAt: v.optional(v.number()),
@@ -397,6 +485,7 @@ export default defineSchema({
     .index("by_tenant_status", ["tenantId", "status"])
     .index("by_tenant_payment_status", ["tenantId", "paymentStatus"])
     .index("by_itinerary", ["itineraryId"])
+    .index("by_quotation", ["quotationId"])
     .index("by_client", ["clientId"]),
 
   // Invoice Payments (for tracking partial payments)
@@ -526,4 +615,129 @@ export default defineSchema({
     fetchedAt: v.number(), // When the rates were fetched from API
     createdAt: v.number(),
   }).index("by_fetched_at", ["fetchedAt"]),
+
+  // ============================================================
+  // SALES WORKFLOW TABLES
+  // ============================================================
+
+  // Notifications (in-app, email, and WhatsApp notifications)
+  notifications: defineTable({
+    tenantId: v.id("tenants"),
+    userId: v.optional(v.id("users")), // Specific user, or null for all staff
+
+    // Notification type and priority
+    type: v.string(), // 'quotation_followup' | 'quotation_approved' | 'quotation_rejected' | 'quotation_expired' |
+                      // 'itinerary_created' | 'trip_details_requested' | 'trip_details_completed' | 'trip_tomorrow' |
+                      // 'invoice_created' | 'invoice_sent' | 'invoice_overdue' | 'payment_received'
+    priority: v.string(), // 'low' | 'medium' | 'high' | 'urgent'
+
+    // Content
+    title: v.string(),
+    message: v.string(),
+
+    // Reference to related entity
+    entityType: v.optional(v.string()), // 'quotation' | 'itinerary' | 'invoice'
+    entityId: v.optional(v.string()), // ID of the related entity (stored as string for flexibility)
+
+    // Delivery channels
+    channels: v.array(v.string()), // ['in_app', 'email', 'whatsapp']
+
+    // In-app status
+    read: v.boolean(),
+    readAt: v.optional(v.number()),
+    dismissed: v.optional(v.boolean()),
+    dismissedAt: v.optional(v.number()),
+
+    // Email delivery tracking
+    emailSent: v.optional(v.boolean()),
+    emailSentAt: v.optional(v.number()),
+    emailError: v.optional(v.string()),
+
+    // WhatsApp delivery tracking
+    whatsappSent: v.optional(v.boolean()),
+    whatsappSentAt: v.optional(v.number()),
+    whatsappError: v.optional(v.string()),
+    whatsappMessageId: v.optional(v.string()), // Twilio message SID
+
+    // Scheduling (for future/recurring notifications)
+    scheduledFor: v.optional(v.number()), // Future timestamp for delayed delivery
+    processed: v.optional(v.boolean()), // Whether scheduled notification was processed
+
+    // Action URL (where clicking the notification should go)
+    actionUrl: v.optional(v.string()),
+
+    createdAt: v.number(),
+  })
+    .index("by_tenant", ["tenantId"])
+    .index("by_tenant_user", ["tenantId", "userId"])
+    .index("by_tenant_unread", ["tenantId", "read"])
+    .index("by_tenant_user_unread", ["tenantId", "userId", "read"])
+    .index("by_scheduled", ["scheduledFor", "processed"])
+    .index("by_entity", ["entityType", "entityId"]),
+
+  // Client Access Tokens (magic links for client portal)
+  clientAccessTokens: defineTable({
+    tenantId: v.id("tenants"),
+    itineraryId: v.id("itineraries"),
+    clientId: v.optional(v.id("clients")),
+
+    // Token
+    token: v.string(), // Unique secure token (UUID or random string)
+    email: v.string(), // Client email the link was sent to
+
+    // Validity
+    expiresAt: v.number(), // Token expiry timestamp (default 7 days)
+    maxUses: v.optional(v.number()), // Max number of times token can be used (default unlimited)
+    useCount: v.optional(v.number()), // Number of times token has been used
+
+    // Usage tracking
+    usedAt: v.optional(v.number()), // First access timestamp
+    lastUsedAt: v.optional(v.number()), // Last access timestamp
+    ipAddress: v.optional(v.string()), // IP of first access (for audit)
+    userAgent: v.optional(v.string()), // Browser/device of first access
+
+    // Status
+    status: v.string(), // 'active' | 'used' | 'expired' | 'revoked'
+    revokedAt: v.optional(v.number()),
+    revokedBy: v.optional(v.id("users")),
+    revokeReason: v.optional(v.string()),
+
+    // Who created the token
+    createdBy: v.optional(v.id("users")),
+    createdAt: v.number(),
+  })
+    .index("by_token", ["token"])
+    .index("by_itinerary", ["itineraryId"])
+    .index("by_tenant", ["tenantId"])
+    .index("by_tenant_status", ["tenantId", "status"])
+    .index("by_expiry", ["expiresAt", "status"]),
+
+  // Scheduled Reminders (tracks which reminders have been sent)
+  scheduledReminders: defineTable({
+    tenantId: v.id("tenants"),
+
+    // What entity this reminder is for
+    entityType: v.string(), // 'quotation' | 'invoice' | 'itinerary'
+    entityId: v.string(), // ID of the entity
+
+    // Reminder configuration
+    reminderType: v.string(), // 'quotation_followup' | 'invoice_overdue' | 'trip_upcoming' | 'trip_details_incomplete'
+    reminderDay: v.number(), // Which day in the sequence (e.g., 3, 7, 14 for quotation followup)
+
+    // Scheduling
+    scheduledFor: v.number(), // When the reminder should be sent
+    processed: v.boolean(), // Whether the reminder has been processed
+    processedAt: v.optional(v.number()),
+
+    // Result tracking
+    notificationId: v.optional(v.id("notifications")), // Link to created notification
+    skipped: v.optional(v.boolean()), // Whether reminder was skipped (e.g., entity status changed)
+    skipReason: v.optional(v.string()),
+
+    createdAt: v.number(),
+  })
+    .index("by_tenant", ["tenantId"])
+    .index("by_entity", ["entityType", "entityId"])
+    .index("by_scheduled", ["scheduledFor", "processed"])
+    .index("by_tenant_type", ["tenantId", "reminderType"]),
 });

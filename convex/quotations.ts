@@ -1,5 +1,6 @@
 import { v } from "convex/values";
-import { query, mutation } from "./_generated/server";
+import { query, mutation, internalMutation } from "./_generated/server";
+import { internal } from "./_generated/api";
 import { canCreateQuotation, isTenantActive } from "./lib/planLimits";
 
 // List all quotations for a tenant
@@ -81,8 +82,11 @@ export const create = mutation({
     extraMileage: v.number(),
     estimatedDays: v.number(),
     departureDate: v.optional(v.number()),
+    isRoundTrip: v.optional(v.boolean()), // true = round trip, false = one-way
     totalDistance: v.number(),
     totalTime: v.number(),
+    deadheadDistance: v.optional(v.number()), // Repositioning distance
+    mainTripDistance: v.optional(v.number()), // Client trip distance
     // Currency configuration (frozen at creation)
     localCurrency: v.optional(v.string()), // 'HNL', 'GTQ', etc.
     exchangeRateUsed: v.number(),
@@ -177,7 +181,7 @@ export const create = mutation({
   },
 });
 
-// Update quotation status
+// Update quotation status (simple status change, no workflow triggers)
 export const updateStatus = mutation({
   args: {
     id: v.id("quotations"),
@@ -206,6 +210,438 @@ export const updateStatus = mutation({
     return id;
   },
 });
+
+// ============================================================
+// APPROVAL WORKFLOW
+// ============================================================
+
+/**
+ * Approve a quotation with optional automatic itinerary and invoice creation
+ *
+ * This is the main approval endpoint that triggers the sales workflow:
+ * 1. Updates quotation status to 'approved'
+ * 2. Creates notification for staff
+ * 3. Optionally creates itinerary (based on tenant settings)
+ * 4. Optionally creates invoice (based on tenant settings - prepayment model)
+ * 5. Cancels any pending follow-up reminders
+ */
+export const approve = mutation({
+  args: {
+    id: v.id("quotations"),
+    // Optional overrides for automatic creation (overrides tenant settings)
+    createItinerary: v.optional(v.boolean()),
+    createInvoice: v.optional(v.boolean()),
+    // Itinerary details (required if creating itinerary)
+    startDate: v.optional(v.number()),
+    vehicleId: v.optional(v.id("vehicles")),
+    driverId: v.optional(v.id("drivers")),
+    // Invoice details (required if creating invoice)
+    paymentTermsDays: v.optional(v.number()), // Days until due date, defaults to tenant setting
+  },
+  handler: async (ctx, args) => {
+    const { id, createItinerary, createInvoice, startDate, vehicleId, driverId, paymentTermsDays } = args;
+    const now = Date.now();
+
+    // Get the quotation
+    const quotation = await ctx.db.get(id);
+    if (!quotation) throw new Error("Quotation not found");
+    if (quotation.status === "approved") throw new Error("Quotation already approved");
+    if (quotation.status === "expired") throw new Error("Cannot approve expired quotation");
+
+    // Get tenant settings
+    const currentYear = new Date().getFullYear();
+    const parameters = await ctx.db
+      .query("parameters")
+      .withIndex("by_tenant_year", (q) =>
+        q.eq("tenantId", quotation.tenantId).eq("year", currentYear)
+      )
+      .first();
+
+    // Determine whether to create itinerary and invoice
+    const shouldCreateItinerary = createItinerary ?? parameters?.autoCreateItinerary ?? false;
+    const shouldCreateInvoice = createInvoice ?? parameters?.autoCreateInvoice ?? true; // Default to prepayment
+
+    // Update quotation status
+    await ctx.db.patch(id, {
+      status: "approved",
+      approvedAt: now,
+      updatedAt: now,
+    });
+
+    // Get client info for notifications
+    let clientName = "Cliente";
+    if (quotation.clientId) {
+      const client = await ctx.db.get(quotation.clientId);
+      if (client) {
+        clientName =
+          client.type === "company"
+            ? client.companyName || "Empresa"
+            : `${client.firstName || ""} ${client.lastName || ""}`.trim() || "Cliente";
+      }
+    }
+
+    // Create approval notification
+    await ctx.runMutation(internal.notifications.createQuotationApproved, {
+      tenantId: quotation.tenantId,
+      quotationId: id,
+      quotationNumber: quotation.quotationNumber,
+      clientName,
+    });
+
+    // Cancel pending follow-up reminders
+    await ctx.runMutation(internal.reminders.cancelReminders, {
+      entityType: "quotation",
+      entityId: id as string,
+      reason: "Quotation approved",
+    });
+
+    let itineraryId: string | undefined;
+    let invoiceId: string | undefined;
+
+    // Create itinerary if requested
+    if (shouldCreateItinerary) {
+      if (!startDate) {
+        throw new Error("Start date is required when creating itinerary");
+      }
+
+      // Generate itinerary number
+      const itineraryNumber = await generateItineraryNumber(ctx, quotation.tenantId);
+
+      itineraryId = await ctx.db.insert("itineraries", {
+        tenantId: quotation.tenantId,
+        itineraryNumber,
+        quotationId: id,
+        clientId: quotation.clientId,
+        vehicleId: vehicleId || quotation.vehicleId,
+        driverId,
+        createdBy: quotation.createdBy,
+        origin: quotation.origin,
+        destination: quotation.destination,
+        baseLocation: quotation.baseLocation,
+        groupSize: quotation.groupSize,
+        totalDistance: quotation.totalDistance,
+        totalTime: quotation.totalTime,
+        startDate,
+        estimatedDays: quotation.estimatedDays,
+        localCurrency: quotation.localCurrency,
+        agreedPriceLocal: quotation.salePriceLocal,
+        agreedPriceHnl: quotation.salePriceHnl,
+        agreedPriceUsd: quotation.salePriceUsd,
+        exchangeRateUsed: quotation.exchangeRateUsed,
+        status: "scheduled",
+        createdAt: now,
+        updatedAt: now,
+      });
+
+      // Create itinerary notification
+      const startDateStr = new Date(startDate).toLocaleDateString("es-HN", {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      });
+
+      await ctx.runMutation(internal.notifications.createItineraryCreated, {
+        tenantId: quotation.tenantId,
+        itineraryId,
+        itineraryNumber,
+        clientName,
+        startDate: startDateStr,
+      });
+    }
+
+    // Create invoice if requested (prepayment model)
+    if (shouldCreateInvoice) {
+      // Generate invoice number
+      const invoiceNumber = await generateInvoiceNumber(ctx, quotation.tenantId);
+
+      // Calculate due date based on payment terms
+      const termsDays = paymentTermsDays ?? parameters?.prepaymentDays ?? 7;
+      const dueDate = now + termsDays * 24 * 60 * 60 * 1000;
+
+      // Generate service description
+      const vehicle = quotation.vehicleId ? await ctx.db.get(quotation.vehicleId) : null;
+      const serviceDescription = generateServiceDescription(quotation, vehicle);
+
+      // Calculate tax based on tenant settings
+      const taxPercentage = parameters?.isTransportTaxable ? (parameters?.taxPercentage ?? 15) : 0;
+      const subtotalLocal = quotation.salePriceLocal || quotation.salePriceHnl;
+      const subtotalUsd = quotation.salePriceUsd;
+      const taxAmountLocal = subtotalLocal * (taxPercentage / 100);
+      const taxAmountUsd = subtotalUsd * (taxPercentage / 100);
+      const totalLocal = subtotalLocal + taxAmountLocal;
+      const totalUsd = subtotalUsd + taxAmountUsd;
+
+      // Create line items
+      const lineItems = [
+        {
+          description: serviceDescription,
+          quantity: 1,
+          unitPriceLocal: subtotalLocal,
+          unitPriceUsd: subtotalUsd,
+          totalLocal: subtotalLocal,
+          totalUsd: subtotalUsd,
+        },
+      ];
+
+      invoiceId = await ctx.db.insert("invoices", {
+        tenantId: quotation.tenantId,
+        invoiceNumber,
+        quotationId: id,
+        itineraryId,
+        clientId: quotation.clientId,
+        createdBy: quotation.createdBy,
+        invoiceDate: now,
+        dueDate,
+        localCurrency: quotation.localCurrency,
+        exchangeRateUsed: quotation.exchangeRateUsed,
+        lineItems,
+        serviceDescription,
+        description: `${quotation.origin} → ${quotation.destination}`,
+        subtotalLocal,
+        subtotalHnl: quotation.salePriceHnl,
+        subtotalUsd,
+        taxPercentage,
+        taxAmountLocal,
+        taxAmountHnl: quotation.salePriceHnl * (taxPercentage / 100),
+        taxAmountUsd,
+        totalLocal,
+        totalHnl: quotation.salePriceHnl * (1 + taxPercentage / 100),
+        totalUsd,
+        amountPaid: 0,
+        amountDue: totalLocal,
+        paymentStatus: "unpaid",
+        status: "draft",
+        createdAt: now,
+        updatedAt: now,
+      });
+
+      // Link invoice to itinerary if created
+      if (itineraryId) {
+        await ctx.db.patch(itineraryId, { invoiceId });
+      }
+
+      // Create invoice notification
+      await ctx.db.insert("notifications", {
+        tenantId: quotation.tenantId,
+        type: "invoice_created",
+        priority: "low",
+        title: `Factura Creada: ${invoiceNumber}`,
+        message: `Se ha creado la factura ${invoiceNumber} para ${clientName} basada en la cotización aprobada.`,
+        entityType: "invoice",
+        entityId: invoiceId as string,
+        channels: ["in_app"],
+        read: false,
+        actionUrl: `/invoices/${invoiceId}`,
+        createdAt: now,
+      });
+    }
+
+    return {
+      quotationId: id,
+      itineraryId,
+      invoiceId,
+      message: "Quotation approved successfully",
+    };
+  },
+});
+
+/**
+ * Reject a quotation
+ */
+export const reject = mutation({
+  args: {
+    id: v.id("quotations"),
+    reason: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const { id, reason } = args;
+    const now = Date.now();
+
+    const quotation = await ctx.db.get(id);
+    if (!quotation) throw new Error("Quotation not found");
+    if (quotation.status === "approved") throw new Error("Cannot reject approved quotation");
+
+    await ctx.db.patch(id, {
+      status: "rejected",
+      rejectedAt: now,
+      internalNotes: reason
+        ? `${quotation.internalNotes || ""}\n[${new Date().toISOString()}] Rejected: ${reason}`.trim()
+        : quotation.internalNotes,
+      updatedAt: now,
+    });
+
+    // Cancel pending follow-up reminders
+    await ctx.runMutation(internal.reminders.cancelReminders, {
+      entityType: "quotation",
+      entityId: id as string,
+      reason: "Quotation rejected",
+    });
+
+    // Get client name for notification
+    let clientName = "Cliente";
+    if (quotation.clientId) {
+      const client = await ctx.db.get(quotation.clientId);
+      if (client) {
+        clientName =
+          client.type === "company"
+            ? client.companyName || "Empresa"
+            : `${client.firstName || ""} ${client.lastName || ""}`.trim() || "Cliente";
+      }
+    }
+
+    // Create rejection notification
+    await ctx.db.insert("notifications", {
+      tenantId: quotation.tenantId,
+      type: "quotation_rejected",
+      priority: "medium",
+      title: `Cotización Rechazada: ${quotation.quotationNumber}`,
+      message: `${clientName} ha rechazado la cotización ${quotation.quotationNumber}.${reason ? ` Razón: ${reason}` : ""}`,
+      entityType: "quotation",
+      entityId: id as string,
+      channels: ["in_app"],
+      read: false,
+      actionUrl: `/quotations/${id}`,
+      createdAt: now,
+    });
+
+    return { success: true };
+  },
+});
+
+/**
+ * Mark quotation as sent and schedule follow-up reminders
+ */
+export const markSent = mutation({
+  args: {
+    id: v.id("quotations"),
+    validUntil: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const { id, validUntil } = args;
+    const now = Date.now();
+
+    const quotation = await ctx.db.get(id);
+    if (!quotation) throw new Error("Quotation not found");
+    if (quotation.status !== "draft") throw new Error("Only draft quotations can be sent");
+
+    // Get tenant settings for default validity period
+    const currentYear = new Date().getFullYear();
+    const parameters = await ctx.db
+      .query("parameters")
+      .withIndex("by_tenant_year", (q) =>
+        q.eq("tenantId", quotation.tenantId).eq("year", currentYear)
+      )
+      .first();
+
+    // Calculate validUntil if not provided
+    const validityDays = parameters?.quotationValidityDays ?? 30;
+    const calculatedValidUntil = validUntil || now + validityDays * 24 * 60 * 60 * 1000;
+
+    await ctx.db.patch(id, {
+      status: "sent",
+      sentAt: now,
+      validUntil: calculatedValidUntil,
+      updatedAt: now,
+    });
+
+    // Schedule follow-up reminders
+    await ctx.runMutation(internal.reminders.scheduleQuotationReminders, {
+      quotationId: id,
+      tenantId: quotation.tenantId,
+      sentAt: now,
+    });
+
+    return { success: true, validUntil: calculatedValidUntil };
+  },
+});
+
+// ============================================================
+// HELPER FUNCTIONS
+// ============================================================
+
+/**
+ * Generate next itinerary number for a tenant
+ */
+async function generateItineraryNumber(ctx: any, tenantId: string): Promise<string> {
+  const year = new Date().getFullYear();
+  const existing = await ctx.db
+    .query("itineraries")
+    .withIndex("by_tenant", (q: any) => q.eq("tenantId", tenantId))
+    .collect();
+
+  const thisYearItineraries = existing.filter((i: any) =>
+    i.itineraryNumber.startsWith(`IT-${year}`)
+  );
+
+  const nextNum = thisYearItineraries.length + 1;
+  return `IT-${year}-${String(nextNum).padStart(4, "0")}`;
+}
+
+/**
+ * Generate next invoice number for a tenant
+ */
+async function generateInvoiceNumber(ctx: any, tenantId: string): Promise<string> {
+  const year = new Date().getFullYear();
+  const existing = await ctx.db
+    .query("invoices")
+    .withIndex("by_tenant", (q: any) => q.eq("tenantId", tenantId))
+    .collect();
+
+  const thisYearInvoices = existing.filter((i: any) =>
+    i.invoiceNumber.startsWith(`INV-${year}`)
+  );
+
+  const nextNum = thisYearInvoices.length + 1;
+  return `INV-${year}-${String(nextNum).padStart(4, "0")}`;
+}
+
+/**
+ * Generate natural language service description for invoice
+ */
+function generateServiceDescription(
+  quotation: any,
+  vehicle: any | null
+): string {
+  const parts: string[] = [];
+
+  // Main service line
+  parts.push(`Servicio de transporte ${quotation.origin} - ${quotation.destination}`);
+
+  // Date if available
+  if (quotation.departureDate) {
+    const date = new Date(quotation.departureDate);
+    const dateStr = date.toLocaleDateString("es-HN", {
+      weekday: "long",
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+    parts.push(`Fecha: ${dateStr}`);
+  }
+
+  // Vehicle info
+  if (vehicle) {
+    const vehicleInfo = vehicle.name || `${vehicle.make || ""} ${vehicle.model || ""}`.trim();
+    parts.push(`Vehículo: ${vehicleInfo} (${vehicle.passengerCapacity} pasajeros)`);
+  }
+
+  // Distance and duration
+  const distanceKm = Math.round(quotation.totalDistance);
+  parts.push(`Distancia: ${distanceKm} km, Duración estimada: ${quotation.estimatedDays} día${quotation.estimatedDays > 1 ? "s" : ""}`);
+
+  // Included services
+  const included: string[] = [];
+  if (quotation.includeFuel) included.push("combustible");
+  if (quotation.includeTolls) included.push("peajes");
+  if (quotation.includeMeals) included.push("viáticos del conductor");
+  if (quotation.includeDriverIncentive) included.push("incentivo del conductor");
+
+  if (included.length > 0) {
+    parts.push(`Incluye: ${included.join(", ")}`);
+  }
+
+  return parts.join(". ");
+}
 
 // Update quotation details
 export const update = mutation({

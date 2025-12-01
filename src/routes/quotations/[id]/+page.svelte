@@ -115,6 +115,13 @@
 	let convertVehicleId = $state('');
 	let isConverting = $state(false);
 
+	// Approval modal state
+	let showApprovalModal = $state(false);
+	let approvalStartDate = $state('');
+	let approvalCreateItinerary = $state(true);
+	let approvalCreateInvoice = $state(true);
+	let isApproving = $state(false);
+
 	// PDF and Email state
 	let isGeneratingPdf = $state(false);
 	let isSendingEmail = $state(false);
@@ -212,6 +219,70 @@
 		showConvertModal = true;
 	}
 
+	function openApprovalModal() {
+		// Set default start date to tomorrow
+		const tomorrow = new Date();
+		tomorrow.setDate(tomorrow.getDate() + 1);
+		approvalStartDate = tomorrow.toISOString().split('T')[0];
+		approvalCreateItinerary = true;
+		approvalCreateInvoice = true;
+		showApprovalModal = true;
+	}
+
+	async function approveQuotation() {
+		if (!quotation) return;
+
+		isApproving = true;
+		try {
+			const startDateTimestamp = approvalStartDate ? new Date(approvalStartDate).getTime() : undefined;
+
+			const result = await client.mutation(api.quotations.approve, {
+				id: quotation._id,
+				createItinerary: approvalCreateItinerary,
+				createInvoice: approvalCreateInvoice,
+				startDate: startDateTimestamp
+			});
+
+			showApprovalModal = false;
+
+			let message = $t('quotations.approveSuccess');
+			if (result.itineraryId) {
+				message += ` ${$t('itineraries.created')}`;
+			}
+			if (result.invoiceId) {
+				message += ` ${$t('invoices.created')}`;
+			}
+
+			showToastMessage(message, 'success');
+
+			// If itinerary was created, navigate to it
+			if (result.itineraryId) {
+				setTimeout(() => goto(`/itineraries/${result.itineraryId}`), 1000);
+			}
+		} catch (error) {
+			console.error('Failed to approve quotation:', error);
+			showToastMessage(error instanceof Error ? error.message : $t('quotations.saveFailed'), 'error');
+		} finally {
+			isApproving = false;
+		}
+	}
+
+	async function rejectQuotation() {
+		if (!quotation) return;
+		if (!confirm($t('quotations.rejectConfirm'))) return;
+
+		try {
+			await client.mutation(api.quotations.reject, {
+				id: quotation._id,
+				reason: 'Rejected by staff'
+			});
+			showToastMessage($t('quotations.rejectSuccess'), 'success');
+		} catch (error) {
+			console.error('Failed to reject quotation:', error);
+			showToastMessage($t('quotations.saveFailed'), 'error');
+		}
+	}
+
 	async function convertToItinerary() {
 		if (!quotation || !convertStartDate) return;
 
@@ -245,8 +316,8 @@
 
 		return {
 			quotationNumber: quotation.quotationNumber,
-			date: formatDate(quotation.createdAt),
-			validUntil: quotation.validUntil ? formatDate(quotation.validUntil) : '',
+			date: quotation.createdAt.toString(), // Pass timestamp as string
+			validUntil: quotation.validUntil ? quotation.validUntil.toString() : '',
 			client: {
 				name: getClientName(clientData),
 				email: clientData?.email || undefined,
@@ -257,7 +328,7 @@
 			trip: {
 				origin: quotation.origin,
 				destination: quotation.destination,
-				departureDate: quotation.departureDate ? formatDate(quotation.departureDate) : undefined,
+				departureDate: quotation.departureDate ? quotation.departureDate.toString() : undefined,
 				returnDate: undefined,
 				groupSize: quotation.groupSize,
 				estimatedDays: quotation.estimatedDays,
@@ -452,11 +523,11 @@
 					</Button>
 				{/if}
 				{#if quotation.status === 'sent'}
-					<Button size="sm" color="green" onclick={() => updateStatus('approved')}>
+					<Button size="sm" color="green" onclick={openApprovalModal}>
 						<CheckCircleOutline class="w-4 h-4 mr-2" />
 						{$t('common.accepted')}
 					</Button>
-					<Button size="sm" color="red" onclick={() => updateStatus('rejected')}>
+					<Button size="sm" color="red" onclick={rejectQuotation}>
 						<CloseCircleOutline class="w-4 h-4 mr-2" />
 						{$t('common.rejected')}
 					</Button>
@@ -831,6 +902,80 @@
 					<EnvelopeOutline class="w-4 h-4 mr-2" />
 				{/if}
 				{$t('common.send')}
+			</Button>
+		</div>
+	{/snippet}
+</Modal>
+
+<!-- Approval Modal -->
+<Modal bind:open={showApprovalModal} title={$t('quotations.approveTitle')} size="md">
+	<div class="space-y-4">
+		<p class="text-gray-600 dark:text-gray-400">
+			{$t('quotations.approveDescription')}
+		</p>
+
+		<div>
+			<Label for="approval-start-date" class="mb-2">{$t('itineraries.details.startDate')}</Label>
+			<Input
+				id="approval-start-date"
+				type="date"
+				bind:value={approvalStartDate}
+			/>
+			<p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+				{$t('quotations.startDateHint')}
+			</p>
+		</div>
+
+		<div class="space-y-3 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+			<h4 class="font-medium text-gray-900 dark:text-white">{$t('quotations.approvalOptions')}</h4>
+
+			<label class="flex items-center gap-3 cursor-pointer">
+				<input
+					type="checkbox"
+					bind:checked={approvalCreateItinerary}
+					class="w-4 h-4 text-primary-600 bg-gray-100 border-gray-300 rounded focus:ring-primary-500 dark:bg-gray-700 dark:border-gray-600"
+				/>
+				<div>
+					<span class="text-gray-900 dark:text-white">{$t('quotations.createItinerary')}</span>
+					<p class="text-xs text-gray-500 dark:text-gray-400">{$t('quotations.createItineraryHint')}</p>
+				</div>
+			</label>
+
+			<label class="flex items-center gap-3 cursor-pointer">
+				<input
+					type="checkbox"
+					bind:checked={approvalCreateInvoice}
+					class="w-4 h-4 text-primary-600 bg-gray-100 border-gray-300 rounded focus:ring-primary-500 dark:bg-gray-700 dark:border-gray-600"
+				/>
+				<div>
+					<span class="text-gray-900 dark:text-white">{$t('quotations.createInvoice')}</span>
+					<p class="text-xs text-gray-500 dark:text-gray-400">{$t('quotations.createInvoiceHint')}</p>
+				</div>
+			</label>
+		</div>
+
+		{#if approvalCreateItinerary && !approvalStartDate}
+			<Alert color="yellow">
+				{$t('quotations.startDateRequired')}
+			</Alert>
+		{/if}
+	</div>
+	{#snippet footer()}
+		<div class="flex justify-end gap-2">
+			<Button color="alternative" onclick={() => (showApprovalModal = false)} disabled={isApproving}>
+				{$t('common.cancel')}
+			</Button>
+			<Button
+				color="green"
+				onclick={approveQuotation}
+				disabled={isApproving || (approvalCreateItinerary && !approvalStartDate)}
+			>
+				{#if isApproving}
+					<Spinner size="4" class="mr-2" />
+				{:else}
+					<CheckCircleOutline class="w-4 h-4 mr-2" />
+				{/if}
+				{$t('quotations.approve')}
 			</Button>
 		</div>
 	{/snippet}

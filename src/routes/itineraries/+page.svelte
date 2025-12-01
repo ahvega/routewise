@@ -273,19 +273,19 @@
 						<Button size="xs" color="light" id="actions-{itinerary._id}">
 							<DotsHorizontalOutline class="w-4 h-4" />
 						</Button>
-						<Dropdown triggeredBy="#actions-{itinerary._id}">
-							<DropdownItem href="/itineraries/{itinerary._id}">
+						<Dropdown triggeredBy="#actions-{itinerary._id}" class="w-48">
+							<DropdownItem href="/itineraries/{itinerary._id}" class="text-gray-700 dark:text-gray-200">
 								<EyeOutline class="w-4 h-4 mr-2 inline" />
 								{$t('itineraries.viewItinerary')}
 							</DropdownItem>
 							{#if itinerary.status === 'scheduled'}
-								<DropdownItem onclick={() => updateStatus(itinerary._id, 'in_progress')}>
+								<DropdownItem onclick={() => updateStatus(itinerary._id, 'in_progress')} class="text-gray-700 dark:text-gray-200">
 									<CheckCircleOutline class="w-4 h-4 mr-2 inline" />
 									{$t('itineraries.startTrip')}
 								</DropdownItem>
 							{/if}
 							{#if itinerary.status === 'in_progress'}
-								<DropdownItem onclick={() => updateStatus(itinerary._id, 'completed')}>
+								<DropdownItem onclick={() => updateStatus(itinerary._id, 'completed')} class="text-gray-700 dark:text-gray-200">
 									<CheckCircleOutline class="w-4 h-4 mr-2 inline" />
 									{$t('itineraries.completeTrip')}
 								</DropdownItem>

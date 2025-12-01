@@ -221,8 +221,8 @@
 
 		return {
 			invoiceNumber: invoice.invoiceNumber,
-			date: formatDate(invoice.invoiceDate),
-			dueDate: formatDate(invoice.dueDate),
+			date: invoice.invoiceDate.toString(), // Pass timestamp as string
+			dueDate: invoice.dueDate.toString(), // Pass timestamp as string
 			client: {
 				name: getClientName(),
 				rtn: clientData?.taxId || undefined,
@@ -650,7 +650,7 @@
 
 <!-- Record Payment Modal -->
 <Modal bind:open={showPaymentModal} size="md" title={$t('invoices.recordPayment')}>
-	<div class="space-y-4">
+	<div class="grid grid-cols-2 gap-4">
 		<div>
 			<Label for="paymentAmount">{$t('invoices.paymentAmount')}</Label>
 			<Input
@@ -676,9 +676,9 @@
 			<Label for="paymentReference">{$t('invoices.reference')}</Label>
 			<Input id="paymentReference" bind:value={paymentReference} placeholder={$t('invoices.referencePlaceholder')} />
 		</div>
-		<div>
+		<div class="col-span-2">
 			<Label for="paymentNotes">{$t('common.notes')}</Label>
-			<Textarea id="paymentNotes" bind:value={paymentNotes} rows={2} />
+			<Textarea id="paymentNotes" bind:value={paymentNotes} rows={2} class="w-full" />
 		</div>
 	</div>
 	{#snippet footer()}

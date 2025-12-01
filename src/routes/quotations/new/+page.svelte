@@ -114,6 +114,9 @@
 
 	const unavailableVehicleIds = $derived(unavailableVehiclesQuery.data || []);
 
+	// Trip type
+	let isRoundTrip = $state(true);
+
 	// Cost options
 	let includeFuel = $state(true);
 	let includeMeals = $state(true);
@@ -223,11 +226,11 @@
 			const baseLocation = vehicleBaseLocation || origin;
 
 			if (baseLocation === origin || !vehicleBaseLocation) {
-				// Simple route: origin to destination round trip
-				routeResult = await routeCalculationService.calculateSimpleRoute(origin, destination);
+				// Simple route: base = origin
+				routeResult = await routeCalculationService.calculateSimpleRoute(origin, destination, isRoundTrip);
 			} else {
 				// Full route with deadhead: base -> origin -> destination -> base
-				routeResult = await routeCalculationService.calculateRoute(origin, destination, baseLocation);
+				routeResult = await routeCalculationService.calculateRoute(origin, destination, baseLocation, isRoundTrip);
 			}
 		} catch (error) {
 			console.error('Route calculation error:', error);
@@ -445,9 +448,13 @@
 				groupSize,
 				extraMileage: extraKm,
 				estimatedDays,
+				isRoundTrip, // Round trip or one-way
 				departureDate: departureDate ? new Date(departureDate).getTime() : undefined,
 				totalDistance: routeResult.totalDistance + extraKm,
 				totalTime: routeResult.totalTime,
+				// Store route breakdown for proper cost attribution
+				deadheadDistance: routeResult.deadheadDistance,
+				mainTripDistance: routeResult.mainTripDistance,
 				fuelCost: costs.fuel,
 				refuelingCost: 0,
 				driverMealsCost: costs.meals,
@@ -534,6 +541,16 @@
 								class="h-11"
 							/>
 						</div>
+					</div>
+
+					<!-- Trip Type Toggle -->
+					<div class="flex items-center gap-4 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+						<Toggle bind:checked={isRoundTrip} class="!mb-0">
+							<span class="font-medium">{isRoundTrip ? $t('quotations.new.roundTrip') : $t('quotations.new.oneWay')}</span>
+						</Toggle>
+						<span class="text-sm text-gray-500 dark:text-gray-400">
+							{isRoundTrip ? $t('quotations.new.roundTripDesc') : $t('quotations.new.oneWayDesc')}
+						</span>
 					</div>
 
 					<div class="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -834,14 +851,25 @@
 							{#if routeResult.deadheadDistance > 0}
 								<div class="p-2 bg-blue-50 dark:bg-blue-900/20 rounded border border-blue-200 dark:border-blue-800">
 									<p class="text-xs text-blue-600 dark:text-blue-400 font-medium mb-1">{$t('quotations.new.repositioning')}</p>
-									<div class="flex justify-between text-blue-700 dark:text-blue-300">
-										<span>Base → {$t('quotations.new.origin')}</span>
-										<span>{formatDistance(routeResult.baseToOrigin)}</span>
-									</div>
-									<div class="flex justify-between text-blue-700 dark:text-blue-300">
-										<span>{$t('quotations.new.destination')} → Base</span>
-										<span>{formatDistance(routeResult.destinationToBase)}</span>
-									</div>
+									{#if routeResult.baseToOrigin > 0}
+										<div class="flex justify-between text-blue-700 dark:text-blue-300">
+											<span>Base → {$t('quotations.new.origin')}</span>
+											<span>{formatDistance(routeResult.baseToOrigin)}</span>
+										</div>
+									{/if}
+									{#if isRoundTrip && routeResult.originToBase > 0}
+										<!-- Round trip: vehicle returns to base from origin after dropping passengers back -->
+										<div class="flex justify-between text-blue-700 dark:text-blue-300">
+											<span>{$t('quotations.new.origin')} → Base</span>
+											<span>{formatDistance(routeResult.originToBase)}</span>
+										</div>
+									{:else if !isRoundTrip && routeResult.destinationToBase > 0}
+										<!-- One-way: vehicle returns to base from destination -->
+										<div class="flex justify-between text-blue-700 dark:text-blue-300">
+											<span>{$t('quotations.new.destination')} → Base</span>
+											<span>{formatDistance(routeResult.destinationToBase)}</span>
+										</div>
+									{/if}
 									<div class="flex justify-between font-medium text-blue-800 dark:text-blue-200 pt-1 border-t border-blue-200 dark:border-blue-700 mt-1">
 										<span>{$t('quotations.new.subtotal')}</span>
 										<span>{formatDistance(routeResult.deadheadDistance)}</span>
@@ -850,15 +878,19 @@
 							{/if}
 
 							<div class="p-2 bg-emerald-50 dark:bg-emerald-900/20 rounded border border-emerald-200 dark:border-emerald-800">
-								<p class="text-xs text-emerald-600 dark:text-emerald-400 font-medium mb-1">{$t('quotations.new.mainTrip')}</p>
+								<p class="text-xs text-emerald-600 dark:text-emerald-400 font-medium mb-1">
+									{isRoundTrip ? $t('quotations.new.roundTrip') : $t('quotations.new.oneWay')}
+								</p>
 								<div class="flex justify-between text-emerald-700 dark:text-emerald-300">
 									<span>{$t('quotations.new.origin')} → {$t('quotations.new.destination')}</span>
 									<span>{formatDistance(routeResult.originToDestination)}</span>
 								</div>
-								<div class="flex justify-between text-emerald-700 dark:text-emerald-300">
-									<span>{$t('quotations.new.destination')} → {$t('quotations.new.origin')}</span>
-									<span>{formatDistance(routeResult.originToDestination)}</span>
-								</div>
+								{#if isRoundTrip}
+									<div class="flex justify-between text-emerald-700 dark:text-emerald-300">
+										<span>{$t('quotations.new.destination')} → {$t('quotations.new.origin')}</span>
+										<span>{formatDistance(routeResult.destinationToOrigin)}</span>
+									</div>
+								{/if}
 								<div class="flex justify-between font-medium text-emerald-800 dark:text-emerald-200 pt-1 border-t border-emerald-200 dark:border-emerald-700 mt-1">
 									<span>{$t('quotations.new.subtotal')}</span>
 									<span>{formatDistance(routeResult.mainTripDistance)}</span>

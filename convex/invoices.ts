@@ -1,6 +1,6 @@
 import { v } from "convex/values";
-import { query, mutation } from "./_generated/server";
-import type { Id } from "./_generated/dataModel";
+import { query, mutation, internalMutation } from "./_generated/server";
+import { internal } from "./_generated/api";
 
 // Generate invoice number
 function generateInvoiceNumber(): string {
@@ -69,13 +69,36 @@ export const getByItinerary = query({
   },
 });
 
+// Get invoice by quotation ID
+export const getByQuotation = query({
+  args: { quotationId: v.id("quotations") },
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query("invoices")
+      .withIndex("by_quotation", (q) => q.eq("quotationId", args.quotationId))
+      .first();
+  },
+});
+
 // Create a new invoice (usually from a completed itinerary)
 export const create = mutation({
   args: {
     tenantId: v.id("tenants"),
+    quotationId: v.optional(v.id("quotations")),
     itineraryId: v.optional(v.id("itineraries")),
     clientId: v.optional(v.id("clients")),
     description: v.string(),
+    // Line items (structured breakdown)
+    lineItems: v.optional(v.array(v.object({
+      description: v.string(),
+      quantity: v.number(),
+      unitPriceLocal: v.number(),
+      unitPriceUsd: v.optional(v.number()),
+      totalLocal: v.number(),
+      totalUsd: v.optional(v.number()),
+    }))),
+    // Natural language service description
+    serviceDescription: v.optional(v.string()),
     // Currency configuration (frozen at creation)
     localCurrency: v.optional(v.string()), // 'HNL', 'GTQ', etc.
     exchangeRateUsed: v.number(),
@@ -85,6 +108,7 @@ export const create = mutation({
     taxPercentage: v.number(),
     dueDate: v.number(),
     notes: v.optional(v.string()),
+    internalNotes: v.optional(v.string()),
     additionalCharges: v.optional(v.array(v.object({
       description: v.string(),
       amount: v.number(),
@@ -117,6 +141,7 @@ export const create = mutation({
     const invoiceId = await ctx.db.insert("invoices", {
       tenantId: args.tenantId,
       invoiceNumber: generateInvoiceNumber(),
+      quotationId: args.quotationId,
       itineraryId: args.itineraryId,
       clientId: args.clientId,
       invoiceDate: now,
@@ -124,6 +149,9 @@ export const create = mutation({
       // Currency configuration
       localCurrency: args.localCurrency,
       exchangeRateUsed: args.exchangeRateUsed,
+      // Line items
+      lineItems: args.lineItems,
+      serviceDescription: args.serviceDescription,
       description: args.description,
       // Subtotal in both currencies (frozen)
       subtotalLocal,
@@ -146,6 +174,7 @@ export const create = mutation({
       discounts: args.discounts,
       status: "draft",
       notes: args.notes,
+      internalNotes: args.internalNotes,
       createdAt: now,
       updatedAt: now,
     });
@@ -153,6 +182,15 @@ export const create = mutation({
     return invoiceId;
   },
 });
+
+// Helper to format date in Spanish
+function formatDateSpanish(timestamp: number): string {
+  const date = new Date(timestamp);
+  const day = date.getDate().toString().padStart(2, '0');
+  const month = (date.getMonth() + 1).toString().padStart(2, '0');
+  const year = date.getFullYear();
+  return `${day}/${month}/${year}`;
+}
 
 // Create invoice from itinerary
 export const createFromItinerary = mutation({
@@ -191,8 +229,53 @@ export const createFromItinerary = mutation({
     const taxAmountUsd = subtotalUsd * (taxPercentage / 100);
     const totalUsd = subtotalUsd + taxAmountUsd;
 
-    // Create description from itinerary
-    const description = `Servicio de transporte: ${itinerary.origin} → ${itinerary.destination}`;
+    // Get vehicle name if available
+    let vehicleName = "";
+    if (itinerary.vehicleId) {
+      const vehicle = await ctx.db.get(itinerary.vehicleId);
+      if (vehicle) {
+        vehicleName = vehicle.name;
+      }
+    }
+
+    // Get distance unit from tenant parameters
+    let distanceUnit = "Km";
+    const parameters = await ctx.db
+      .query("parameters")
+      .withIndex("by_tenant", (q) => q.eq("tenantId", itinerary.tenantId))
+      .filter((q) => q.eq(q.field("isActive"), true))
+      .first();
+    if (parameters?.preferredDistanceUnit) {
+      distanceUnit = parameters.preferredDistanceUnit === "miles" ? "Mi" : "Km";
+    }
+
+    // Build detailed description
+    const tripType = itinerary.isRoundTrip !== false ? "ida y vuelta" : "solo ida";
+    const startDateStr = formatDateSpanish(itinerary.startDate);
+    const endDateStr = itinerary.endDate ? formatDateSpanish(itinerary.endDate) : startDateStr;
+    const dateRange = itinerary.endDate && itinerary.endDate !== itinerary.startDate
+      ? `${startDateStr} - ${endDateStr}`
+      : startDateStr;
+
+    // Format distance with thousands separator
+    const formattedDistance = Math.round(itinerary.totalDistance).toLocaleString('es-HN');
+
+    // Build description parts
+    const descriptionParts = [
+      `Servicios de Transporte desde ${itinerary.origin} hacia ${itinerary.destination}`,
+      tripType,
+      `para grupo de ${itinerary.groupSize} personas`,
+    ];
+
+    if (vehicleName) {
+      descriptionParts.push(`en vehículo: ${vehicleName}`);
+    }
+
+    descriptionParts.push(`${itinerary.estimatedDays} Día${itinerary.estimatedDays > 1 ? 's' : ''}: ${dateRange}`);
+    descriptionParts.push(`total ${formattedDistance} ${distanceUnit}`);
+
+    // Create description from itinerary with full trip details
+    const description = descriptionParts.join(', ');
 
     const invoiceId = await ctx.db.insert("invoices", {
       tenantId: itinerary.tenantId,
@@ -325,6 +408,7 @@ export const recordPayment = mutation({
     referenceNumber: v.optional(v.string()),
     paymentDate: v.optional(v.number()),
     notes: v.optional(v.string()),
+    recordedBy: v.optional(v.id("users")),
   },
   handler: async (ctx, args) => {
     const invoice = await ctx.db.get(args.invoiceId);
@@ -342,6 +426,7 @@ export const recordPayment = mutation({
       paymentMethod: args.paymentMethod,
       referenceNumber: args.referenceNumber,
       notes: args.notes,
+      recordedBy: args.recordedBy,
       createdAt: now,
     });
 
@@ -375,6 +460,45 @@ export const recordPayment = mutation({
     }
 
     await ctx.db.patch(args.invoiceId, updates);
+
+    // Cancel any pending overdue reminders if fully paid
+    if (paymentStatus === "paid") {
+      await ctx.runMutation(internal.reminders.cancelReminders, {
+        entityType: "invoice",
+        entityId: args.invoiceId as string,
+        reason: "Invoice paid in full",
+      });
+    }
+
+    // Get client name for notification
+    let clientName = "Cliente";
+    if (invoice.clientId) {
+      const client = await ctx.db.get(invoice.clientId);
+      if (client) {
+        clientName =
+          client.type === "company"
+            ? client.companyName || "Empresa"
+            : `${client.firstName || ""} ${client.lastName || ""}`.trim() || "Cliente";
+      }
+    }
+
+    // Create payment notification
+    await ctx.runMutation(internal.notifications.createPaymentReceived, {
+      tenantId: invoice.tenantId,
+      invoiceId: args.invoiceId,
+      invoiceNumber: invoice.invoiceNumber,
+      clientName,
+      amount: args.amount,
+      currency: invoice.localCurrency || "HNL",
+      isFullPayment: paymentStatus === "paid",
+    });
+
+    return {
+      success: true,
+      newAmountPaid,
+      newAmountDue: Math.max(0, newAmountDue),
+      paymentStatus,
+    };
   },
 });
 

@@ -21,10 +21,14 @@ export interface RouteResult {
 	// Individual leg distances for breakdown
 	baseToOrigin: number;
 	originToDestination: number;
+	destinationToOrigin: number; // Return leg (only for round trip)
 	destinationToBase: number;
+	originToBase: number; // For one-way trips when origin != base
 	// Deadhead (repositioning) totals
 	deadheadDistance: number;
 	mainTripDistance: number;
+	// Trip type
+	isRoundTrip: boolean;
 }
 
 // Distance Matrix API response types
@@ -69,31 +73,40 @@ export class RouteCalculationService {
 	}
 
 	/**
-	 * Calculate a complete round-trip route:
-	 * BASE -> ORIGIN -> DESTINATION -> BASE
+	 * Calculate a complete route with proper deadhead handling:
+	 *
+	 * ROUND TRIP: BASE -> ORIGIN -> DESTINATION -> ORIGIN -> BASE
+	 *   - Deadhead: base->origin + origin->base (vehicle returns to base after dropping at origin)
+	 *   - Main trip: origin->destination->origin (round trip for passengers)
+	 *
+	 * ONE-WAY TRIP: BASE -> ORIGIN -> DESTINATION -> BASE
+	 *   - Deadhead: base->origin + destination->base (vehicle repositioning)
+	 *   - Main trip: origin->destination (one-way for passengers)
 	 *
 	 * @param origin - Trip pickup location
 	 * @param destination - Trip dropoff location
 	 * @param baseLocation - Vehicle's home base location
+	 * @param isRoundTrip - Whether this is a round trip (default: true)
 	 * @returns Complete route information with all segments
 	 */
 	async calculateRoute(
 		origin: string,
 		destination: string,
-		baseLocation: string
+		baseLocation: string,
+		isRoundTrip: boolean = true
 	): Promise<RouteResult> {
 		if (!this.isReady()) {
 			throw new Error('RouteCalculationService not initialized. Call initialize() first.');
 		}
 
 		// Calculate all required distances using Distance Matrix API
-		// We need: base->origin, origin->destination, destination->base
+		// We need all combinations for flexible calculations
 		const matrixResult = await this.getDistanceMatrix(
 			[baseLocation, origin, destination],
 			[baseLocation, origin, destination]
 		);
 
-		// Extract the specific distances we need from the 3x3 matrix:
+		// Extract distances from the 3x3 matrix:
 		// Row 0 = from baseLocation: [base->base, base->origin, base->destination]
 		// Row 1 = from origin: [origin->base, origin->origin, origin->destination]
 		// Row 2 = from destination: [dest->base, dest->origin, dest->destination]
@@ -104,36 +117,90 @@ export class RouteCalculationService {
 		const originToDestination = matrixResult.distances[1][2]; // origin -> destination
 		const originToDestinationTime = matrixResult.durations[1][2];
 
+		const destinationToOrigin = matrixResult.distances[2][1]; // destination -> origin
+		const destinationToOriginTime = matrixResult.durations[2][1];
+
 		const destinationToBase = matrixResult.distances[2][0]; // destination -> base
 		const destinationToBaseTime = matrixResult.durations[2][0];
 
-		// Build route segments
-		const segments: RouteSegment[] = [
-			{
-				origin: baseLocation,
-				destination: origin,
-				distance: baseToOrigin,
-				duration: baseToOriginTime
-			},
-			{
-				origin: origin,
-				destination: destination,
-				distance: originToDestination,
-				duration: originToDestinationTime
-			},
-			{
-				origin: destination,
-				destination: baseLocation,
-				distance: destinationToBase,
-				duration: destinationToBaseTime
-			}
-		];
+		const originToBase = matrixResult.distances[1][0]; // origin -> base
+		const originToBaseTime = matrixResult.durations[1][0];
 
-		// Calculate totals
-		const deadheadDistance = baseToOrigin + destinationToBase;
-		const mainTripDistance = originToDestination;
-		const totalDistance = deadheadDistance + mainTripDistance;
-		const totalTime = baseToOriginTime + originToDestinationTime + destinationToBaseTime;
+		let segments: RouteSegment[];
+		let deadheadDistance: number;
+		let mainTripDistance: number;
+		let totalDistance: number;
+		let totalTime: number;
+
+		if (isRoundTrip) {
+			// ROUND TRIP: Base -> Origin -> Destination -> Origin -> Base
+			// The vehicle picks up passengers at origin, takes them to destination and back,
+			// then returns to base
+			segments = [
+				{
+					origin: baseLocation,
+					destination: origin,
+					distance: baseToOrigin,
+					duration: baseToOriginTime
+				},
+				{
+					origin: origin,
+					destination: destination,
+					distance: originToDestination,
+					duration: originToDestinationTime
+				},
+				{
+					origin: destination,
+					destination: origin,
+					distance: destinationToOrigin,
+					duration: destinationToOriginTime
+				},
+				{
+					origin: origin,
+					destination: baseLocation,
+					distance: originToBase,
+					duration: originToBaseTime
+				}
+			];
+
+			// For round trip: deadhead is base->origin + origin->base
+			deadheadDistance = baseToOrigin + originToBase;
+			// Main trip is origin->destination->origin (round trip for passengers)
+			mainTripDistance = originToDestination + destinationToOrigin;
+			totalDistance = deadheadDistance + mainTripDistance;
+			totalTime = baseToOriginTime + originToDestinationTime + destinationToOriginTime + originToBaseTime;
+		} else {
+			// ONE-WAY TRIP: Base -> Origin -> Destination -> Base
+			// The vehicle picks up passengers at origin, drops them at destination,
+			// then returns empty to base
+			segments = [
+				{
+					origin: baseLocation,
+					destination: origin,
+					distance: baseToOrigin,
+					duration: baseToOriginTime
+				},
+				{
+					origin: origin,
+					destination: destination,
+					distance: originToDestination,
+					duration: originToDestinationTime
+				},
+				{
+					origin: destination,
+					destination: baseLocation,
+					distance: destinationToBase,
+					duration: destinationToBaseTime
+				}
+			];
+
+			// For one-way: deadhead is base->origin + destination->base
+			deadheadDistance = baseToOrigin + destinationToBase;
+			// Main trip is just origin->destination (one-way for passengers)
+			mainTripDistance = originToDestination;
+			totalDistance = deadheadDistance + mainTripDistance;
+			totalTime = baseToOriginTime + originToDestinationTime + destinationToBaseTime;
+		}
 
 		return {
 			segments,
@@ -141,19 +208,27 @@ export class RouteCalculationService {
 			totalTime,
 			baseToOrigin,
 			originToDestination,
+			destinationToOrigin,
 			destinationToBase,
+			originToBase,
 			deadheadDistance,
-			mainTripDistance
+			mainTripDistance,
+			isRoundTrip
 		};
 	}
 
 	/**
-	 * Calculate a simple point-to-point route (no base location)
+	 * Calculate a simple point-to-point route (no base location / base = origin)
 	 * Used when vehicle base location is same as origin
+	 *
+	 * @param origin - Trip pickup location (also serves as base)
+	 * @param destination - Trip dropoff location
+	 * @param isRoundTrip - Whether this is a round trip (default: true)
 	 */
 	async calculateSimpleRoute(
 		origin: string,
-		destination: string
+		destination: string,
+		isRoundTrip: boolean = true
 	): Promise<RouteResult> {
 		if (!this.isReady()) {
 			throw new Error('RouteCalculationService not initialized');
@@ -164,34 +239,65 @@ export class RouteCalculationService {
 		const distance = matrixResult.distances[0][0];
 		const duration = matrixResult.durations[0][0];
 
-		// For round trip, double the distance and time
-		const roundTripDistance = distance * 2;
-		const roundTripTime = duration * 2;
+		let segments: RouteSegment[];
+		let totalDistance: number;
+		let totalTime: number;
+		let mainTripDistance: number;
 
-		const segments: RouteSegment[] = [
-			{
-				origin,
-				destination,
-				distance,
-				duration
-			},
-			{
-				origin: destination,
-				destination: origin,
-				distance,
-				duration
-			}
-		];
+		if (isRoundTrip) {
+			// Round trip: origin -> destination -> origin
+			segments = [
+				{
+					origin,
+					destination,
+					distance,
+					duration
+				},
+				{
+					origin: destination,
+					destination: origin,
+					distance,
+					duration
+				}
+			];
+			totalDistance = distance * 2;
+			totalTime = duration * 2;
+			mainTripDistance = distance * 2;
+		} else {
+			// One-way: origin -> destination -> origin (vehicle must return)
+			// Even for one-way passenger trip, vehicle returns to base (origin)
+			segments = [
+				{
+					origin,
+					destination,
+					distance,
+					duration
+				},
+				{
+					origin: destination,
+					destination: origin,
+					distance,
+					duration
+				}
+			];
+			// For one-way when base = origin: main trip is one-way, but vehicle returns (deadhead)
+			totalDistance = distance * 2; // Vehicle still travels both ways
+			totalTime = duration * 2;
+			mainTripDistance = distance; // Only the passenger portion
+		}
 
 		return {
 			segments,
-			totalDistance: roundTripDistance,
-			totalTime: roundTripTime,
+			totalDistance,
+			totalTime,
 			baseToOrigin: 0,
 			originToDestination: distance,
-			destinationToBase: 0,
-			deadheadDistance: 0,
-			mainTripDistance: roundTripDistance
+			destinationToOrigin: distance,
+			destinationToBase: isRoundTrip ? 0 : distance, // Vehicle returns to base (origin)
+			originToBase: 0,
+			deadheadDistance: isRoundTrip ? 0 : distance, // Return trip is deadhead for one-way
+			mainTripDistance,
+			isRoundTrip
 		};
 	}
 

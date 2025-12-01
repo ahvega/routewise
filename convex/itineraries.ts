@@ -1,5 +1,6 @@
 import { v } from "convex/values";
-import { query, mutation } from "./_generated/server";
+import { query, mutation, internalMutation } from "./_generated/server";
+import { internal } from "./_generated/api";
 
 // List all itineraries for a tenant
 export const list = query({
@@ -420,5 +421,515 @@ export const getUnavailableVehicles = query({
     }
 
     return unavailableVehicleIds;
+  },
+});
+
+// ============================================================
+// TRIP DETAILS & CLIENT PORTAL
+// ============================================================
+
+/**
+ * Generate a secure random token for client portal access
+ */
+function generateSecureToken(): string {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  let token = '';
+  for (let i = 0; i < 32; i++) {
+    token += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return token;
+}
+
+/**
+ * Generate client access link (magic link for trip details portal)
+ */
+export const generateClientAccessLink = mutation({
+  args: {
+    itineraryId: v.id("itineraries"),
+    email: v.optional(v.string()),
+    expiryDays: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const { itineraryId, expiryDays = 7 } = args;
+    const now = Date.now();
+
+    const itinerary = await ctx.db.get(itineraryId);
+    if (!itinerary) throw new Error("Itinerary not found");
+
+    // Get client email if not provided
+    let email = args.email;
+    if (!email && itinerary.clientId) {
+      const client = await ctx.db.get(itinerary.clientId);
+      email = client?.email;
+    }
+    if (!email) {
+      throw new Error("Client email is required to generate access link");
+    }
+
+    // Generate new token
+    const token = generateSecureToken();
+    const expiresAt = now + expiryDays * 24 * 60 * 60 * 1000;
+
+    // Revoke any existing active tokens for this itinerary
+    const existingTokens = await ctx.db
+      .query("clientAccessTokens")
+      .withIndex("by_itinerary", (q) => q.eq("itineraryId", itineraryId))
+      .filter((q) => q.eq(q.field("status"), "active"))
+      .collect();
+
+    for (const existingToken of existingTokens) {
+      await ctx.db.patch(existingToken._id, {
+        status: "revoked",
+        revokedAt: now,
+        revokeReason: "New token generated",
+      });
+    }
+
+    // Create new token record
+    const tokenId = await ctx.db.insert("clientAccessTokens", {
+      tenantId: itinerary.tenantId,
+      itineraryId,
+      clientId: itinerary.clientId,
+      token,
+      email,
+      expiresAt,
+      status: "active",
+      createdAt: now,
+    });
+
+    // Update itinerary with token reference
+    await ctx.db.patch(itineraryId, {
+      clientAccessToken: token,
+      clientAccessExpiresAt: expiresAt,
+      updatedAt: now,
+    });
+
+    return {
+      token,
+      tokenId,
+      expiresAt,
+      portalUrl: `/portal/${token}`,
+    };
+  },
+});
+
+/**
+ * Get itinerary by client access token (public query for portal)
+ */
+export const getByClientToken = query({
+  args: { token: v.string() },
+  handler: async (ctx, args) => {
+    const now = Date.now();
+
+    // Find the token
+    const tokenRecord = await ctx.db
+      .query("clientAccessTokens")
+      .withIndex("by_token", (q) => q.eq("token", args.token))
+      .first();
+
+    if (!tokenRecord) {
+      return { error: "invalid_token", message: "Token inválido o no encontrado" };
+    }
+
+    if (tokenRecord.status !== "active") {
+      return { error: "token_revoked", message: "Este enlace ha sido revocado" };
+    }
+
+    if (tokenRecord.expiresAt < now) {
+      return { error: "token_expired", message: "Este enlace ha expirado" };
+    }
+
+    // Get the itinerary
+    const itinerary = await ctx.db.get(tokenRecord.itineraryId);
+    if (!itinerary) {
+      return { error: "itinerary_not_found", message: "Itinerario no encontrado" };
+    }
+
+    // Get client info
+    let client = null;
+    if (itinerary.clientId) {
+      client = await ctx.db.get(itinerary.clientId);
+    }
+
+    // Get vehicle info
+    let vehicle = null;
+    if (itinerary.vehicleId) {
+      vehicle = await ctx.db.get(itinerary.vehicleId);
+    }
+
+    // Get tenant info for branding
+    const tenant = await ctx.db.get(itinerary.tenantId);
+
+    // Return limited itinerary data for client portal
+    return {
+      success: true,
+      itinerary: {
+        _id: itinerary._id,
+        itineraryNumber: itinerary.itineraryNumber,
+        origin: itinerary.origin,
+        destination: itinerary.destination,
+        startDate: itinerary.startDate,
+        estimatedDays: itinerary.estimatedDays,
+        groupSize: itinerary.groupSize,
+        pickupTime: itinerary.pickupTime,
+        // Existing trip details (if already filled)
+        tripLeaderName: itinerary.tripLeaderName,
+        tripLeaderPhone: itinerary.tripLeaderPhone,
+        tripLeaderEmail: itinerary.tripLeaderEmail,
+        pickupExactAddress: itinerary.pickupExactAddress,
+        dropoffExactAddress: itinerary.dropoffExactAddress,
+        detailsCompletedAt: itinerary.detailsCompletedAt,
+      },
+      client: client
+        ? {
+            name:
+              client.type === "company"
+                ? client.companyName
+                : `${client.firstName || ""} ${client.lastName || ""}`.trim(),
+            email: client.email,
+          }
+        : null,
+      vehicle: vehicle
+        ? {
+            name: vehicle.name,
+            make: vehicle.make,
+            model: vehicle.model,
+            passengerCapacity: vehicle.passengerCapacity,
+          }
+        : null,
+      tenant: tenant
+        ? {
+            companyName: tenant.companyName,
+            logoUrl: tenant.logoUrl,
+          }
+        : null,
+    };
+  },
+});
+
+/**
+ * Update trip details from client portal
+ */
+export const updateTripDetails = mutation({
+  args: {
+    token: v.string(),
+    tripLeaderName: v.string(),
+    tripLeaderPhone: v.string(),
+    tripLeaderEmail: v.optional(v.string()),
+    pickupExactAddress: v.string(),
+    dropoffExactAddress: v.string(),
+    // Optional coordinates (if geocoded client-side)
+    pickupCoordinates: v.optional(
+      v.object({
+        lat: v.number(),
+        lng: v.number(),
+      })
+    ),
+    dropoffCoordinates: v.optional(
+      v.object({
+        lat: v.number(),
+        lng: v.number(),
+      })
+    ),
+  },
+  handler: async (ctx, args) => {
+    const {
+      token,
+      tripLeaderName,
+      tripLeaderPhone,
+      tripLeaderEmail,
+      pickupExactAddress,
+      dropoffExactAddress,
+      pickupCoordinates,
+      dropoffCoordinates,
+    } = args;
+    const now = Date.now();
+
+    // Find and validate token
+    const tokenRecord = await ctx.db
+      .query("clientAccessTokens")
+      .withIndex("by_token", (q) => q.eq("token", token))
+      .first();
+
+    if (!tokenRecord) {
+      throw new Error("Token inválido");
+    }
+    if (tokenRecord.status !== "active") {
+      throw new Error("Este enlace ha sido revocado");
+    }
+    if (tokenRecord.expiresAt < now) {
+      throw new Error("Este enlace ha expirado");
+    }
+
+    // Get the itinerary
+    const itinerary = await ctx.db.get(tokenRecord.itineraryId);
+    if (!itinerary) {
+      throw new Error("Itinerario no encontrado");
+    }
+
+    // Generate map URLs from coordinates or addresses
+    const pickupGoogleMapsUrl = pickupCoordinates
+      ? `https://www.google.com/maps/search/?api=1&query=${pickupCoordinates.lat},${pickupCoordinates.lng}`
+      : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(pickupExactAddress)}`;
+
+    const pickupWazeUrl = pickupCoordinates
+      ? `https://waze.com/ul?ll=${pickupCoordinates.lat},${pickupCoordinates.lng}&navigate=yes`
+      : `https://waze.com/ul?q=${encodeURIComponent(pickupExactAddress)}&navigate=yes`;
+
+    const dropoffGoogleMapsUrl = dropoffCoordinates
+      ? `https://www.google.com/maps/search/?api=1&query=${dropoffCoordinates.lat},${dropoffCoordinates.lng}`
+      : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(dropoffExactAddress)}`;
+
+    const dropoffWazeUrl = dropoffCoordinates
+      ? `https://waze.com/ul?ll=${dropoffCoordinates.lat},${dropoffCoordinates.lng}&navigate=yes`
+      : `https://waze.com/ul?q=${encodeURIComponent(dropoffExactAddress)}&navigate=yes`;
+
+    // Update itinerary with trip details
+    await ctx.db.patch(itinerary._id, {
+      tripLeaderName,
+      tripLeaderPhone,
+      tripLeaderEmail,
+      pickupExactAddress,
+      pickupCoordinates,
+      pickupGoogleMapsUrl,
+      pickupWazeUrl,
+      dropoffExactAddress,
+      dropoffCoordinates,
+      dropoffGoogleMapsUrl,
+      dropoffWazeUrl,
+      detailsCompletedAt: now,
+      detailsCompletedBy: "client",
+      updatedAt: now,
+    });
+
+    // Mark token as used
+    await ctx.db.patch(tokenRecord._id, {
+      usedAt: tokenRecord.usedAt || now,
+      lastUsedAt: now,
+      useCount: (tokenRecord.useCount || 0) + 1,
+    });
+
+    // Get client name for notification
+    let clientName = "Cliente";
+    if (itinerary.clientId) {
+      const client = await ctx.db.get(itinerary.clientId);
+      if (client) {
+        clientName =
+          client.type === "company"
+            ? client.companyName || "Empresa"
+            : `${client.firstName || ""} ${client.lastName || ""}`.trim() || "Cliente";
+      }
+    }
+
+    // Create notification for staff
+    await ctx.runMutation(internal.notifications.createTripDetailsCompleted, {
+      tenantId: itinerary.tenantId,
+      itineraryId: itinerary._id,
+      itineraryNumber: itinerary.itineraryNumber,
+      clientName,
+    });
+
+    return {
+      success: true,
+      message: "Detalles del viaje actualizados correctamente",
+    };
+  },
+});
+
+/**
+ * Update trip details from staff (manual entry)
+ */
+export const updateTripDetailsStaff = mutation({
+  args: {
+    itineraryId: v.id("itineraries"),
+    tripLeaderName: v.optional(v.string()),
+    tripLeaderPhone: v.optional(v.string()),
+    tripLeaderEmail: v.optional(v.string()),
+    pickupExactAddress: v.optional(v.string()),
+    dropoffExactAddress: v.optional(v.string()),
+    pickupNotes: v.optional(v.string()),
+    dropoffNotes: v.optional(v.string()),
+    pickupCoordinates: v.optional(
+      v.object({
+        lat: v.number(),
+        lng: v.number(),
+      })
+    ),
+    dropoffCoordinates: v.optional(
+      v.object({
+        lat: v.number(),
+        lng: v.number(),
+      })
+    ),
+  },
+  handler: async (ctx, args) => {
+    const { itineraryId, ...details } = args;
+    const now = Date.now();
+
+    const itinerary = await ctx.db.get(itineraryId);
+    if (!itinerary) throw new Error("Itinerary not found");
+
+    const updates: Record<string, any> = {
+      updatedAt: now,
+    };
+
+    // Update trip leader info
+    if (details.tripLeaderName !== undefined) updates.tripLeaderName = details.tripLeaderName;
+    if (details.tripLeaderPhone !== undefined) updates.tripLeaderPhone = details.tripLeaderPhone;
+    if (details.tripLeaderEmail !== undefined) updates.tripLeaderEmail = details.tripLeaderEmail;
+
+    // Update pickup details
+    if (details.pickupExactAddress !== undefined) {
+      updates.pickupExactAddress = details.pickupExactAddress;
+      // Generate map URLs
+      if (details.pickupCoordinates) {
+        updates.pickupCoordinates = details.pickupCoordinates;
+        updates.pickupGoogleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${details.pickupCoordinates.lat},${details.pickupCoordinates.lng}`;
+        updates.pickupWazeUrl = `https://waze.com/ul?ll=${details.pickupCoordinates.lat},${details.pickupCoordinates.lng}&navigate=yes`;
+      } else {
+        updates.pickupGoogleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(details.pickupExactAddress)}`;
+        updates.pickupWazeUrl = `https://waze.com/ul?q=${encodeURIComponent(details.pickupExactAddress)}&navigate=yes`;
+      }
+    }
+
+    // Update dropoff details
+    if (details.dropoffExactAddress !== undefined) {
+      updates.dropoffExactAddress = details.dropoffExactAddress;
+      // Generate map URLs
+      if (details.dropoffCoordinates) {
+        updates.dropoffCoordinates = details.dropoffCoordinates;
+        updates.dropoffGoogleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${details.dropoffCoordinates.lat},${details.dropoffCoordinates.lng}`;
+        updates.dropoffWazeUrl = `https://waze.com/ul?ll=${details.dropoffCoordinates.lat},${details.dropoffCoordinates.lng}&navigate=yes`;
+      } else {
+        updates.dropoffGoogleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(details.dropoffExactAddress)}`;
+        updates.dropoffWazeUrl = `https://waze.com/ul?q=${encodeURIComponent(details.dropoffExactAddress)}&navigate=yes`;
+      }
+    }
+
+    // Update notes
+    if (details.pickupNotes !== undefined) updates.pickupNotes = details.pickupNotes;
+    if (details.dropoffNotes !== undefined) updates.dropoffNotes = details.dropoffNotes;
+
+    // Check if all required details are now complete
+    const updatedItinerary = { ...itinerary, ...updates };
+    const detailsComplete =
+      updatedItinerary.tripLeaderName &&
+      updatedItinerary.tripLeaderPhone &&
+      updatedItinerary.pickupExactAddress;
+
+    if (detailsComplete && !itinerary.detailsCompletedAt) {
+      updates.detailsCompletedAt = now;
+      updates.detailsCompletedBy = "staff";
+    }
+
+    await ctx.db.patch(itineraryId, updates);
+
+    return { success: true };
+  },
+});
+
+/**
+ * Revoke client access token
+ */
+export const revokeClientAccessToken = mutation({
+  args: {
+    itineraryId: v.id("itineraries"),
+    reason: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const { itineraryId, reason } = args;
+    const now = Date.now();
+
+    // Find active token for this itinerary
+    const tokenRecord = await ctx.db
+      .query("clientAccessTokens")
+      .withIndex("by_itinerary", (q) => q.eq("itineraryId", itineraryId))
+      .filter((q) => q.eq(q.field("status"), "active"))
+      .first();
+
+    if (tokenRecord) {
+      await ctx.db.patch(tokenRecord._id, {
+        status: "revoked",
+        revokedAt: now,
+        revokeReason: reason || "Manually revoked",
+      });
+    }
+
+    // Clear token from itinerary
+    await ctx.db.patch(itineraryId, {
+      clientAccessToken: undefined,
+      clientAccessExpiresAt: undefined,
+      updatedAt: now,
+    });
+
+    return { success: true };
+  },
+});
+
+/**
+ * Check if trip details are complete for an itinerary
+ */
+export const checkTripDetailsComplete = query({
+  args: { itineraryId: v.id("itineraries") },
+  handler: async (ctx, args) => {
+    const itinerary = await ctx.db.get(args.itineraryId);
+    if (!itinerary) return { complete: false, missing: ["itinerary"] };
+
+    const missing: string[] = [];
+
+    if (!itinerary.tripLeaderName) missing.push("tripLeaderName");
+    if (!itinerary.tripLeaderPhone) missing.push("tripLeaderPhone");
+    if (!itinerary.pickupExactAddress) missing.push("pickupExactAddress");
+
+    return {
+      complete: missing.length === 0,
+      missing,
+      detailsCompletedAt: itinerary.detailsCompletedAt,
+      detailsCompletedBy: itinerary.detailsCompletedBy,
+    };
+  },
+});
+
+/**
+ * Get itineraries with incomplete trip details (for dashboard/alerts)
+ */
+export const getIncompleteDetails = query({
+  args: {
+    tenantId: v.id("tenants"),
+    daysUntilTrip: v.optional(v.number()), // Filter by trips starting within N days
+  },
+  handler: async (ctx, args) => {
+    const { tenantId, daysUntilTrip } = args;
+    const now = Date.now();
+
+    // Get scheduled itineraries
+    const itineraries = await ctx.db
+      .query("itineraries")
+      .withIndex("by_tenant_status", (q) =>
+        q.eq("tenantId", tenantId).eq("status", "scheduled")
+      )
+      .collect();
+
+    // Filter by incomplete details and optionally by upcoming date
+    const incomplete = itineraries.filter((i) => {
+      // Check if details are incomplete
+      const hasIncomplete =
+        !i.tripLeaderName || !i.tripLeaderPhone || !i.pickupExactAddress;
+
+      if (!hasIncomplete) return false;
+
+      // Optionally filter by upcoming date
+      if (daysUntilTrip !== undefined) {
+        const maxDate = now + daysUntilTrip * 24 * 60 * 60 * 1000;
+        return i.startDate <= maxDate;
+      }
+
+      return true;
+    });
+
+    // Sort by start date (nearest first)
+    incomplete.sort((a, b) => a.startDate - b.startDate);
+
+    return incomplete;
   },
 });

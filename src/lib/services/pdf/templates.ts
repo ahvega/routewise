@@ -106,12 +106,29 @@ function formatCurrency(value: number, currency: 'HNL' | 'USD' = 'HNL'): string 
   }).format(value);
 }
 
-function formatDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString('es-HN', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric'
-  });
+function formatDate(dateInput: string | number): string {
+  // Handle both timestamps (numbers) and formatted strings
+  if (typeof dateInput === 'number' || !isNaN(Number(dateInput))) {
+    // It's a timestamp or numeric string
+    return new Date(Number(dateInput)).toLocaleDateString('es-HN', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+  }
+
+  // Try parsing as ISO date string first
+  const date = new Date(dateInput);
+  if (!isNaN(date.getTime())) {
+    return date.toLocaleDateString('es-HN', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+  }
+
+  // If already formatted, return as-is
+  return dateInput;
 }
 
 const baseStyles = `
