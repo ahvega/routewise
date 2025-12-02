@@ -21,7 +21,8 @@
       "WebFetch(domain:svelte.dev)",
       "Bash(dir:*)",
       "mcp__MCP_DOCKER__sequentialthinking",
-      "Bash(git clone:*)"
+      "Bash(git clone:*)",
+      "WebFetch(domain:flowbite-svelte.com)"
     ],
     "deny": []
   }

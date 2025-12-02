@@ -46,8 +46,8 @@ export interface SendEmailResult {
   error?: string;
 }
 
-// Default from address
-const DEFAULT_FROM = 'RouteWise <noreply@routewise.app>';
+// Default from address - use RESEND_FROM_EMAIL env var or Resend's test domain for dev
+const DEFAULT_FROM = env.RESEND_FROM_EMAIL || 'RouteWise <onboarding@resend.dev>';
 
 export async function sendEmail(options: SendEmailOptions): Promise<SendEmailResult> {
   try {
