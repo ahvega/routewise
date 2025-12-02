@@ -4,7 +4,9 @@
 param(
     [switch]$SkipConvex,
     [switch]$SkipSvelte,
-    [switch]$SkipUpdate
+    [switch]$SkipUpdate,
+    [Alias("SkipConvexUpdate")]
+    [switch]$SkipPkgUpdate
 )
 
 $ErrorActionPreference = "SilentlyContinue"
@@ -14,7 +16,7 @@ Write-Host "  RouteWise Dev Server Startup Script" -ForegroundColor Cyan
 Write-Host "========================================`n" -ForegroundColor Cyan
 
 # Update Convex to latest version
-if (-not $SkipUpdate) {
+if (-not $SkipUpdate -and -not $SkipPkgUpdate) {
     Write-Host "[1/4] Updating Convex to latest version..." -ForegroundColor Yellow
 
     $updateResult = & npm install convex@latest 2>&1
@@ -26,7 +28,7 @@ if (-not $SkipUpdate) {
         Write-Host "  $updateResult" -ForegroundColor Gray
     }
 } else {
-    Write-Host "[1/4] Skipping Convex update (--SkipUpdate flag)" -ForegroundColor Gray
+    Write-Host "[1/4] Skipping Convex update (-SkipUpdate or -SkipConvexUpdate flag)" -ForegroundColor Gray
 }
 
 Write-Host ""

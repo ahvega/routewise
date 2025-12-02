@@ -325,19 +325,28 @@
 		if (!quotation || !vehicle || !tenant) return null;
 
 		// Calculate discount if client has one
+		// To make the math work: subtotal - discount = salePriceHnl
+		// So: subtotal = salePriceHnl + discountAmount
 		const discountPercentage = clientData?.discountPercentage || 0;
-		const priceBeforeDiscount = quotation.totalCost * (1 + quotation.selectedMarkupPercentage / 100);
-		const discountAmountHnl = priceBeforeDiscount * (discountPercentage / 100);
+		// Calculate discount amount based on the final sale price
+		// If discount is 10%, then salePriceHnl = subtotal * 0.9, so subtotal = salePriceHnl / 0.9
+		const subtotalHnl = discountPercentage > 0
+			? Math.round(quotation.salePriceHnl / (1 - discountPercentage / 100))
+			: quotation.salePriceHnl;
+		const discountAmountHnl = subtotalHnl - quotation.salePriceHnl;
 
 		return {
 			quotationNumber: quotation.quotationNumber,
 			date: quotation.createdAt.toString(), // Pass timestamp as string
 			validUntil: quotation.validUntil ? quotation.validUntil.toString() : '',
+			groupLeaderName: quotation.groupLeaderName,
 			client: {
 				name: getClientName(clientData),
+				code: clientData?.clientCode || undefined,
 				email: clientData?.email || undefined,
 				phone: clientData?.phone || undefined,
 				address: clientData?.address || undefined,
+				taxId: clientData?.taxId || undefined,
 				discountPercentage: discountPercentage
 			},
 			trip: {
@@ -366,15 +375,16 @@
 				totalCost: quotation.totalCost
 			},
 			pricing: {
-				subtotalHnl: Math.round(priceBeforeDiscount),
+				subtotalHnl: subtotalHnl,
 				discountPercentage: discountPercentage,
-				discountAmountHnl: Math.round(discountAmountHnl),
+				discountAmountHnl: discountAmountHnl,
 				salePriceHnl: quotation.salePriceHnl,
 				salePriceUsd: quotation.salePriceUsd,
 				markup: quotation.selectedMarkupPercentage
 			},
 			company: {
 				name: tenant.companyName,
+				logo: tenant.logoUrl || undefined,
 				phone: tenant.primaryContactPhone || undefined,
 				email: tenant.primaryContactEmail || undefined,
 				address: tenant.address || undefined,

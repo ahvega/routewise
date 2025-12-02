@@ -132,7 +132,7 @@
 			</div>
 		{:else if migrationComplete}
 			<!-- Migration Success -->
-			<Card class="max-w-none">
+			<Card class="max-w-none !p-6">
 				<div class="text-center py-8">
 					<CheckCircleOutline class="w-16 h-16 mx-auto mb-4 text-green-500" />
 					<h2 class="text-2xl font-bold text-gray-900 dark:text-white mb-2">
@@ -167,7 +167,7 @@
 			<!-- Migration Form -->
 			<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
 				<!-- Current Data Stats -->
-				<Card class="lg:col-span-1">
+				<Card class="lg:col-span-1 !p-6">
 					<h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Current Data</h3>
 					<p class="text-sm text-gray-500 mb-4">
 						This data will be preserved during migration:
@@ -212,7 +212,7 @@
 				</Card>
 
 				<!-- Migration Form -->
-				<Card class="lg:col-span-2">
+				<Card class="lg:col-span-2 !p-6">
 					<div class="flex items-center gap-2 mb-6">
 						<BuildingOutline class="w-5 h-5 text-gray-500" />
 						<h3 class="text-lg font-semibold text-gray-900 dark:text-white">Organization Details</h3>

@@ -1,11 +1,36 @@
 import { v } from "convex/values";
-import { query, mutation } from "./_generated/server";
+import { query, mutation, QueryCtx } from "./_generated/server";
 
-// Generate advance number
-function generateAdvanceNumber(): string {
-  const year = new Date().getFullYear();
-  const random = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
-  return `ADV-${year}-${random}`;
+// Generate advance number (A00001 format)
+// Uses sequential numbering based on existing advances
+async function generateAdvanceNumber(ctx: QueryCtx, tenantId: string): Promise<string> {
+  const existing = await ctx.db
+    .query("expenseAdvances")
+    .withIndex("by_tenant", (q) => q.eq("tenantId", tenantId as any))
+    .collect();
+
+  let maxSeq = 0;
+  for (const a of existing) {
+    // Parse from A00001 format
+    if (a.advanceNumber?.startsWith('A')) {
+      const match = a.advanceNumber.match(/^A(\d+)/);
+      if (match) {
+        const num = parseInt(match[1], 10);
+        if (num > maxSeq) maxSeq = num;
+      }
+    }
+    // Also parse from legacy format ADV-YYYY-NNNN
+    if (a.advanceNumber?.startsWith('ADV-')) {
+      const match = a.advanceNumber.match(/ADV-\d{4}-(\d+)/);
+      if (match) {
+        const num = parseInt(match[1], 10);
+        if (num > maxSeq) maxSeq = num;
+      }
+    }
+  }
+
+  const nextSeq = maxSeq + 1;
+  return `A${nextSeq.toString().padStart(5, '0')}`;
 }
 
 // List all expense advances for a tenant
@@ -54,13 +79,20 @@ export const get = query({
 });
 
 // Get expense advance by itinerary ID
+// Returns the active (non-cancelled) advance for this itinerary
 export const getByItinerary = query({
   args: { itineraryId: v.id("itineraries") },
   handler: async (ctx, args) => {
-    return await ctx.db
+    const advances = await ctx.db
       .query("expenseAdvances")
       .withIndex("by_itinerary", (q) => q.eq("itineraryId", args.itineraryId))
-      .first();
+      .collect();
+
+    // Return the first non-cancelled advance (most recent first)
+    // This allows creating a new advance if all previous ones were cancelled
+    return advances
+      .filter(a => a.status !== 'cancelled')
+      .sort((a, b) => b.createdAt - a.createdAt)[0] || null;
   },
 });
 
@@ -88,18 +120,20 @@ export const createFromItinerary = mutation({
     estimatedOther: v.optional(v.number()),
     purpose: v.optional(v.string()),
     notes: v.optional(v.string()),
+    saveAsDraft: v.optional(v.boolean()), // If true, saves as draft instead of pending
   },
   handler: async (ctx, args) => {
     const itinerary = await ctx.db.get(args.itineraryId);
     if (!itinerary) throw new Error("Itinerary not found");
 
-    // Check if advance already exists for this itinerary
-    const existingAdvance = await ctx.db
+    // Check if an active (non-cancelled) advance already exists for this itinerary
+    const existingAdvances = await ctx.db
       .query("expenseAdvances")
       .withIndex("by_itinerary", (q) => q.eq("itineraryId", args.itineraryId))
-      .first();
+      .collect();
 
-    if (existingAdvance) {
+    const activeAdvance = existingAdvances.find(a => a.status !== 'cancelled');
+    if (activeAdvance) {
       throw new Error("Expense advance already exists for this itinerary");
     }
 
@@ -120,9 +154,13 @@ export const createFromItinerary = mutation({
 
     const purpose = args.purpose || `Gastos de viaje: ${itinerary.origin} → ${itinerary.destination}`;
 
+    // Use draft status if requested, otherwise pending
+    const status = args.saveAsDraft ? "draft" : "pending";
+
+    const advanceNumber = await generateAdvanceNumber(ctx, itinerary.tenantId);
     const advanceId = await ctx.db.insert("expenseAdvances", {
       tenantId: itinerary.tenantId,
-      advanceNumber: generateAdvanceNumber(),
+      advanceNumber,
       itineraryId: args.itineraryId,
       driverId: itinerary.driverId,
       // Currency configuration (from itinerary)
@@ -138,7 +176,7 @@ export const createFromItinerary = mutation({
       estimatedLodging,
       estimatedTolls,
       estimatedOther,
-      status: "pending",
+      status,
       notes: args.notes,
       createdAt: now,
       updatedAt: now,
@@ -167,6 +205,7 @@ export const create = mutation({
     estimatedTolls: v.optional(v.number()),
     estimatedOther: v.optional(v.number()),
     notes: v.optional(v.string()),
+    saveAsDraft: v.optional(v.boolean()), // If true, saves as draft instead of pending
   },
   handler: async (ctx, args) => {
     const now = Date.now();
@@ -174,11 +213,15 @@ export const create = mutation({
     const amountLocal = args.amountLocal ?? args.amountHnl;
     const amountUsd = amountLocal / args.exchangeRateUsed;
 
+    // Use draft status if requested, otherwise pending
+    const status = args.saveAsDraft ? "draft" : "pending";
+
+    const advanceNumber = await generateAdvanceNumber(ctx, args.tenantId);
     const advanceId = await ctx.db.insert("expenseAdvances", {
       tenantId: args.tenantId,
       itineraryId: args.itineraryId,
       driverId: args.driverId,
-      advanceNumber: generateAdvanceNumber(),
+      advanceNumber,
       // Currency configuration
       localCurrency: args.localCurrency,
       exchangeRateUsed: args.exchangeRateUsed,
@@ -193,7 +236,7 @@ export const create = mutation({
       estimatedTolls: args.estimatedTolls,
       estimatedOther: args.estimatedOther,
       notes: args.notes,
-      status: "pending",
+      status,
       createdAt: now,
       updatedAt: now,
     });
@@ -222,8 +265,9 @@ export const update = mutation({
     const advance = await ctx.db.get(id);
     if (!advance) throw new Error("Expense advance not found");
 
-    if (advance.status !== "pending") {
-      throw new Error("Can only update pending advances");
+    // Allow updates for draft and pending advances
+    if (advance.status !== "draft" && advance.status !== "pending") {
+      throw new Error("Can only update draft or pending advances");
     }
 
     // Recalculate USD if amount changed
@@ -241,6 +285,26 @@ export const update = mutation({
       amountLocal: finalAmountLocal,
       amountHnl: finalAmountLocal, // Legacy field
       amountUsd,
+      updatedAt: Date.now(),
+    });
+  },
+});
+
+// Submit draft for approval (draft → pending)
+export const submitForApproval = mutation({
+  args: {
+    id: v.id("expenseAdvances"),
+  },
+  handler: async (ctx, args) => {
+    const advance = await ctx.db.get(args.id);
+    if (!advance) throw new Error("Expense advance not found");
+
+    if (advance.status !== "draft") {
+      throw new Error("Can only submit draft advances for approval");
+    }
+
+    await ctx.db.patch(args.id, {
+      status: "pending",
       updatedAt: Date.now(),
     });
   },
@@ -397,15 +461,15 @@ export const cancel = mutation({
   },
 });
 
-// Delete expense advance (only pending)
+// Delete expense advance (only draft or pending)
 export const remove = mutation({
   args: { id: v.id("expenseAdvances") },
   handler: async (ctx, args) => {
     const advance = await ctx.db.get(args.id);
     if (!advance) throw new Error("Expense advance not found");
 
-    if (advance.status !== "pending") {
-      throw new Error("Only pending advances can be deleted");
+    if (advance.status !== "draft" && advance.status !== "pending") {
+      throw new Error("Only draft or pending advances can be deleted");
     }
 
     await ctx.db.delete(args.id);
@@ -421,6 +485,7 @@ export const getStats = query({
       .withIndex("by_tenant", (q) => q.eq("tenantId", args.tenantId))
       .collect();
 
+    const draft = advances.filter(a => a.status === "draft");
     const pending = advances.filter(a => a.status === "pending");
     const approved = advances.filter(a => a.status === "approved");
     const disbursed = advances.filter(a => a.status === "disbursed");
@@ -436,6 +501,7 @@ export const getStats = query({
     const totalBalanceOwed = unsettledBalances.reduce((sum, a) => sum + (a.balanceAmount ?? 0), 0);
 
     return {
+      draftCount: draft.length,
       pendingCount: pending.length,
       approvedCount: approved.length,
       disbursedCount: disbursed.length,

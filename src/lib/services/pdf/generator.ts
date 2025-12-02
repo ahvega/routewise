@@ -17,10 +17,10 @@ const defaultOptions: PdfOptions = {
   format: 'A4',
   landscape: false,
   margin: {
-    top: '20mm',
-    right: '15mm',
-    bottom: '20mm',
-    left: '15mm'
+    top: '0.5in',
+    right: '0.5in',
+    bottom: '0.5in',
+    left: '0.5in'
   }
 };
 

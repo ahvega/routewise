@@ -24,7 +24,10 @@
 		ExclamationCircleOutline,
 		TruckOutline,
 		UserOutline,
-		CalendarMonthOutline
+		CalendarMonthOutline,
+		EditOutline,
+		PaperPlaneOutline,
+		TrashBinOutline
 	} from 'flowbite-svelte-icons';
 	import { t } from '$lib/i18n';
 	import StatusBadge from '$lib/components/ui/StatusBadge.svelte';
@@ -220,6 +223,34 @@
 		{ value: 'cash', name: $t('expenses.disbursement.cash') },
 		{ value: 'transfer', name: $t('expenses.disbursement.transfer') }
 	];
+
+	// Submit draft for approval
+	async function submitForApproval() {
+		if (!advance) return;
+		isSubmitting = true;
+		try {
+			await client.mutation(api.expenseAdvances.submitForApproval, { id: advance._id });
+			showSuccessToast($t('expenses.messages.submitted'));
+		} catch (error) {
+			showErrorToast($t('common.error'));
+		} finally {
+			isSubmitting = false;
+		}
+	}
+
+	// Delete draft
+	async function deleteAdvance() {
+		if (!advance) return;
+		isSubmitting = true;
+		try {
+			await client.mutation(api.expenseAdvances.remove, { id: advance._id });
+			goto('/expenses');
+		} catch (error) {
+			showErrorToast($t('common.error'));
+		} finally {
+			isSubmitting = false;
+		}
+	}
 </script>
 
 <svelte:head>
@@ -430,7 +461,7 @@
 				<!-- Timeline -->
 				<Card class="!p-6">
 					<h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-						{$t('expenses.timeline')}
+						{$t('expenses.sections.timeline')}
 					</h3>
 					<div class="space-y-4">
 						<div class="flex gap-3">
@@ -511,7 +542,20 @@
 				<Card class="!p-4">
 					<h3 class="font-semibold text-gray-900 dark:text-white mb-4">{$t('common.actions')}</h3>
 					<div class="space-y-2">
-						{#if advance.status === 'pending'}
+						{#if advance.status === 'draft'}
+							<Button color="light" href="/expenses/{advance._id}/edit" class="w-full">
+								<EditOutline class="w-4 h-4 mr-2" />
+								{$t('expenses.actions.edit')}
+							</Button>
+							<Button color="primary" class="w-full" onclick={submitForApproval} disabled={isSubmitting}>
+								<PaperPlaneOutline class="w-4 h-4 mr-2" />
+								{$t('expenses.actions.submitForApproval')}
+							</Button>
+							<Button color="red" outline class="w-full" onclick={deleteAdvance} disabled={isSubmitting}>
+								<TrashBinOutline class="w-4 h-4 mr-2" />
+								{$t('expenses.actions.delete')}
+							</Button>
+						{:else if advance.status === 'pending'}
 							<Button color="green" class="w-full" onclick={() => (showApproveModal = true)}>
 								<CheckCircleOutline class="w-4 h-4 mr-2" />
 								{$t('expenses.actions.approve')}

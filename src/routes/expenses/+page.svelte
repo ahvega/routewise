@@ -26,26 +26,33 @@
 	} from 'flowbite-svelte-icons';
 	import { t } from '$lib/i18n';
 	import StatusBadge from '$lib/components/ui/StatusBadge.svelte';
-
-	// TODO: Get from auth context
-	const tenantId = 'k17cx55v2hrtfwgq5zf2j1ms4h74nfb0' as Id<'tenants'>;
+	import { tenantStore } from '$lib/stores';
 
 	let statusFilter = $state('');
 	let searchQuery = $state('');
 
 	const advancesQuery = useQuery(
 		api.expenseAdvances.list,
-		() => ({
-			tenantId,
+		() => (tenantStore.tenantId ? {
+			tenantId: tenantStore.tenantId,
 			status: statusFilter || undefined
-		})
+		} : 'skip')
 	);
 
-	const statsQuery = useQuery(api.expenseAdvances.getStats, () => ({ tenantId }));
+	const statsQuery = useQuery(
+		api.expenseAdvances.getStats,
+		() => (tenantStore.tenantId ? { tenantId: tenantStore.tenantId } : 'skip')
+	);
 
 	// Also fetch itineraries and drivers for display
-	const itinerariesQuery = useQuery(api.itineraries.list, () => ({ tenantId }));
-	const driversQuery = useQuery(api.drivers.list, () => ({ tenantId }));
+	const itinerariesQuery = useQuery(
+		api.itineraries.list,
+		() => (tenantStore.tenantId ? { tenantId: tenantStore.tenantId } : 'skip')
+	);
+	const driversQuery = useQuery(
+		api.drivers.list,
+		() => (tenantStore.tenantId ? { tenantId: tenantStore.tenantId } : 'skip')
+	);
 
 	const advances = $derived(advancesQuery.data ?? []);
 	const stats = $derived(statsQuery.data);
@@ -113,6 +120,7 @@
 
 	const statusOptions = [
 		{ value: '', name: $t('common.all') },
+		{ value: 'draft', name: $t('expenses.status.draft') },
 		{ value: 'pending', name: $t('expenses.status.pending') },
 		{ value: 'approved', name: $t('expenses.status.approved') },
 		{ value: 'disbursed', name: $t('expenses.status.disbursed') },

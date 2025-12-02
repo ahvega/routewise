@@ -155,7 +155,7 @@
 		</div>
 	{:else if tenant}
 		<!-- Current Plan Overview -->
-		<Card class="max-w-none">
+		<Card class="max-w-none !p-6">
 			<div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
 				<div class="flex items-start gap-4">
 					<div class="p-3 bg-primary-100 dark:bg-primary-900 rounded-lg">
@@ -207,7 +207,7 @@
 		</Card>
 
 		<!-- Usage Overview -->
-		<Card class="max-w-none">
+		<Card class="max-w-none !p-6">
 			<div class="flex items-center gap-2 mb-6">
 				<ChartOutline class="w-5 h-5 text-gray-500" />
 				<h3 class="text-lg font-semibold text-gray-900 dark:text-white">{$t('settings.billing.usage')}</h3>
@@ -317,7 +317,7 @@
 		</Card>
 
 		<!-- Plan Features -->
-		<Card class="max-w-none">
+		<Card class="max-w-none !p-6">
 			<h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">{$t('settings.billing.planFeatures')}</h3>
 
 			<div class="grid grid-cols-2 md:grid-cols-3 gap-4">
@@ -338,7 +338,7 @@
 
 		<!-- Usage History -->
 		{#if history.length > 0}
-			<Card class="max-w-none">
+			<Card class="max-w-none !p-6">
 				<h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">{$t('settings.billing.usageHistory')}</h3>
 
 				<Table striped>

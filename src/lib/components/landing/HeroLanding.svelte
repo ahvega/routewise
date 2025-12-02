@@ -2,7 +2,6 @@
 	import { Button } from 'flowbite-svelte';
 	import { ArrowRightOutline, MapPinAltSolid, ChartPieSolid, CashOutline, TruckSolid } from 'flowbite-svelte-icons';
 	import { t } from '$lib/i18n';
-	import { page } from '$app/stores';
 
 	const features = $derived([
 		{ icon: MapPinAltSolid, key: 'routes' },
@@ -11,9 +10,9 @@
 		{ icon: TruckSolid, key: 'fleet' }
 	]);
 
-	// Check if user was just logged out - use fresh login to force new auth
-	const wasLoggedOut = $derived($page.url.searchParams.get('logged_out') === 'true');
-	const loginUrl = $derived(wasLoggedOut ? '/auth/login?fresh=true' : '/auth/login');
+	// Always use fresh login from landing page to ensure clean authentication
+	// This prevents cached SSO sessions from auto-logging in unwanted users
+	const loginUrl = '/auth/login?fresh=true';
 </script>
 
 <div class="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex flex-col">

@@ -272,8 +272,12 @@
 					{#snippet icon()}
 						<ExclamationCircleOutline class="w-5 h-5" />
 					{/snippet}
-					<span class="font-medium">{alert.title}:</span>
-					{alert.message}
+					{#if alert.messageKey && alert.messageParams}
+						{$t(alert.messageKey, alert.messageParams)}
+					{:else}
+						<span class="font-medium">{alert.title}:</span>
+						{alert.message}
+					{/if}
 				</Alert>
 			{/each}
 		</div>
@@ -860,8 +864,14 @@
 						<div class="flex items-start gap-3 p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-800">
 							<ExclamationCircleOutline class="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
 							<div>
-								<p class="font-medium text-amber-800 dark:text-amber-200 text-sm">{alert.title}</p>
-								<p class="text-xs text-amber-600 dark:text-amber-400">{alert.message}</p>
+								{#if alert.messageKey && alert.messageParams}
+									<p class="font-medium text-amber-800 dark:text-amber-200 text-sm">
+										{$t(alert.messageKey, alert.messageParams)}
+									</p>
+								{:else}
+									<p class="font-medium text-amber-800 dark:text-amber-200 text-sm">{alert.title}</p>
+									<p class="text-xs text-amber-600 dark:text-amber-400">{alert.message}</p>
+								{/if}
 							</div>
 						</div>
 					{/each}

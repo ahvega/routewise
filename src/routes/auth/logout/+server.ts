@@ -2,6 +2,23 @@ import { redirect } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { getLogoutUrl } from '$lib/auth/workos.server';
 
+// Helper function to clear all session cookies with proper options
+function clearSessionCookies(cookies: Parameters<RequestHandler>[0]['cookies']) {
+	// Clear session cookie with all possible path variations
+	cookies.delete('session', { path: '/' });
+	cookies.delete('wos-session', { path: '/' });
+
+	// Also set expired cookies to ensure they're cleared across all browsers
+	cookies.set('session', '', {
+		path: '/',
+		httpOnly: true,
+		secure: false,
+		sameSite: 'lax',
+		maxAge: 0, // Immediately expire
+		expires: new Date(0) // Also set to epoch for older browsers
+	});
+}
+
 export const GET: RequestHandler = async ({ cookies }) => {
 	// Get session to retrieve sessionId for WorkOS logout
 	const sessionCookie = cookies.get('session');
@@ -25,8 +42,7 @@ export const GET: RequestHandler = async ({ cookies }) => {
 	}
 
 	// Clear all local session cookies
-	cookies.delete('session', { path: '/' });
-	cookies.delete('wos-session', { path: '/' });
+	clearSessionCookies(cookies);
 
 	// If we have a WorkOS logout URL, redirect there
 	// WorkOS will then redirect back to our app after invalidating the session
@@ -62,8 +78,7 @@ export const POST: RequestHandler = async ({ cookies }) => {
 	}
 
 	// Clear all local session cookies
-	cookies.delete('session', { path: '/' });
-	cookies.delete('wos-session', { path: '/' });
+	clearSessionCookies(cookies);
 
 	// If we have a WorkOS logout URL, redirect there
 	if (workosLogoutUrl) {

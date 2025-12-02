@@ -317,7 +317,7 @@
 		</div>
 	{:else}
 		<!-- Team Members -->
-		<Card class="max-w-none">
+		<Card class="max-w-none !p-6">
 			<div class="flex items-center justify-between mb-4">
 				<div class="flex items-center gap-2">
 					<UsersOutline class="w-5 h-5 text-gray-500" />
@@ -398,7 +398,7 @@
 		</Card>
 
 		<!-- Sales Agents Configuration -->
-		<Card class="max-w-none">
+		<Card class="max-w-none !p-6">
 			<div class="flex items-center justify-between mb-4">
 				<div class="flex items-center gap-2">
 					<BriefcaseOutline class="w-5 h-5 text-gray-500" />
@@ -490,7 +490,7 @@
 
 		<!-- Pending Invitations -->
 		{#if invitations.length > 0}
-			<Card class="max-w-none">
+			<Card class="max-w-none !p-6">
 				<div class="flex items-center gap-2 mb-4">
 					<EnvelopeOutline class="w-5 h-5 text-gray-500" />
 					<h3 class="text-lg font-semibold text-gray-900 dark:text-white">

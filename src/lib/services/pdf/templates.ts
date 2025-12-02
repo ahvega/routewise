@@ -250,6 +250,7 @@ function formatDate(dateInput: string | number): string {
 }
 
 const baseStyles = `
+  @import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&display=swap');
   * {
     margin: 0;
     padding: 0;
@@ -259,13 +260,13 @@ const baseStyles = `
     font-family: Arial, Helvetica, sans-serif;
     font-size: 11px;
     line-height: 1.4;
-    color: #333;
+    color: #000;
     background: white;
   }
   .container {
     max-width: 800px;
     margin: 0 auto;
-    padding: 30px 40px;
+    padding: 0;
   }
   /* Professional Quotation Header */
   .header {
@@ -335,28 +336,40 @@ const baseStyles = `
   .info-cell label {
     display: block;
     font-size: 9px;
-    color: #666;
+    color: #444;
     text-transform: uppercase;
     margin-bottom: 2px;
   }
   .info-cell span {
+    font-family: 'Fira Code', monospace;
     font-weight: 500;
+    color: #000;
   }
   .client-name {
     font-size: 14px;
     font-weight: bold;
     margin-bottom: 5px;
+    color: #000;
   }
   .client-details {
     font-size: 10px;
-    color: #555;
+    color: #333;
   }
-  /* Itinerary Code */
+  /* Itinerary Code - Inline version below client name */
+  .itinerary-code-inline {
+    font-family: 'Fira Code', monospace;
+    font-size: 11px;
+    font-weight: 600;
+    color: #1e40af;
+    margin: 4px 0;
+  }
+  /* Itinerary Code - Standalone block (legacy) */
   .itinerary-code {
     text-align: center;
     background: #f0f4f8;
     padding: 8px;
     margin-bottom: 15px;
+    font-family: 'Fira Code', monospace;
     font-size: 13px;
     font-weight: 600;
     color: #1e40af;
@@ -388,14 +401,16 @@ const baseStyles = `
   }
   .services-table td.text-right {
     text-align: right;
-    font-family: 'Courier New', Courier, monospace;
+    font-family: 'Fira Code', monospace;
+    color: #000;
   }
   .service-description {
     font-weight: 500;
+    color: #000;
   }
   .service-details {
     font-size: 9px;
-    color: #666;
+    color: #333;
     margin-top: 3px;
   }
   .service-details div {
@@ -433,7 +448,8 @@ const baseStyles = `
     font-size: 10px;
   }
   .totals-row span:last-child {
-    font-family: 'Courier New', Courier, monospace;
+    font-family: 'Fira Code', monospace;
+    color: #000;
   }
   .totals-row.subtotal {
     background: #f9fafb;
@@ -451,6 +467,9 @@ const baseStyles = `
     font-weight: bold;
     border: none;
     padding: 10px;
+  }
+  .totals-row.total span:last-child {
+    color: white !important;
   }
   .totals-row.usd {
     font-size: 9px;
@@ -676,12 +695,23 @@ function formatShortDate(dateInput: string | number): string {
   return `${day}/${month}/${year}`;
 }
 
-// Generate itinerary code: YYMM-GroupLeader x Pax
+// Generate itinerary code: QuotationNumber-ClientCode-GroupLeader x Pax
 function generateItineraryCode(data: QuotationPdfData): string {
-  const now = new Date(data.date);
-  const yymm = `${String(now.getFullYear()).slice(-2)}${String(now.getMonth() + 1).padStart(2, '0')}`;
-  const leaderName = data.groupLeaderName?.replace(/\s+/g, '_') || data.client.name.split(' ')[0];
-  return `${yymm}-${leaderName} x ${data.trip.groupSize}`;
+  // Get quotation number (without prefix if present)
+  const quotationNum = data.quotationNumber.replace(/^[A-Z]-?/i, '');
+
+  // Get client 4-letter acronym code
+  const clientCode = data.client.code ||
+    data.client.name.split(' ')
+      .map(w => w[0])
+      .join('')
+      .substring(0, 4)
+      .toUpperCase();
+
+  // Get group leader name or first name from client
+  const leaderName = data.groupLeaderName || data.client.name.split(' ')[0];
+
+  return `${quotationNum}-${clientCode}-${leaderName} x ${data.trip.groupSize}`;
 }
 
 // Generate service line description for single-vehicle quotations
@@ -743,10 +773,8 @@ export function generateQuotationHtml(data: QuotationPdfData): string {
   // Itinerary code
   const itineraryCode = generateItineraryCode(data);
 
-  // Extract sequence number from quotation number for display
-  const sequenceDisplay = data.quotationSequence
-    ? String(data.quotationSequence)
-    : data.quotationNumber.match(/^Q?(\d+)/)?.[1] || data.quotationNumber;
+  // Use full quotation number for display
+  const quotationDisplay = data.quotationNumber;
 
   return `
 <!DOCTYPE html>
@@ -780,8 +808,9 @@ export function generateQuotationHtml(data: QuotationPdfData): string {
     <!-- Client & Document Info Grid -->
     <div class="info-grid">
       <div class="info-left">
-        <div style="font-size: 10px; color: #666; text-transform: uppercase; margin-bottom: 5px;">Cliente / Itinerario</div>
+        <div style="font-size: 10px; color: #444; text-transform: uppercase; margin-bottom: 5px;">Cliente</div>
         <div class="client-name">${data.client.name}</div>
+        <div class="itinerary-code-inline">${itineraryCode}</div>
         <div class="client-details">
           ${data.client.city ? `${data.client.city}` : ''}${data.client.city && data.client.country ? ', ' : ''}${data.client.country || ''}
         </div>
@@ -797,7 +826,7 @@ export function generateQuotationHtml(data: QuotationPdfData): string {
         </div>
         <div class="info-cell">
           <label>Cotización #</label>
-          <span>${sequenceDisplay}</span>
+          <span>${quotationDisplay}</span>
         </div>
         <div class="info-cell">
           <label>${data.company.fiscalDocumentName || 'RTN'}</label>
@@ -812,11 +841,6 @@ export function generateQuotationHtml(data: QuotationPdfData): string {
           <span>${data.salesAgentInitials || ''}</span>
         </div>
       </div>
-    </div>
-
-    <!-- Itinerary Code -->
-    <div class="itinerary-code">
-      ${itineraryCode}
     </div>
 
     <!-- Service Lines Table -->

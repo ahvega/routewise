@@ -571,8 +571,8 @@ export default defineSchema({
     estimatedLodging: v.optional(v.number()),
     estimatedTolls: v.optional(v.number()),
     estimatedOther: v.optional(v.number()),
-    // Status workflow: pending → approved → disbursed → settled
-    status: v.string(), // 'pending' | 'approved' | 'disbursed' | 'settled' | 'cancelled'
+    // Status workflow: draft → pending → approved → disbursed → settled
+    status: v.string(), // 'draft' | 'pending' | 'approved' | 'disbursed' | 'settled' | 'cancelled'
     approvedBy: v.optional(v.id("users")),
     approvedAt: v.optional(v.number()),
     disbursedAt: v.optional(v.number()),

@@ -122,41 +122,55 @@ export const getAlerts = query({
       entityId?: string;
       entityType?: string;
       date?: number;
+      // For i18n support
+      titleKey?: string;
+      messageKey?: string;
+      messageParams?: Record<string, string | number>;
     }> = [];
 
     // License expiry alerts
     for (const driver of drivers) {
       if (driver.status !== "active") continue;
+      const driverName = `${driver.firstName} ${driver.lastName}`;
 
       if (driver.licenseExpiry < now) {
         alerts.push({
           type: "danger",
           category: "license",
           title: "License Expired",
-          message: `${driver.firstName} ${driver.lastName}'s license has expired`,
+          message: `${driverName}'s license has expired`,
           entityId: driver._id,
           entityType: "driver",
           date: driver.licenseExpiry,
+          titleKey: "dashboard.licenseExpired",
+          messageKey: "dashboard.licenseExpired",
+          messageParams: { name: driverName },
         });
       } else if (driver.licenseExpiry < sevenDaysFromNow) {
         alerts.push({
           type: "danger",
           category: "license",
           title: "License Expiring Soon",
-          message: `${driver.firstName} ${driver.lastName}'s license expires in less than 7 days`,
+          message: `${driverName}'s license expires in less than 7 days`,
           entityId: driver._id,
           entityType: "driver",
           date: driver.licenseExpiry,
+          titleKey: "dashboard.licenseExpiring",
+          messageKey: "dashboard.licenseExpiring",
+          messageParams: { name: driverName },
         });
       } else if (driver.licenseExpiry < thirtyDaysFromNow) {
         alerts.push({
           type: "warning",
           category: "license",
           title: "License Expiring",
-          message: `${driver.firstName} ${driver.lastName}'s license expires within 30 days`,
+          message: `${driverName}'s license expires within 30 days`,
           entityId: driver._id,
           entityType: "driver",
           date: driver.licenseExpiry,
+          titleKey: "dashboard.licenseExpiring",
+          messageKey: "dashboard.licenseExpiring",
+          messageParams: { name: driverName },
         });
       }
     }

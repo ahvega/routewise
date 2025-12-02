@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { useConvexClient } from 'convex-svelte';
 	import { api } from '$convex/_generated/api';
-	import { goto } from '$app/navigation';
 	import { Button, Input, Label, Select, Card, Progressbar, Alert, Spinner } from 'flowbite-svelte';
 	import {
 		BuildingOutline,
@@ -150,8 +149,9 @@
 				throw new Error('Failed to update session');
 			}
 
-			// Redirect to dashboard
-			goto('/');
+			// Use window.location for a full page reload to ensure session is properly set
+			// This avoids issues with Vite HMR reloading the page during SPA navigation
+			window.location.href = '/';
 		} catch (err) {
 			console.error('Failed to create organization:', err);
 			errorMessage = err instanceof Error ? err.message : 'Failed to create organization. Please try again.';

@@ -56,7 +56,9 @@
         "emailSent": "Correo enviado exitosamente",
         "downloadComplete": "Descarga completada",
         "downloadPdf": "Descargar PDF",
-        "close": "Cerrar"
+        "close": "Cerrar",
+        "total": "Total",
+        "number": "Número"
     },
     "statuses": {
         "active": "Activo",
@@ -167,6 +169,8 @@
         "outstandingAdvances": "Anticipos Pendientes",
         "recentActivity": "Actividad Reciente",
         "alerts": "Alertas",
+        "licenseExpired": "Licencia Vencida: La licencia de {name} ha expirado",
+        "licenseExpiring": "Licencia por Vencer: La licencia de {name} vence pronto",
         "upcomingTrips": "Próximos Viajes",
         "noUpcomingTrips": "No hay viajes programados",
         "justNow": "Ahora mismo"
@@ -303,6 +307,7 @@
     "drivers": {
         "title": "Conductores",
         "subtitle": "Administra tu equipo de conductores ({count} conductores)",
+        "driver": "Conductor",
         "addDriver": "Agregar Conductor",
         "editDriver": "Editar Conductor",
         "deleteDriver": "Eliminar Conductor",
@@ -365,6 +370,7 @@
     "quotations": {
         "title": "Cotizaciones",
         "subtitle": "Administra tus cotizaciones de transporte ({count} cotizaciones)",
+        "route": "Ruta",
         "newQuotation": "Nueva Cotización",
         "editQuotation": "Editar Cotización",
         "viewQuotation": "Ver Cotización",
@@ -730,6 +736,7 @@
     "itineraries": {
         "title": "Itinerarios",
         "subtitle": "Gestiona viajes programados ({count} itinerarios)",
+        "startDate": "Itinerario Inicia",
         "newItinerary": "Nuevo Itinerario",
         "editItinerary": "Editar Itinerario",
         "viewItinerary": "Ver Itinerario",
@@ -935,6 +942,43 @@
         "notRequired": "No requerido",
         "filterByStatus": "Filtrar por estado...",
         "searchPlaceholder": "Buscar anticipos...",
+        "notFound": "Anticipo no encontrado",
+        "amount": "Monto del Anticipo",
+        "actualExpenses": "Gastos Reales",
+        "driverOwes": "El conductor debe",
+        "companyOwes": "La empresa debe",
+        "estimatedBreakdown": "Desglose Estimado",
+        "actualBreakdown": "Desglose Real",
+        "pendingBalance": "Saldo Pendiente",
+        "markBalanceSettled": "Marcar Saldo como Liquidado",
+        "receiptsCount": "Cantidad de Recibos",
+        "confirmApprove": "¿Está seguro que desea aprobar este anticipo?",
+        "disbursementMethod": "Método de Desembolso",
+        "disbursementReference": "Referencia",
+        "disbursementReferencePlaceholder": "Número de transacción o cheque",
+        "settleInstructions": "Ingrese los gastos reales del viaje para calcular el saldo final",
+        "advanceGiven": "Anticipo Entregado",
+        "balance": "Saldo",
+        "breakdown": {
+            "fuel": "Combustible",
+            "meals": "Viáticos",
+            "lodging": "Hospedaje",
+            "tolls": "Peajes",
+            "other": "Otros"
+        },
+        "disbursement": {
+            "cash": "Efectivo",
+            "transfer": "Transferencia"
+        },
+        "messages": {
+            "submitted": "Anticipo enviado para aprobación",
+            "approved": "Anticipo aprobado exitosamente",
+            "disbursed": "Anticipo desembolsado exitosamente",
+            "settled": "Anticipo liquidado exitosamente",
+            "cancelled": "Anticipo cancelado",
+            "balanceSettled": "Saldo liquidado exitosamente",
+            "deleted": "Anticipo eliminado"
+        },
         "fields": {
             "purpose": "Propósito",
             "fuel": "Combustible",
@@ -950,6 +994,7 @@
             "cancellationReason": "Razón de Cancelación"
         },
         "status": {
+            "draft": "Borrador",
             "pending": "Pendiente",
             "approved": "Aprobado",
             "disbursed": "Desembolsado",
@@ -957,6 +1002,7 @@
             "cancelled": "Cancelado"
         },
         "stats": {
+            "draft": "Borradores",
             "pending": "Pendientes",
             "disbursed": "Desembolsados",
             "settled": "Liquidados",
@@ -971,11 +1017,15 @@
             "date": "Fecha"
         },
         "actions": {
+            "edit": "Editar",
+            "submitForApproval": "Enviar para Aprobación",
             "approve": "Aprobar",
             "disburse": "Desembolsar",
             "settle": "Liquidar",
             "cancel": "Cancelar",
-            "settleBalance": "Liquidar Saldo"
+            "settleBalance": "Liquidar Saldo",
+            "saveAsDraft": "Guardar como Borrador",
+            "delete": "Eliminar"
         },
         "sections": {
             "details": "Detalles del Anticipo",
@@ -995,6 +1045,7 @@
         },
         "timeline": {
             "created": "Anticipo Creado",
+            "submitted": "Enviado para Aprobación",
             "approved": "Anticipo Aprobado",
             "disbursed": "Dinero Entregado",
             "settled": "Gastos Liquidados",
