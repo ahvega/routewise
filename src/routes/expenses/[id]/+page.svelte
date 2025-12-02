@@ -555,6 +555,12 @@
 								<TrashBinOutline class="w-4 h-4 mr-2" />
 								{$t('expenses.actions.delete')}
 							</Button>
+						{:else if advance.status === 'cancelled'}
+							<!-- Cancelled advances can be deleted to allow creating a new one -->
+							<Button color="red" outline class="w-full" onclick={deleteAdvance} disabled={isSubmitting}>
+								<TrashBinOutline class="w-4 h-4 mr-2" />
+								{$t('expenses.actions.delete')}
+							</Button>
 						{:else if advance.status === 'pending'}
 							<Button color="green" class="w-full" onclick={() => (showApproveModal = true)}>
 								<CheckCircleOutline class="w-4 h-4 mr-2" />

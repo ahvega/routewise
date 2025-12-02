@@ -461,15 +461,18 @@ export const cancel = mutation({
   },
 });
 
-// Delete expense advance (only draft or pending)
+// Delete expense advance (draft, pending, or cancelled)
 export const remove = mutation({
   args: { id: v.id("expenseAdvances") },
   handler: async (ctx, args) => {
     const advance = await ctx.db.get(args.id);
     if (!advance) throw new Error("Expense advance not found");
 
-    if (advance.status !== "draft" && advance.status !== "pending") {
-      throw new Error("Only draft or pending advances can be deleted");
+    // Allow deleting draft, pending, or cancelled advances
+    // Approved, disbursed, and settled advances cannot be deleted (they are financial records)
+    const deletableStatuses = ["draft", "pending", "cancelled"];
+    if (!deletableStatuses.includes(advance.status)) {
+      throw new Error("Only draft, pending, or cancelled advances can be deleted");
     }
 
     await ctx.db.delete(args.id);
