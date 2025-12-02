@@ -89,8 +89,91 @@ export const byQuotation = query({
   },
 });
 
-// Generate next itinerary number
-async function generateItineraryNumber(ctx: any, tenantId: string): Promise<string> {
+// Document naming convention: YYMM-I#####-CODE-Leader_x_Pax
+// Example: 2512-I00005-HOTR-Carlos_Perez_x_08
+
+interface ItineraryNumberParts {
+  itineraryNumber: string;
+  itineraryLongName: string;
+  sequence: number;
+}
+
+// Generate YYMM prefix from current date
+function getYYMMPrefix(): string {
+  const now = new Date();
+  const year = String(now.getFullYear()).slice(-2);
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  return `${year}${month}`;
+}
+
+// Sanitize group leader name for document naming
+function sanitizeLeaderName(name: string | null | undefined): string {
+  if (!name || !name.trim()) return 'Grupo';
+  return name
+    .trim()
+    .replace(/[^a-zA-ZáéíóúñÁÉÍÓÚÑ\s]/g, '')
+    .replace(/\s+/g, '_')
+    .substring(0, 25);
+}
+
+// Get next sequence number for itineraries
+async function getNextItinerarySequence(ctx: any, tenantId: string): Promise<number> {
+  const existing = await ctx.db
+    .query("itineraries")
+    .withIndex("by_tenant", (q: any) => q.eq("tenantId", tenantId))
+    .collect();
+
+  let maxSeq = 0;
+  for (const i of existing) {
+    if (i.itinerarySequence && i.itinerarySequence > maxSeq) {
+      maxSeq = i.itinerarySequence;
+    }
+    // Parse from new format 2512-I00005
+    const match = i.itineraryNumber?.match(/^\d{4}-I(\d+)/);
+    if (match) {
+      const num = parseInt(match[1], 10);
+      if (num > maxSeq) maxSeq = num;
+    }
+    // Parse from legacy format IT-YYYY-NNNN
+    const legacyMatch = i.itineraryNumber?.match(/^IT-\d{4}-(\d+)/);
+    if (legacyMatch) {
+      const num = parseInt(legacyMatch[1], 10);
+      if (num > maxSeq) maxSeq = num;
+    }
+  }
+
+  return maxSeq + 1;
+}
+
+// Generate itinerary number in new format
+async function generateItineraryNumber(
+  ctx: any,
+  tenantId: string,
+  clientCode: string | null,
+  groupLeaderName: string | null,
+  groupSize: number
+): Promise<ItineraryNumberParts> {
+  const sequence = await getNextItinerarySequence(ctx, tenantId);
+  const paddedSeq = String(sequence).padStart(5, '0');
+  const yymmPrefix = getYYMMPrefix();
+  const code = clientCode || '';
+  const leaderPart = sanitizeLeaderName(groupLeaderName);
+  const groupSizePadded = String(groupSize).padStart(2, '0');
+
+  // Short number: 2512-I00005
+  const itineraryNumber = `${yymmPrefix}-I${paddedSeq}`;
+
+  // Long name: 2512-I00005-HOTR-Carlos_Perez_x_08
+  const longNameParts = [itineraryNumber];
+  if (code) longNameParts.push(code);
+  longNameParts.push(`${leaderPart}_x_${groupSizePadded}`);
+  const itineraryLongName = longNameParts.join('-');
+
+  return { itineraryNumber, itineraryLongName, sequence };
+}
+
+// Legacy function for backwards compatibility
+async function generateItineraryNumberLegacy(ctx: any, tenantId: string): Promise<string> {
   const year = new Date().getFullYear();
   const existing = await ctx.db
     .query("itineraries")
@@ -139,7 +222,24 @@ export const createFromQuotation = mutation({
     }
 
     const now = Date.now();
-    const itineraryNumber = await generateItineraryNumber(ctx, quotation.tenantId);
+
+    // Get client code if available
+    let clientCode: string | null = null;
+    if (quotation.clientId) {
+      const client = await ctx.db.get(quotation.clientId);
+      if (client?.clientCode) {
+        clientCode = client.clientCode;
+      }
+    }
+
+    // Generate itinerary number with new format
+    const { itineraryNumber, itineraryLongName, sequence } = await generateItineraryNumber(
+      ctx,
+      quotation.tenantId,
+      clientCode,
+      quotation.groupLeaderName || null,
+      quotation.groupSize
+    );
 
     // Use quotation's vehicle if not specified
     const vehicleId = args.vehicleId || quotation.vehicleId;
@@ -147,6 +247,8 @@ export const createFromQuotation = mutation({
     return await ctx.db.insert("itineraries", {
       tenantId: quotation.tenantId,
       itineraryNumber,
+      itineraryLongName,
+      itinerarySequence: sequence,
       quotationId: args.quotationId,
       clientId: quotation.clientId,
       vehicleId,
@@ -196,6 +298,7 @@ export const create = mutation({
     destination: v.string(),
     baseLocation: v.string(),
     groupSize: v.number(),
+    groupLeaderName: v.optional(v.string()), // For document naming
     totalDistance: v.number(),
     totalTime: v.number(),
     startDate: v.number(),
@@ -217,11 +320,30 @@ export const create = mutation({
   },
   handler: async (ctx, args) => {
     const now = Date.now();
-    const itineraryNumber = await generateItineraryNumber(ctx, args.tenantId);
+
+    // Get client code if available
+    let clientCode: string | null = null;
+    if (args.clientId) {
+      const client = await ctx.db.get(args.clientId);
+      if (client?.clientCode) {
+        clientCode = client.clientCode;
+      }
+    }
+
+    // Generate itinerary number with new format
+    const { itineraryNumber, itineraryLongName, sequence } = await generateItineraryNumber(
+      ctx,
+      args.tenantId,
+      clientCode,
+      args.groupLeaderName || null,
+      args.groupSize
+    );
 
     return await ctx.db.insert("itineraries", {
       ...args,
       itineraryNumber,
+      itineraryLongName,
+      itinerarySequence: sequence,
       status: 'scheduled',
       createdAt: now,
       updatedAt: now,

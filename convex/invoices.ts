@@ -2,8 +2,91 @@ import { v } from "convex/values";
 import { query, mutation, internalMutation } from "./_generated/server";
 import { internal } from "./_generated/api";
 
-// Generate invoice number
-function generateInvoiceNumber(): string {
+// Document naming convention: YYMM-F#####-CODE-Leader_x_Pax
+// Example: 2512-F00005-HOTR-Carlos_Perez_x_08
+
+interface InvoiceNumberParts {
+  invoiceNumber: string;
+  invoiceLongName: string;
+  sequence: number;
+}
+
+// Generate YYMM prefix from current date
+function getYYMMPrefix(): string {
+  const now = new Date();
+  const year = String(now.getFullYear()).slice(-2);
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  return `${year}${month}`;
+}
+
+// Sanitize group leader name for document naming
+function sanitizeLeaderName(name: string | null | undefined): string {
+  if (!name || !name.trim()) return 'Grupo';
+  return name
+    .trim()
+    .replace(/[^a-zA-ZáéíóúñÁÉÍÓÚÑ\s]/g, '')
+    .replace(/\s+/g, '_')
+    .substring(0, 25);
+}
+
+// Get next sequence number for invoices
+async function getNextInvoiceSequence(ctx: any, tenantId: string): Promise<number> {
+  const existing = await ctx.db
+    .query("invoices")
+    .withIndex("by_tenant", (q: any) => q.eq("tenantId", tenantId))
+    .collect();
+
+  let maxSeq = 0;
+  for (const i of existing) {
+    if (i.invoiceSequence && i.invoiceSequence > maxSeq) {
+      maxSeq = i.invoiceSequence;
+    }
+    // Parse from new format 2512-F00005
+    const match = i.invoiceNumber?.match(/^\d{4}-F(\d+)/);
+    if (match) {
+      const num = parseInt(match[1], 10);
+      if (num > maxSeq) maxSeq = num;
+    }
+    // Parse from legacy format INV-YYYY-NNNN
+    const legacyMatch = i.invoiceNumber?.match(/^INV-\d{4}-(\d+)/);
+    if (legacyMatch) {
+      const num = parseInt(legacyMatch[1], 10);
+      if (num > maxSeq) maxSeq = num;
+    }
+  }
+
+  return maxSeq + 1;
+}
+
+// Generate invoice number in new format
+async function generateInvoiceNumber(
+  ctx: any,
+  tenantId: string,
+  clientCode: string | null,
+  groupLeaderName: string | null,
+  groupSize: number
+): Promise<InvoiceNumberParts> {
+  const sequence = await getNextInvoiceSequence(ctx, tenantId);
+  const paddedSeq = String(sequence).padStart(5, '0');
+  const yymmPrefix = getYYMMPrefix();
+  const code = clientCode || '';
+  const leaderPart = sanitizeLeaderName(groupLeaderName);
+  const groupSizePadded = String(groupSize).padStart(2, '0');
+
+  // Short number: 2512-F00005
+  const invoiceNumber = `${yymmPrefix}-F${paddedSeq}`;
+
+  // Long name: 2512-F00005-HOTR-Carlos_Perez_x_08
+  const longNameParts = [invoiceNumber];
+  if (code) longNameParts.push(code);
+  longNameParts.push(`${leaderPart}_x_${groupSizePadded}`);
+  const invoiceLongName = longNameParts.join('-');
+
+  return { invoiceNumber, invoiceLongName, sequence };
+}
+
+// Legacy function for backwards compatibility
+function generateInvoiceNumberLegacy(): string {
   const year = new Date().getFullYear();
   const random = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
   return `INV-${year}-${random}`;
@@ -87,6 +170,8 @@ export const create = mutation({
     quotationId: v.optional(v.id("quotations")),
     itineraryId: v.optional(v.id("itineraries")),
     clientId: v.optional(v.id("clients")),
+    groupLeaderName: v.optional(v.string()), // For document naming
+    groupSize: v.optional(v.number()), // For document naming
     description: v.string(),
     // Line items (structured breakdown)
     lineItems: v.optional(v.array(v.object({
@@ -121,6 +206,42 @@ export const create = mutation({
   handler: async (ctx, args) => {
     const now = Date.now();
 
+    // Get client code if available
+    let clientCode: string | null = null;
+    let groupLeaderName = args.groupLeaderName || null;
+    let groupSize = args.groupSize || 1;
+
+    if (args.clientId) {
+      const client = await ctx.db.get(args.clientId);
+      if (client?.clientCode) {
+        clientCode = client.clientCode;
+      }
+    }
+
+    // If we have a quotation, get group info from there
+    if (args.quotationId) {
+      const quotation = await ctx.db.get(args.quotationId);
+      if (quotation) {
+        groupLeaderName = groupLeaderName || quotation.groupLeaderName || null;
+        groupSize = groupSize || quotation.groupSize || 1;
+        if (!clientCode && quotation.clientId) {
+          const client = await ctx.db.get(quotation.clientId);
+          if (client?.clientCode) {
+            clientCode = client.clientCode;
+          }
+        }
+      }
+    }
+
+    // Generate invoice number with new format
+    const { invoiceNumber, invoiceLongName, sequence } = await generateInvoiceNumber(
+      ctx,
+      args.tenantId,
+      clientCode,
+      groupLeaderName,
+      groupSize
+    );
+
     // Use local currency amounts if provided, otherwise use HNL (legacy)
     const subtotalLocal = args.subtotalLocal ?? args.subtotalHnl;
 
@@ -140,7 +261,9 @@ export const create = mutation({
 
     const invoiceId = await ctx.db.insert("invoices", {
       tenantId: args.tenantId,
-      invoiceNumber: generateInvoiceNumber(),
+      invoiceNumber,
+      invoiceLongName,
+      invoiceSequence: sequence,
       quotationId: args.quotationId,
       itineraryId: args.itineraryId,
       clientId: args.clientId,
@@ -277,9 +400,38 @@ export const createFromItinerary = mutation({
     // Create description from itinerary with full trip details
     const description = descriptionParts.join(', ');
 
+    // Get client code for invoice naming
+    let clientCode: string | null = null;
+    if (itinerary.clientId) {
+      const client = await ctx.db.get(itinerary.clientId);
+      if (client?.clientCode) {
+        clientCode = client.clientCode;
+      }
+    }
+
+    // Get group leader name from quotation if available
+    let groupLeaderName: string | null = null;
+    if (itinerary.quotationId) {
+      const quotation = await ctx.db.get(itinerary.quotationId);
+      if (quotation?.groupLeaderName) {
+        groupLeaderName = quotation.groupLeaderName;
+      }
+    }
+
+    // Generate invoice number with new format
+    const { invoiceNumber, invoiceLongName, sequence } = await generateInvoiceNumber(
+      ctx,
+      itinerary.tenantId,
+      clientCode,
+      groupLeaderName,
+      itinerary.groupSize
+    );
+
     const invoiceId = await ctx.db.insert("invoices", {
       tenantId: itinerary.tenantId,
-      invoiceNumber: generateInvoiceNumber(),
+      invoiceNumber,
+      invoiceLongName,
+      invoiceSequence: sequence,
       itineraryId: args.itineraryId,
       clientId: itinerary.clientId,
       invoiceDate: now,

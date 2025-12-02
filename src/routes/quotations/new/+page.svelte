@@ -63,6 +63,18 @@
 		() => (tenantStore.tenantId ? { tenantId: tenantStore.tenantId } : 'skip')
 	);
 
+	// Query sales agents for assignment
+	const salesAgentsQuery = useQuery(
+		api.tenants.getSalesAgents,
+		() => (tenantStore.tenantId ? { tenantId: tenantStore.tenantId } : 'skip')
+	);
+
+	// Query default sales agent
+	const defaultAgentQuery = useQuery(
+		api.tenants.getDefaultSalesAgent,
+		() => (tenantStore.tenantId ? { tenantId: tenantStore.tenantId } : 'skip')
+	);
+
 	const vehicles = $derived(vehiclesQuery.data || []);
 	const clients = $derived(clientsQuery.data || []);
 	const activeVehicles = $derived(vehicles.filter((v) => v.status === 'active'));
@@ -70,6 +82,8 @@
 	const isLoadingVehicles = $derived(vehiclesQuery.isLoading);
 	const isLoadingClients = $derived(clientsQuery.isLoading);
 	const parameters = $derived(parametersQuery.data);
+	const salesAgents = $derived(salesAgentsQuery.data || []);
+	const defaultSalesAgent = $derived(defaultAgentQuery.data);
 
 	// Markup options
 	const markupOptions = [10, 15, 20, 25, 30];
@@ -96,6 +110,27 @@
 	let selectedClientId = $state<string>('');
 	let selectedMarkup = $state(20); // Default 20% markup
 	let notes = $state('');
+
+	// New quotation standardization fields
+	let groupLeaderName = $state(''); // Group leader name for quotation naming
+	let assignedToId = $state<string>(''); // Sales agent ID
+	let paymentConditions = $state('contado'); // Payment conditions
+
+	// Payment condition options
+	const paymentConditionOptions = [
+		{ value: 'contado', label: 'Contado' },
+		{ value: 'credito_15', label: 'Crédito 15 días' },
+		{ value: 'credito_30', label: 'Crédito 30 días' },
+		{ value: 'credito_45', label: 'Crédito 45 días' },
+		{ value: 'credito_60', label: 'Crédito 60 días' }
+	];
+
+	// Set default sales agent when query loads
+	$effect(() => {
+		if (defaultSalesAgent && !assignedToId) {
+			assignedToId = defaultSalesAgent.userId;
+		}
+	});
 
 	// Departure date
 	let departureDate = $state('');
@@ -525,6 +560,10 @@
 				tenantId: tenantStore.tenantId as Id<'tenants'>,
 				clientId: selectedClientId ? (selectedClientId as Id<'clients'>) : undefined,
 				vehicleId: selectedVehicleId as Id<'vehicles'>,
+				// New quotation standardization fields
+				assignedTo: assignedToId ? (assignedToId as Id<'users'>) : undefined,
+				groupLeaderName: groupLeaderName.trim() || undefined,
+				paymentConditions: paymentConditions || undefined,
 				origin,
 				destination,
 				baseLocation: vehicleBaseLocation || origin,
@@ -747,6 +786,51 @@
 						{/if}
 					</div>
 				{/if}
+			</Card>
+
+			<!-- Quotation Details - Group Leader, Sales Agent, Payment -->
+			<Card class="max-w-none !p-6">
+				<h5 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Detalles de Cotización</h5>
+
+				<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+					<!-- Group Leader Name -->
+					<div>
+						<Label for="groupLeader" class="mb-2">Líder del Grupo / Contacto</Label>
+						<Input
+							id="groupLeader"
+							bind:value={groupLeaderName}
+							placeholder="Nombre del coordinador o líder"
+						/>
+						<p class="text-xs text-gray-500 mt-1">Nombre que aparecerá en el número de cotización</p>
+					</div>
+
+					<!-- Payment Conditions -->
+					<div>
+						<Label for="paymentConditions" class="mb-2">Condiciones de Pago</Label>
+						<Select id="paymentConditions" bind:value={paymentConditions}>
+							{#each paymentConditionOptions as option}
+								<option value={option.value}>{option.label}</option>
+							{/each}
+						</Select>
+					</div>
+
+					<!-- Sales Agent -->
+					{#if salesAgents.length > 0}
+						<div class="md:col-span-2">
+							<Label for="salesAgent" class="mb-2">Agente de Ventas</Label>
+							<Select id="salesAgent" bind:value={assignedToId}>
+								<option value="">Sin asignar</option>
+								{#each salesAgents as agent}
+									<option value={agent.userId}>
+										{agent.name} ({agent.initials})
+										{#if agent.isDefault} - Predeterminado{/if}
+									</option>
+								{/each}
+							</Select>
+							<p class="text-xs text-gray-500 mt-1">Las iniciales del agente aparecerán en documentos PDF</p>
+						</div>
+					{/if}
+				</div>
 			</Card>
 
 			<Card class="max-w-none !p-6">

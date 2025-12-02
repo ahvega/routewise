@@ -347,6 +347,10 @@ export const update = mutation({
     city: v.optional(v.string()),
     country: v.optional(v.string()),
     timezone: v.optional(v.string()),
+    websiteUrl: v.optional(v.string()),
+    fiscalDocumentName: v.optional(v.string()),
+    fiscalDocumentNumber: v.optional(v.string()),
+    defaultPaymentConditions: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const { id, ...updates } = args;
@@ -358,5 +362,238 @@ export const update = mutation({
       updatedAt: Date.now(),
     });
     return id;
+  },
+});
+
+// ============================================================
+// LOGO UPLOAD
+// ============================================================
+
+// Generate upload URL for logo
+export const generateLogoUploadUrl = mutation({
+  args: {},
+  handler: async (ctx) => {
+    return await ctx.storage.generateUploadUrl();
+  },
+});
+
+// Save logo after upload
+export const saveLogo = mutation({
+  args: {
+    tenantId: v.id("tenants"),
+    storageId: v.id("_storage"),
+  },
+  handler: async (ctx, args) => {
+    const tenant = await ctx.db.get(args.tenantId);
+    if (!tenant) throw new Error("Tenant not found");
+
+    // Get the URL for the uploaded file
+    const url = await ctx.storage.getUrl(args.storageId);
+
+    // Delete old logo if exists
+    if (tenant.logoStorageId) {
+      await ctx.storage.delete(tenant.logoStorageId);
+    }
+
+    // Update tenant with new logo
+    await ctx.db.patch(args.tenantId, {
+      logoStorageId: args.storageId,
+      logoUrl: url,
+      updatedAt: Date.now(),
+    });
+
+    return { success: true, logoUrl: url };
+  },
+});
+
+// Delete logo
+export const deleteLogo = mutation({
+  args: {
+    tenantId: v.id("tenants"),
+  },
+  handler: async (ctx, args) => {
+    const tenant = await ctx.db.get(args.tenantId);
+    if (!tenant) throw new Error("Tenant not found");
+
+    // Delete from storage if exists
+    if (tenant.logoStorageId) {
+      await ctx.storage.delete(tenant.logoStorageId);
+    }
+
+    // Clear logo fields
+    await ctx.db.patch(args.tenantId, {
+      logoStorageId: undefined,
+      logoUrl: undefined,
+      updatedAt: Date.now(),
+    });
+
+    return { success: true };
+  },
+});
+
+// ============================================================
+// SALES AGENTS MANAGEMENT
+// ============================================================
+
+// Get sales agents for dropdown (enriched with user data)
+export const getSalesAgents = query({
+  args: { tenantId: v.id("tenants") },
+  handler: async (ctx, args) => {
+    const tenant = await ctx.db.get(args.tenantId);
+    if (!tenant?.salesAgents) return [];
+
+    // Enrich with user data
+    const agents = await Promise.all(
+      tenant.salesAgents.map(async (agent) => {
+        const user = await ctx.db.get(agent.userId);
+        return {
+          userId: agent.userId,
+          initials: agent.initials,
+          isDefault: agent.isDefault,
+          name: user?.fullName || user?.email || 'Unknown',
+          email: user?.email || '',
+          avatarUrl: user?.avatarUrl,
+        };
+      })
+    );
+    return agents;
+  },
+});
+
+// Update sales agents list
+export const updateSalesAgents = mutation({
+  args: {
+    tenantId: v.id("tenants"),
+    salesAgents: v.array(v.object({
+      userId: v.id("users"),
+      initials: v.string(),
+      isDefault: v.boolean(),
+    })),
+  },
+  handler: async (ctx, args) => {
+    const tenant = await ctx.db.get(args.tenantId);
+    if (!tenant) throw new Error("Tenant not found");
+
+    // Validate that all users belong to this tenant
+    for (const agent of args.salesAgents) {
+      const user = await ctx.db.get(agent.userId);
+      if (!user || user.tenantId !== args.tenantId) {
+        throw new Error(`Invalid user: ${agent.userId}`);
+      }
+    }
+
+    // Ensure only one default agent
+    const defaultCount = args.salesAgents.filter(a => a.isDefault).length;
+    if (defaultCount > 1) {
+      throw new Error("Only one agent can be set as default");
+    }
+
+    await ctx.db.patch(args.tenantId, {
+      salesAgents: args.salesAgents,
+      updatedAt: Date.now(),
+    });
+
+    return { success: true };
+  },
+});
+
+// Add a sales agent
+export const addSalesAgent = mutation({
+  args: {
+    tenantId: v.id("tenants"),
+    userId: v.id("users"),
+    initials: v.string(),
+    isDefault: v.optional(v.boolean()),
+  },
+  handler: async (ctx, args) => {
+    const tenant = await ctx.db.get(args.tenantId);
+    if (!tenant) throw new Error("Tenant not found");
+
+    // Validate user belongs to tenant
+    const user = await ctx.db.get(args.userId);
+    if (!user || user.tenantId !== args.tenantId) {
+      throw new Error("User does not belong to this tenant");
+    }
+
+    const currentAgents = tenant.salesAgents || [];
+
+    // Check if user is already an agent
+    if (currentAgents.some(a => a.userId === args.userId)) {
+      throw new Error("User is already a sales agent");
+    }
+
+    // If this is the first agent or marked as default, make it default
+    const isDefault = args.isDefault || currentAgents.length === 0;
+
+    // If setting as default, clear other defaults
+    const updatedAgents = isDefault
+      ? currentAgents.map(a => ({ ...a, isDefault: false }))
+      : currentAgents;
+
+    updatedAgents.push({
+      userId: args.userId,
+      initials: args.initials.toUpperCase().substring(0, 3),
+      isDefault,
+    });
+
+    await ctx.db.patch(args.tenantId, {
+      salesAgents: updatedAgents,
+      updatedAt: Date.now(),
+    });
+
+    return { success: true };
+  },
+});
+
+// Remove a sales agent
+export const removeSalesAgent = mutation({
+  args: {
+    tenantId: v.id("tenants"),
+    userId: v.id("users"),
+  },
+  handler: async (ctx, args) => {
+    const tenant = await ctx.db.get(args.tenantId);
+    if (!tenant) throw new Error("Tenant not found");
+
+    const currentAgents = tenant.salesAgents || [];
+    const agentToRemove = currentAgents.find(a => a.userId === args.userId);
+
+    if (!agentToRemove) {
+      throw new Error("User is not a sales agent");
+    }
+
+    const updatedAgents = currentAgents.filter(a => a.userId !== args.userId);
+
+    // If removed agent was default, make first remaining agent default
+    if (agentToRemove.isDefault && updatedAgents.length > 0) {
+      updatedAgents[0].isDefault = true;
+    }
+
+    await ctx.db.patch(args.tenantId, {
+      salesAgents: updatedAgents,
+      updatedAt: Date.now(),
+    });
+
+    return { success: true };
+  },
+});
+
+// Get default sales agent
+export const getDefaultSalesAgent = query({
+  args: { tenantId: v.id("tenants") },
+  handler: async (ctx, args) => {
+    const tenant = await ctx.db.get(args.tenantId);
+    if (!tenant?.salesAgents) return null;
+
+    const defaultAgent = tenant.salesAgents.find(a => a.isDefault);
+    if (!defaultAgent) return null;
+
+    const user = await ctx.db.get(defaultAgent.userId);
+    return {
+      userId: defaultAgent.userId,
+      initials: defaultAgent.initials,
+      name: user?.fullName || user?.email || 'Unknown',
+      email: user?.email || '',
+    };
   },
 });

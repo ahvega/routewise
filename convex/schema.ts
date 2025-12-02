@@ -9,12 +9,15 @@ export default defineSchema({
     plan: v.string(), // 'trial' | 'starter' | 'professional' | 'business' | 'enterprise' | 'founder'
     status: v.string(), // 'active' | 'suspended' | 'cancelled' | 'trial_expired'
     logoUrl: v.optional(v.string()),
+    logoStorageId: v.optional(v.id("_storage")), // Convex file storage ID for logo
     primaryContactEmail: v.string(),
     primaryContactPhone: v.optional(v.string()),
     address: v.optional(v.string()),
     city: v.optional(v.string()),
     country: v.string(),
     timezone: v.string(),
+    // Website URL for PDF header
+    websiteUrl: v.optional(v.string()),
     // Subscription fields
     subscriptionId: v.optional(v.string()), // Stripe subscription ID
     subscriptionStatus: v.optional(v.string()), // 'trialing' | 'active' | 'past_due' | 'cancelled'
@@ -43,6 +46,14 @@ export default defineSchema({
     // Fiscal document configuration (country-specific)
     fiscalDocumentName: v.optional(v.string()), // "RTN" in Honduras, "NIT" in Guatemala, etc.
     fiscalDocumentNumber: v.optional(v.string()), // Company's fiscal document number
+    // Sales agents configuration (for quotation assignment)
+    salesAgents: v.optional(v.array(v.object({
+      userId: v.id("users"),
+      initials: v.string(), // 2-3 character initials like "AH", "JM"
+      isDefault: v.boolean(),
+    }))),
+    // Default payment conditions for quotations
+    defaultPaymentConditions: v.optional(v.string()), // "Contado", "Crédito 15 días", etc.
     // Owner reference
     ownerId: v.optional(v.id("users")),
     createdAt: v.number(),
@@ -183,6 +194,8 @@ export default defineSchema({
   clients: defineTable({
     tenantId: v.id("tenants"),
     type: v.string(), // 'individual' | 'company'
+    // Client code for quotation naming (4-letter acronym, e.g., "HOTR" for "Honduras Travel")
+    clientCode: v.optional(v.string()), // Auto-generated or manually set
     companyName: v.optional(v.string()),
     firstName: v.optional(v.string()),
     lastName: v.optional(v.string()),
@@ -204,7 +217,8 @@ export default defineSchema({
     updatedAt: v.number(),
   })
     .index("by_tenant", ["tenantId"])
-    .index("by_tenant_email", ["tenantId", "email"]),
+    .index("by_tenant_email", ["tenantId", "email"])
+    .index("by_tenant_code", ["tenantId", "clientCode"]),
 
   // Drivers
   drivers: defineTable({
@@ -228,10 +242,20 @@ export default defineSchema({
   // Quotations
   quotations: defineTable({
     tenantId: v.id("tenants"),
-    quotationNumber: v.string(),
+    quotationNumber: v.string(), // Short format: 2512-C00005
+    quotationLongName: v.optional(v.string()), // Full format: 2512-C00005-HOTR-Carlos_Perez_x_08
+    quotationSequence: v.optional(v.number()), // The sequential number (e.g., 5)
     clientId: v.optional(v.id("clients")),
     vehicleId: v.optional(v.id("vehicles")),
     createdBy: v.optional(v.id("users")),
+    // Sales agent assignment
+    assignedTo: v.optional(v.id("users")), // Sales agent responsible for this quotation
+    assignedToInitials: v.optional(v.string()), // Cached initials for PDF display (e.g., "AH")
+    // Group leader info (for naming convention)
+    groupLeaderName: v.optional(v.string()), // e.g., "Erasmo Santos"
+    // Payment and commercial terms
+    paymentConditions: v.optional(v.string()), // "Contado", "Crédito 15 días", etc.
+    purchaseOrderNumber: v.optional(v.string()), // Client's P.O. number
     // Trip details
     origin: v.string(),
     destination: v.string(),
@@ -241,11 +265,26 @@ export default defineSchema({
     estimatedDays: v.number(),
     isRoundTrip: v.optional(v.boolean()), // true = round trip, false = one-way (defaults to true for backwards compat)
     departureDate: v.optional(v.number()), // Planned departure date
+    returnDate: v.optional(v.number()), // Planned return date (for multi-day trips)
     // Route info
     totalDistance: v.number(),
     totalTime: v.number(),
     deadheadDistance: v.optional(v.number()), // Repositioning distance (base->origin + return to base)
     mainTripDistance: v.optional(v.number()), // Client trip distance (origin->destination, with or without return)
+    // Multi-vehicle service lines (for quotations with multiple vehicles/dates)
+    serviceLines: v.optional(v.array(v.object({
+      id: v.string(), // Unique line ID (UUID)
+      description: v.string(), // Full service description
+      route: v.string(), // "Tegucigalpa - La Ceiba - Tegucigalpa"
+      days: v.number(), // Trip duration in days
+      distance: v.number(), // Distance in km
+      dates: v.string(), // Date range string "15-17/jul/2025"
+      vehicleId: v.optional(v.id("vehicles")),
+      vehicleName: v.string(), // "01 Coaster x 22"
+      quantity: v.number(), // Usually 1
+      unitPrice: v.number(), // Price per unit in local currency
+      totalPrice: v.number(), // quantity * unitPrice
+    }))),
     // Currency used for this quotation (frozen at creation)
     localCurrency: v.optional(v.string()), // 'HNL', 'GTQ', etc. - defaults to HNL for backwards compatibility
     exchangeRateUsed: v.number(), // Exchange rate at time of creation
@@ -285,6 +324,9 @@ export default defineSchema({
     salePriceLocal: v.optional(v.number()), // Sale price in local currency
     salePriceHnl: v.number(), // Legacy field, kept for backwards compatibility
     salePriceUsd: v.number(),
+    // Client discount (applied after subtotal)
+    discountPercentage: v.optional(v.number()), // e.g., 10 for 10%
+    discountAmount: v.optional(v.number()), // Calculated discount amount in local currency
     // Options
     includeFuel: v.boolean(),
     includeMeals: v.boolean(),
@@ -307,12 +349,15 @@ export default defineSchema({
   })
     .index("by_tenant", ["tenantId"])
     .index("by_tenant_status", ["tenantId", "status"])
-    .index("by_client", ["clientId"]),
+    .index("by_client", ["clientId"])
+    .index("by_assigned", ["assignedTo"]),
 
   // Itineraries (Scheduled trips from approved quotations)
   itineraries: defineTable({
     tenantId: v.id("tenants"),
-    itineraryNumber: v.string(),
+    itineraryNumber: v.string(), // Short format: 2512-I00005
+    itineraryLongName: v.optional(v.string()), // Full format: 2512-I00005-HOTR-Carlos_Perez_x_08
+    itinerarySequence: v.optional(v.number()), // Sequential number
     quotationId: v.optional(v.id("quotations")),
     clientId: v.optional(v.id("clients")),
     vehicleId: v.optional(v.id("vehicles")),
@@ -408,7 +453,9 @@ export default defineSchema({
   // Invoices
   invoices: defineTable({
     tenantId: v.id("tenants"),
-    invoiceNumber: v.string(),
+    invoiceNumber: v.string(), // Short format: 2512-F00005
+    invoiceLongName: v.optional(v.string()), // Full format: 2512-F00005-HOTR-Carlos_Perez_x_08
+    invoiceSequence: v.optional(v.number()), // Sequential number
     quotationId: v.optional(v.id("quotations")), // Reference to source quotation
     itineraryId: v.optional(v.id("itineraries")),
     clientId: v.optional(v.id("clients")),

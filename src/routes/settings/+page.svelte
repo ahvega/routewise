@@ -10,9 +10,11 @@
 		TabItem,
 		Spinner,
 		Toast,
-		Helper
+		Helper,
+		Fileupload,
+		Alert
 	} from 'flowbite-svelte';
-	import { CheckCircleOutline, CloseCircleOutline, CogOutline, UsersOutline, CreditCardOutline, ChevronRightOutline } from 'flowbite-svelte-icons';
+	import { CheckCircleOutline, CloseCircleOutline, CogOutline, UsersOutline, CreditCardOutline, ChevronRightOutline, UploadOutline, TrashBinOutline } from 'flowbite-svelte-icons';
 	import { useQuery, useConvexClient } from 'convex-svelte';
 	import { api } from '$convex/_generated/api';
 	import { tenantStore } from '$lib/stores';
@@ -113,6 +115,13 @@
 	// Loading states
 	let isSaving = $state(false);
 	let isSavingOrg = $state(false);
+	let isUploadingLogo = $state(false);
+	let isDeletingLogo = $state(false);
+
+	// Logo upload state
+	let logoError = $state<string | null>(null);
+	const MAX_LOGO_SIZE = 5 * 1024 * 1024; // 5MB
+	const ALLOWED_LOGO_TYPES = ['image/png', 'image/jpeg', 'image/svg+xml'];
 
 	// Default pricing levels
 	const defaultPricingLevels: PricingLevel[] = [
@@ -282,6 +291,79 @@
 			showToastMessage($t('settings.saveFailed'), 'error');
 		} finally {
 			isSavingOrg = false;
+		}
+	}
+
+	async function handleLogoUpload(event: Event) {
+		const input = event.target as HTMLInputElement;
+		const file = input.files?.[0];
+
+		if (!file || !tenantStore.tenantId) return;
+
+		// Validate file type
+		if (!ALLOWED_LOGO_TYPES.includes(file.type)) {
+			logoError = 'Formato no válido. Use PNG, JPG o SVG.';
+			return;
+		}
+
+		// Validate file size
+		if (file.size > MAX_LOGO_SIZE) {
+			logoError = 'El archivo es muy grande. Máximo 5MB.';
+			return;
+		}
+
+		logoError = null;
+		isUploadingLogo = true;
+
+		try {
+			// Get upload URL from Convex
+			const uploadUrl = await client.mutation(api.tenants.generateLogoUploadUrl, {});
+
+			// Upload file to Convex storage
+			const response = await fetch(uploadUrl, {
+				method: 'POST',
+				headers: { 'Content-Type': file.type },
+				body: file
+			});
+
+			if (!response.ok) {
+				throw new Error('Failed to upload file');
+			}
+
+			const { storageId } = await response.json();
+
+			// Save logo reference to tenant
+			await client.mutation(api.tenants.saveLogo, {
+				tenantId: tenantStore.tenantId,
+				storageId
+			});
+
+			showToastMessage('Logo actualizado exitosamente', 'success');
+		} catch (error) {
+			console.error('Failed to upload logo:', error);
+			logoError = 'Error al subir el logo. Intente nuevamente.';
+			showToastMessage('Error al subir el logo', 'error');
+		} finally {
+			isUploadingLogo = false;
+			// Reset file input
+			input.value = '';
+		}
+	}
+
+	async function handleDeleteLogo() {
+		if (!tenantStore.tenantId) return;
+
+		isDeletingLogo = true;
+		try {
+			await client.mutation(api.tenants.deleteLogo, {
+				tenantId: tenantStore.tenantId
+			});
+			showToastMessage('Logo eliminado', 'success');
+		} catch (error) {
+			console.error('Failed to delete logo:', error);
+			showToastMessage('Error al eliminar el logo', 'error');
+		} finally {
+			isDeletingLogo = false;
 		}
 	}
 
@@ -793,6 +875,92 @@
 			</TabItem>
 
 			<TabItem title={$t('settings.tabs.organization')}>
+				<!-- Company Logo Upload -->
+				<Card class="max-w-none mt-4">
+					<h5 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Logo de la Empresa</h5>
+					<p class="text-sm text-gray-500 dark:text-gray-400 mb-4">
+						Este logo se mostrará en cotizaciones, facturas y documentos PDF.
+					</p>
+
+					{#if tenant}
+						<div class="flex items-start gap-6">
+							<!-- Logo Preview -->
+							<div class="flex-shrink-0">
+								<div class="w-32 h-32 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg flex items-center justify-center overflow-hidden bg-gray-50 dark:bg-gray-800">
+									{#if tenant.logoUrl}
+										<img
+											src={tenant.logoUrl}
+											alt="Logo de la empresa"
+											class="max-w-full max-h-full object-contain"
+										/>
+									{:else}
+										<div class="text-center text-gray-400 dark:text-gray-500 p-4">
+											<UploadOutline class="w-8 h-8 mx-auto mb-2" />
+											<span class="text-xs">Sin logo</span>
+										</div>
+									{/if}
+								</div>
+							</div>
+
+							<!-- Upload Controls -->
+							<div class="flex-1 space-y-4">
+								<div>
+									<Label for="logoUpload">Subir nuevo logo</Label>
+									<input
+										type="file"
+										id="logoUpload"
+										accept="image/png,image/jpeg,image/svg+xml"
+										onchange={handleLogoUpload}
+										disabled={isUploadingLogo}
+										class="block w-full text-sm text-gray-500 dark:text-gray-400
+											file:mr-4 file:py-2 file:px-4
+											file:rounded-lg file:border-0
+											file:text-sm file:font-semibold
+											file:bg-primary-50 file:text-primary-700
+											dark:file:bg-primary-900 dark:file:text-primary-300
+											hover:file:bg-primary-100 dark:hover:file:bg-primary-800
+											disabled:opacity-50 disabled:cursor-not-allowed"
+									/>
+									<Helper class="mt-1">PNG, JPG o SVG. Máximo 5MB.</Helper>
+								</div>
+
+								{#if logoError}
+									<Alert color="red" class="!p-3">
+										<span class="text-sm">{logoError}</span>
+									</Alert>
+								{/if}
+
+								{#if isUploadingLogo}
+									<div class="flex items-center gap-2 text-sm text-gray-500">
+										<Spinner size="4" />
+										<span>Subiendo logo...</span>
+									</div>
+								{/if}
+
+								{#if tenant.logoUrl}
+									<Button
+										color="red"
+										outline
+										size="sm"
+										onclick={handleDeleteLogo}
+										disabled={isDeletingLogo}
+									>
+										{#if isDeletingLogo}
+											<Spinner size="4" class="mr-2" />
+										{:else}
+											<TrashBinOutline class="w-4 h-4 mr-2" />
+										{/if}
+										Eliminar logo
+									</Button>
+								{/if}
+							</div>
+						</div>
+					{:else}
+						<p class="text-gray-500 dark:text-gray-400">Cargando...</p>
+					{/if}
+				</Card>
+
+				<!-- Organization Info -->
 				<Card class="max-w-none mt-4">
 					<h5 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">{$t('settings.organization.title')}</h5>
 

@@ -69,6 +69,7 @@
 	// Form state
 	let formData = $state({
 		type: 'company' as 'company' | 'individual',
+		clientCode: '', // 4-letter code for quotation naming
 		companyName: '',
 		firstName: '',
 		lastName: '',
@@ -97,6 +98,14 @@
 
 	// Table columns configuration (reactive for i18n)
 	const columns = $derived<Column<any>[]>([
+		{
+			key: 'clientCode',
+			label: 'Código',
+			sortable: true,
+			filterable: true,
+			filterPlaceholder: 'Código...',
+			getValue: (c) => c.clientCode || '-'
+		},
 		{
 			key: 'name',
 			label: $t('clients.columns.client'),
@@ -151,6 +160,7 @@
 		const defaultLevel = pricingLevels.find(l => l.isDefault) || pricingLevels[0];
 		formData = {
 			type: 'company',
+			clientCode: '', // Auto-generated if left empty
 			companyName: '',
 			firstName: '',
 			lastName: '',
@@ -176,6 +186,7 @@
 		editingId = clientData._id;
 		formData = {
 			type: clientData.type,
+			clientCode: clientData.clientCode || '',
 			companyName: clientData.companyName || '',
 			firstName: clientData.firstName || '',
 			lastName: clientData.lastName || '',
@@ -219,6 +230,7 @@
 		try {
 			const payload = {
 				...formData,
+				clientCode: formData.clientCode?.trim().toUpperCase() || undefined, // Will auto-generate if empty
 				companyName: formData.companyName || undefined,
 				firstName: formData.firstName || undefined,
 				lastName: formData.lastName || undefined,
@@ -396,19 +408,43 @@
 		</div>
 
 		{#if formData.type === 'company'}
-			<div>
-				<Label for="companyName">{$t('clients.fields.companyName')} *</Label>
-				<Input id="companyName" bind:value={formData.companyName} required placeholder={$t('clients.fields.companyNamePlaceholder')} />
+			<div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+				<div class="md:col-span-3">
+					<Label for="companyName">{$t('clients.fields.companyName')} *</Label>
+					<Input id="companyName" bind:value={formData.companyName} required placeholder={$t('clients.fields.companyNamePlaceholder')} />
+				</div>
+				<div>
+					<Label for="clientCode">Código</Label>
+					<Input
+						id="clientCode"
+						bind:value={formData.clientCode}
+						placeholder="AUTO"
+						maxlength="4"
+						class="uppercase font-mono"
+					/>
+					<p class="text-xs text-gray-500 mt-1">4 letras, ej: HOTR</p>
+				</div>
 			</div>
 		{:else}
-			<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-				<div>
+			<div class="grid grid-cols-1 md:grid-cols-5 gap-4">
+				<div class="md:col-span-2">
 					<Label for="firstName">{$t('clients.fields.firstName')} *</Label>
 					<Input id="firstName" bind:value={formData.firstName} required placeholder={$t('clients.fields.firstNamePlaceholder')} />
 				</div>
-				<div>
+				<div class="md:col-span-2">
 					<Label for="lastName">{$t('clients.fields.lastName')} *</Label>
 					<Input id="lastName" bind:value={formData.lastName} required placeholder={$t('clients.fields.lastNamePlaceholder')} />
+				</div>
+				<div>
+					<Label for="clientCode">Código</Label>
+					<Input
+						id="clientCode"
+						bind:value={formData.clientCode}
+						placeholder="AUTO"
+						maxlength="4"
+						class="uppercase font-mono"
+					/>
+					<p class="text-xs text-gray-500 mt-1">4 letras</p>
 				</div>
 			</div>
 		{/if}

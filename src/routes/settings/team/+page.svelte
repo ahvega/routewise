@@ -20,7 +20,8 @@
 		Input,
 		Select,
 		Toast,
-		Avatar
+		Avatar,
+		Toggle
 	} from 'flowbite-svelte';
 	import {
 		UsersOutline,
@@ -31,7 +32,8 @@
 		CloseCircleOutline,
 		ClockOutline,
 		RefreshOutline,
-		UserOutline
+		UserOutline,
+		BriefcaseOutline
 	} from 'flowbite-svelte-icons';
 
 	let { data } = $props();
@@ -55,11 +57,23 @@
 		() => (tenantStore.tenantId ? { id: tenantStore.tenantId } : 'skip')
 	);
 
+	// Query sales agents
+	const salesAgentsQuery = useQuery(
+		api.tenants.getSalesAgents,
+		() => (tenantStore.tenantId ? { tenantId: tenantStore.tenantId } : 'skip')
+	);
+
 	// Derived values
 	const users = $derived(usersQuery.data || []);
 	const invitations = $derived(invitationsQuery.data || []);
 	const tenant = $derived(tenantQuery.data);
+	const salesAgents = $derived(salesAgentsQuery.data || []);
 	const isLoading = $derived(usersQuery.isLoading);
+
+	// Get users who are not yet sales agents
+	const availableForSalesAgent = $derived(
+		users.filter(u => !salesAgents.some(a => a.userId === u._id))
+	);
 
 	// Check if can invite more users
 	const canInvite = $derived(() => {
@@ -74,6 +88,14 @@
 	let inviteEmail = $state('');
 	let inviteRole = $state('user');
 	let isInviting = $state(false);
+
+	// Sales agent modal state
+	let showAddAgentModal = $state(false);
+	let selectedUserId = $state('');
+	let agentInitials = $state('');
+	let isAddingAgent = $state(false);
+	let isRemovingAgent = $state<string | null>(null);
+	let isUpdatingDefault = $state(false);
 
 	// Toast state
 	let showToast = $state(false);
@@ -142,6 +164,94 @@
 		} catch (err) {
 			console.error('Failed to remove user:', err);
 			showToastMessage(err instanceof Error ? err.message : $t('settings.team.removeFailed'), 'error');
+		}
+	}
+
+	// Generate initials from name
+	function generateInitials(name: string): string {
+		const words = name.trim().split(/\s+/);
+		if (words.length === 1) {
+			return words[0].substring(0, 2).toUpperCase();
+		}
+		return (words[0][0] + words[words.length - 1][0]).toUpperCase();
+	}
+
+	// Handle user selection for sales agent
+	function handleUserSelect() {
+		if (selectedUserId) {
+			const user = users.find(u => u._id === selectedUserId);
+			if (user && user.fullName) {
+				agentInitials = generateInitials(user.fullName);
+			}
+		}
+	}
+
+	async function handleAddSalesAgent() {
+		if (!tenantStore.tenantId || !selectedUserId || !agentInitials.trim()) return;
+
+		isAddingAgent = true;
+		try {
+			await client.mutation(api.tenants.addSalesAgent, {
+				tenantId: tenantStore.tenantId,
+				userId: selectedUserId as any,
+				initials: agentInitials.trim().toUpperCase(),
+				isDefault: salesAgents.length === 0 // First agent is default
+			});
+
+			showToastMessage('Agente de ventas agregado', 'success');
+			showAddAgentModal = false;
+			selectedUserId = '';
+			agentInitials = '';
+		} catch (err) {
+			console.error('Failed to add sales agent:', err);
+			showToastMessage(err instanceof Error ? err.message : 'Error al agregar agente', 'error');
+		} finally {
+			isAddingAgent = false;
+		}
+	}
+
+	async function handleRemoveSalesAgent(userId: string) {
+		if (!tenantStore.tenantId) return;
+		if (!confirm('¿Eliminar este agente de ventas?')) return;
+
+		isRemovingAgent = userId;
+		try {
+			await client.mutation(api.tenants.removeSalesAgent, {
+				tenantId: tenantStore.tenantId,
+				userId: userId as any
+			});
+			showToastMessage('Agente eliminado', 'success');
+		} catch (err) {
+			console.error('Failed to remove sales agent:', err);
+			showToastMessage('Error al eliminar agente', 'error');
+		} finally {
+			isRemovingAgent = null;
+		}
+	}
+
+	async function handleSetDefaultAgent(userId: string) {
+		if (!tenantStore.tenantId) return;
+
+		isUpdatingDefault = true;
+		try {
+			// Update all agents: set selected as default, others as non-default
+			const updatedAgents = salesAgents.map(a => ({
+				userId: a.userId as any,
+				initials: a.initials,
+				isDefault: a.userId === userId
+			}));
+
+			await client.mutation(api.tenants.updateSalesAgents, {
+				tenantId: tenantStore.tenantId,
+				salesAgents: updatedAgents
+			});
+
+			showToastMessage('Agente predeterminado actualizado', 'success');
+		} catch (err) {
+			console.error('Failed to update default agent:', err);
+			showToastMessage('Error al actualizar agente predeterminado', 'error');
+		} finally {
+			isUpdatingDefault = false;
 		}
 	}
 
@@ -287,6 +397,97 @@
 			{/if}
 		</Card>
 
+		<!-- Sales Agents Configuration -->
+		<Card class="max-w-none">
+			<div class="flex items-center justify-between mb-4">
+				<div class="flex items-center gap-2">
+					<BriefcaseOutline class="w-5 h-5 text-gray-500" />
+					<h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+						Agentes de Ventas
+						<span class="text-gray-500 font-normal">({salesAgents.length})</span>
+					</h3>
+				</div>
+				<Button
+					size="sm"
+					color="light"
+					onclick={() => (showAddAgentModal = true)}
+					disabled={availableForSalesAgent.length === 0}
+				>
+					<PlusOutline class="w-4 h-4 mr-2" />
+					Agregar Agente
+				</Button>
+			</div>
+
+			<p class="text-sm text-gray-500 dark:text-gray-400 mb-4">
+				Los agentes de ventas aparecen como opción al crear cotizaciones. Sus iniciales se muestran en los documentos PDF.
+			</p>
+
+			{#if salesAgents.length === 0}
+				<div class="text-center py-8 text-gray-500 dark:text-gray-400">
+					<BriefcaseOutline class="w-12 h-12 mx-auto mb-3 opacity-50" />
+					<p>No hay agentes de ventas configurados</p>
+					<p class="text-sm">Agrega miembros del equipo como agentes de ventas</p>
+				</div>
+			{:else}
+				<Table striped>
+					<TableHead>
+						<TableHeadCell>Agente</TableHeadCell>
+						<TableHeadCell>Iniciales</TableHeadCell>
+						<TableHeadCell>Predeterminado</TableHeadCell>
+						<TableHeadCell class="text-right">Acciones</TableHeadCell>
+					</TableHead>
+					<TableBody>
+						{#each salesAgents as agent}
+							<TableBodyRow>
+								<TableBodyCell>
+									<div class="flex items-center gap-3">
+										{#if agent.avatarUrl}
+											<Avatar src={agent.avatarUrl} size="sm" />
+										{:else}
+											<Avatar size="sm">
+												<UserOutline class="w-4 h-4" />
+											</Avatar>
+										{/if}
+										<div>
+											<p class="font-medium text-gray-900 dark:text-white">{agent.name}</p>
+											<p class="text-sm text-gray-500">{agent.email}</p>
+										</div>
+									</div>
+								</TableBodyCell>
+								<TableBodyCell>
+									<Badge color="blue" class="font-mono text-lg">
+										{agent.initials}
+									</Badge>
+								</TableBodyCell>
+								<TableBodyCell>
+									<Toggle
+										checked={agent.isDefault}
+										disabled={isUpdatingDefault || agent.isDefault}
+										onchange={() => handleSetDefaultAgent(agent.userId)}
+									/>
+								</TableBodyCell>
+								<TableBodyCell class="text-right">
+									<Button
+										size="xs"
+										color="red"
+										outline
+										disabled={isRemovingAgent === agent.userId}
+										onclick={() => handleRemoveSalesAgent(agent.userId)}
+									>
+										{#if isRemovingAgent === agent.userId}
+											<Spinner size="4" />
+										{:else}
+											<TrashBinOutline class="w-4 h-4" />
+										{/if}
+									</Button>
+								</TableBodyCell>
+							</TableBodyRow>
+						{/each}
+					</TableBody>
+				</Table>
+			{/if}
+		</Card>
+
 		<!-- Pending Invitations -->
 		{#if invitations.length > 0}
 			<Card class="max-w-none">
@@ -396,6 +597,52 @@
 			{/if}
 			<EnvelopeOutline class="w-4 h-4 mr-2" />
 			{$t('settings.team.sendInvite')}
+		</Button>
+	{/snippet}
+</Modal>
+
+<!-- Add Sales Agent Modal -->
+<Modal bind:open={showAddAgentModal} size="sm" title="Agregar Agente de Ventas">
+	<div class="space-y-4">
+		<div>
+			<Label for="selectUser">Seleccionar Miembro</Label>
+			<Select id="selectUser" bind:value={selectedUserId} onchange={handleUserSelect}>
+				<option value="">-- Seleccionar --</option>
+				{#each availableForSalesAgent as user}
+					<option value={user._id}>{user.fullName} ({user.email})</option>
+				{/each}
+			</Select>
+		</div>
+
+		<div>
+			<Label for="agentInitials">Iniciales (2-3 caracteres)</Label>
+			<Input
+				id="agentInitials"
+				bind:value={agentInitials}
+				placeholder="Ej: AH, JM"
+				maxlength="3"
+				class="uppercase font-mono"
+			/>
+			<p class="text-xs text-gray-500 mt-1">
+				Las iniciales se muestran en cotizaciones y documentos PDF
+			</p>
+		</div>
+	</div>
+
+	{#snippet footer()}
+		<Button color="light" onclick={() => { showAddAgentModal = false; selectedUserId = ''; agentInitials = ''; }}>
+			Cancelar
+		</Button>
+		<Button
+			color="blue"
+			onclick={handleAddSalesAgent}
+			disabled={isAddingAgent || !selectedUserId || !agentInitials.trim()}
+		>
+			{#if isAddingAgent}
+				<Spinner size="4" class="mr-2" />
+			{/if}
+			<PlusOutline class="w-4 h-4 mr-2" />
+			Agregar Agente
 		</Button>
 	{/snippet}
 </Modal>

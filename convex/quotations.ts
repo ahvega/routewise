@@ -52,8 +52,169 @@ export const get = query({
   },
 });
 
-// Generate next quotation number
-async function generateQuotationNumber(ctx: any, tenantId: string): Promise<string> {
+// Helper to generate client code from name (4 letters)
+function generateClientCode(name: string): string {
+  // Remove common suffixes and clean the name
+  const cleaned = name
+    .replace(/\s+(S\.?\s*A\.?|Inc\.?|LLC|Ltd\.?|Corp\.?|Company|Co\.?)$/i, '')
+    .trim();
+
+  // Split into words
+  const words = cleaned.split(/\s+/).filter(w => w.length > 0);
+
+  if (words.length === 0) return 'XXXX';
+  if (words.length === 1) {
+    // Single word: take first 4 letters
+    return words[0].substring(0, 4).toUpperCase();
+  }
+  if (words.length === 2) {
+    // Two words: take 2 letters from each
+    return (words[0].substring(0, 2) + words[1].substring(0, 2)).toUpperCase();
+  }
+  // 3+ words: take first letter of first 4 words, or 2+1+1 pattern
+  if (words.length >= 4) {
+    return (words[0][0] + words[1][0] + words[2][0] + words[3][0]).toUpperCase();
+  }
+  // 3 words: 2 from first, 1 from second, 1 from third
+  return (words[0].substring(0, 2) + words[1][0] + words[2][0]).toUpperCase();
+}
+
+// Get next sequence number for quotations (global per tenant)
+async function getNextSequenceNumber(ctx: any, tenantId: string): Promise<number> {
+  const existing = await ctx.db
+    .query("quotations")
+    .withIndex("by_tenant", (q: any) => q.eq("tenantId", tenantId))
+    .collect();
+
+  // Find max sequence number
+  let maxSeq = 0;
+  for (const q of existing) {
+    if (q.quotationSequence && q.quotationSequence > maxSeq) {
+      maxSeq = q.quotationSequence;
+    }
+    // Also parse from legacy format QT-YYYY-NNNN
+    if (q.quotationNumber?.startsWith('QT-')) {
+      const match = q.quotationNumber.match(/QT-\d{4}-(\d+)/);
+      if (match) {
+        const num = parseInt(match[1], 10);
+        if (num > maxSeq) maxSeq = num;
+      }
+    }
+    // Also parse from new format Q00025-XXXX-...
+    if (q.quotationNumber?.startsWith('Q') && !q.quotationNumber.startsWith('QT-')) {
+      const match = q.quotationNumber.match(/^Q(\d+)-/);
+      if (match) {
+        const num = parseInt(match[1], 10);
+        if (num > maxSeq) maxSeq = num;
+      }
+    }
+  }
+
+  return maxSeq + 1;
+}
+
+// Document naming convention: YYMM-X#####-CODE-Leader_x_Pax
+// X = C (Cotización), I (Itinerario), F (Factura)
+// Example: 2512-C00005-HOTR-Carlos_Perez_x_08
+
+interface DocumentNumberParts {
+  documentNumber: string;
+  longName: string; // Full descriptive name for display
+  sequence: number;
+}
+
+// Document type prefixes
+export const DOCUMENT_PREFIX = {
+  QUOTATION: 'C',    // Cotización
+  ITINERARY: 'I',    // Itinerario
+  INVOICE: 'F',      // Factura
+} as const;
+
+type DocumentType = keyof typeof DOCUMENT_PREFIX;
+
+// Generate YYMM prefix from current date
+function getYYMMPrefix(): string {
+  const now = new Date();
+  const year = String(now.getFullYear()).slice(-2);
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  return `${year}${month}`;
+}
+
+// Sanitize group leader name for document naming
+function sanitizeLeaderName(name: string | null | undefined): string {
+  if (!name || !name.trim()) return 'Grupo';
+  return name
+    .trim()
+    .replace(/[^a-zA-ZáéíóúñÁÉÍÓÚÑ\s]/g, '') // Allow Spanish characters
+    .replace(/\s+/g, '_')
+    .substring(0, 25);
+}
+
+// Generate document number in new format: YYMM-X#####-CODE-Leader_x_Pax
+async function generateDocumentNumber(
+  ctx: any,
+  tenantId: string,
+  documentType: DocumentType,
+  clientCode: string | null,
+  groupLeaderName: string | null,
+  groupSize: number
+): Promise<DocumentNumberParts> {
+  const sequence = await getNextSequenceNumber(ctx, tenantId);
+  const paddedSeq = String(sequence).padStart(5, '0');
+
+  // Get YYMM prefix
+  const yymmPrefix = getYYMMPrefix();
+
+  // Document type prefix
+  const typePrefix = DOCUMENT_PREFIX[documentType];
+
+  // Use client code or empty for individuals
+  const code = clientCode || '';
+
+  // Sanitize group leader name
+  const leaderPart = sanitizeLeaderName(groupLeaderName);
+
+  // Pad group size to 2 digits
+  const groupSizePadded = String(groupSize).padStart(2, '0');
+
+  // Short document number: 2512-C00005
+  const documentNumber = `${yymmPrefix}-${typePrefix}${paddedSeq}`;
+
+  // Long name with all parts: 2512-C00005-HOTR-Carlos_Perez_x_08
+  const longNameParts = [documentNumber];
+  if (code) longNameParts.push(code);
+  longNameParts.push(`${leaderPart}_x_${groupSizePadded}`);
+  const longName = longNameParts.join('-');
+
+  return { documentNumber, longName, sequence };
+}
+
+// Generate quotation number (wrapper for backwards compatibility)
+async function generateQuotationNumber(
+  ctx: any,
+  tenantId: string,
+  clientCode: string | null,
+  groupLeaderName: string | null,
+  groupSize: number
+): Promise<{ quotationNumber: string; quotationLongName: string; sequence: number }> {
+  const { documentNumber, longName, sequence } = await generateDocumentNumber(
+    ctx,
+    tenantId,
+    'QUOTATION',
+    clientCode,
+    groupLeaderName,
+    groupSize
+  );
+
+  return {
+    quotationNumber: documentNumber,
+    quotationLongName: longName,
+    sequence,
+  };
+}
+
+// Legacy function for backwards compatibility
+async function generateQuotationNumberLegacy(ctx: any, tenantId: string): Promise<string> {
   const year = new Date().getFullYear();
   const existing = await ctx.db
     .query("quotations")
@@ -75,6 +236,14 @@ export const create = mutation({
     clientId: v.optional(v.id("clients")),
     vehicleId: v.optional(v.id("vehicles")),
     createdBy: v.optional(v.id("users")),
+    // Sales agent assignment
+    assignedTo: v.optional(v.id("users")),
+    // Group leader info (for naming convention)
+    groupLeaderName: v.optional(v.string()),
+    // Payment and commercial terms
+    paymentConditions: v.optional(v.string()),
+    purchaseOrderNumber: v.optional(v.string()),
+    // Trip details
     origin: v.string(),
     destination: v.string(),
     baseLocation: v.string(),
@@ -82,11 +251,26 @@ export const create = mutation({
     extraMileage: v.number(),
     estimatedDays: v.number(),
     departureDate: v.optional(v.number()),
+    returnDate: v.optional(v.number()),
     isRoundTrip: v.optional(v.boolean()), // true = round trip, false = one-way
     totalDistance: v.number(),
     totalTime: v.number(),
     deadheadDistance: v.optional(v.number()), // Repositioning distance
     mainTripDistance: v.optional(v.number()), // Client trip distance
+    // Multi-vehicle service lines
+    serviceLines: v.optional(v.array(v.object({
+      id: v.string(),
+      description: v.string(),
+      route: v.string(),
+      days: v.number(),
+      distance: v.number(),
+      dates: v.string(),
+      vehicleId: v.optional(v.id("vehicles")),
+      vehicleName: v.string(),
+      quantity: v.number(),
+      unitPrice: v.number(),
+      totalPrice: v.number(),
+    }))),
     // Currency configuration (frozen at creation)
     localCurrency: v.optional(v.string()), // 'HNL', 'GTQ', etc.
     exchangeRateUsed: v.number(),
@@ -125,6 +309,9 @@ export const create = mutation({
     salePriceLocal: v.optional(v.number()),
     salePriceHnl: v.number(), // Legacy field
     salePriceUsd: v.number(),
+    // Client discount
+    discountPercentage: v.optional(v.number()),
+    discountAmount: v.optional(v.number()),
     // Options
     includeFuel: v.boolean(),
     includeMeals: v.boolean(),
@@ -149,11 +336,54 @@ export const create = mutation({
     }
 
     const now = Date.now();
-    const quotationNumber = await generateQuotationNumber(ctx, args.tenantId);
+
+    // Get client code if client is specified
+    let clientCode: string | null = null;
+    if (args.clientId) {
+      const client = await ctx.db.get(args.clientId);
+      if (client) {
+        // Use existing client code or generate one
+        if (client.clientCode) {
+          clientCode = client.clientCode;
+        } else {
+          // Generate code from client name
+          const clientName = client.type === 'company'
+            ? client.companyName || ''
+            : `${client.firstName || ''} ${client.lastName || ''}`.trim();
+          if (clientName) {
+            clientCode = generateClientCode(clientName);
+            // Save generated code to client
+            await ctx.db.patch(args.clientId, { clientCode });
+          }
+        }
+      }
+    }
+
+    // Get sales agent initials if assigned
+    let assignedToInitials: string | undefined;
+    if (args.assignedTo) {
+      const tenant = await ctx.db.get(args.tenantId);
+      const agentConfig = tenant?.salesAgents?.find(a => a.userId === args.assignedTo);
+      if (agentConfig) {
+        assignedToInitials = agentConfig.initials;
+      }
+    }
+
+    // Generate quotation number with new format
+    const { quotationNumber, quotationLongName, sequence } = await generateQuotationNumber(
+      ctx,
+      args.tenantId,
+      clientCode,
+      args.groupLeaderName || null,
+      args.groupSize
+    );
 
     const quotationId = await ctx.db.insert("quotations", {
       ...args,
       quotationNumber,
+      quotationLongName,
+      quotationSequence: sequence,
+      assignedToInitials,
       createdAt: now,
       updatedAt: now,
     });
