@@ -135,3 +135,6 @@ legacy/
 .env.*
 *.env.local
 
+# Development / Testing
+next-steps.txt
+fixes-to-do.node_modules
