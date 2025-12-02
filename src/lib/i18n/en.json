@@ -1032,7 +1032,12 @@
 			"cash": "Cash",
 			"transfer": "Bank Transfer",
 			"check": "Check"
-		}
+		},
+		"downloadPdf": "Download PDF",
+		"pdfDownloaded": "PDF downloaded successfully",
+		"pdfFailed": "Failed to generate PDF",
+		"confirmCancel": "Are you sure you want to cancel this advance?",
+		"cancellationReason": "Cancellation reason"
 	},
 	"reports": {
 		"title": "Reports",

@@ -1421,6 +1421,663 @@ function generateScheduleHtml(days: ItineraryDaySchedule[]): string {
   `).join('');
 }
 
+// ============================================
+// EXPENSE ADVANCE (Anticipo de Viáticos) PDF
+// ============================================
+
+export interface ExpenseAdvanceViatico {
+  date: string; // "jue.-28/ene."
+  location: string; // "SPS - SAL"
+  breakfast?: number;
+  lunch?: number;
+  dinner?: number;
+  busOrHotel?: number; // "Bus" for HNL, "Hotel" for USD version
+  other?: number;
+  total: number;
+}
+
+export interface ExpenseAdvanceGasto {
+  date: string;
+  location: string;
+  concept: string; // "Fumigación Frontera", "Combustible (Galones)", etc.
+  quantity: number;
+  unitPrice: number;
+  total: number;
+}
+
+export interface ExpenseAdvanceLiquidacion {
+  date: string;
+  location: string;
+  concept: string; // "Combustible F# 118213"
+  receiptNumber?: string; // "Rec/Fact #"
+  currency: 'HNL' | 'USD';
+  originalValue: number;
+  totalInCurrency: number; // Converted to document currency
+}
+
+export interface ExpenseAdvancePdfData {
+  // Identification
+  advanceNumber: string;
+  advanceLongName?: string;
+
+  // Header info
+  clientName: string;
+  itineraryCode: string; // "1603-El Buen Pastor x 80"
+  route: string; // "SPS - Tegucigalpa -SPS"
+  driverName: string;
+  driverRole?: string; // "Guía", "Conductor"
+
+  // Currency and amounts
+  currency: 'HNL' | 'USD';
+  exchangeRate?: number; // Only for USD documents
+  totalAdvance: number;
+  totalInAlternateCurrency?: number; // If USD, show HNL equivalent
+
+  // Document mode
+  mode: 'advance' | 'settlement'; // Pre-trip vs post-trip
+
+  // Sections
+  viaticos: ExpenseAdvanceViatico[];
+  gastosItinerario: ExpenseAdvanceGasto[];
+  liquidacion?: ExpenseAdvanceLiquidacion[]; // Only for settlement mode
+
+  // Totals
+  viaticosTotal: number;
+  gastosTotal: number;
+  liquidacionTotal?: number;
+
+  // Balance (for settlement)
+  noReceiptTotal?: number; // "No necesita Recibo (Alimentación y Hotel)"
+  receiptRequiredTotal?: number; // "Presentar Recibos (Otros gastos)"
+  balanceEmployeeFavor?: number; // "Saldo a Favor de Empleado"
+  balanceCompanyFavor?: number; // "Saldo a Favor de LAT Tours"
+
+  // Metadata
+  preparedBy?: string;
+  approvedBy?: string;
+  documentDate: string;
+
+  // Company info
+  company: {
+    name: string;
+    logo?: string;
+  };
+}
+
+// Expense advance specific styles
+const expenseAdvanceStyles = `
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+  body {
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 10px;
+    line-height: 1.3;
+    color: #333;
+    background: white;
+  }
+  .container {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 15px 20px;
+  }
+  /* Header */
+  .advance-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid #333;
+  }
+  .logo-area {
+    width: 100px;
+  }
+  .logo-area img {
+    max-height: 45px;
+    max-width: 90px;
+  }
+  .exchange-rate {
+    font-size: 11px;
+    text-align: center;
+    flex: 1;
+  }
+  .exchange-rate .rate-label {
+    color: #666;
+  }
+  .exchange-rate .rate-value {
+    font-weight: 500;
+  }
+  .total-box {
+    text-align: right;
+  }
+  .total-label {
+    font-size: 11px;
+    color: #666;
+  }
+  .total-amount {
+    font-size: 18px;
+    font-weight: bold;
+    color: #333;
+  }
+  .total-secondary {
+    font-size: 10px;
+    color: #666;
+  }
+  /* Title */
+  .document-title {
+    background: #f59e0b;
+    color: #333;
+    font-size: 14px;
+    font-weight: bold;
+    text-align: center;
+    padding: 8px 15px;
+    margin-bottom: 10px;
+  }
+  .document-title .currency-label {
+    font-weight: normal;
+    font-size: 12px;
+  }
+  .document-title .amount {
+    font-size: 16px;
+    margin-left: 10px;
+  }
+  /* Info Row */
+  .info-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 0;
+    border: 1px solid #333;
+    margin-bottom: 10px;
+    font-size: 10px;
+  }
+  .info-cell {
+    padding: 6px 10px;
+    border-right: 1px solid #333;
+  }
+  .info-cell:last-child {
+    border-right: none;
+  }
+  .info-cell label {
+    font-weight: bold;
+    color: #333;
+    display: block;
+    margin-bottom: 2px;
+  }
+  .info-cell span {
+    color: #000;
+  }
+  .route-info {
+    font-size: 9px;
+    color: #666;
+    margin-top: 2px;
+  }
+  /* Section Headers */
+  .section-header {
+    background: #fef3c7;
+    color: #333;
+    font-size: 11px;
+    font-weight: bold;
+    text-align: center;
+    padding: 5px 10px;
+    margin: 10px 0 0 0;
+    border: 1px solid #fcd34d;
+  }
+  /* Tables */
+  .data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 9px;
+  }
+  .data-table th {
+    background: #fef3c7;
+    color: #333;
+    padding: 5px 6px;
+    text-align: center;
+    font-weight: 600;
+    border: 1px solid #e5e7eb;
+    font-size: 9px;
+  }
+  .data-table td {
+    padding: 4px 6px;
+    border: 1px solid #e5e7eb;
+    vertical-align: middle;
+  }
+  .data-table td.date-col {
+    font-size: 8px;
+    white-space: nowrap;
+  }
+  .data-table td.number {
+    text-align: right;
+    font-family: monospace;
+  }
+  .data-table td.currency-symbol {
+    text-align: center;
+    width: 15px;
+    padding: 4px 2px;
+  }
+  .data-table td.empty {
+    color: #999;
+    text-align: center;
+  }
+  .data-table tr.total-row {
+    font-weight: bold;
+  }
+  .data-table tr.total-row td {
+    background: #f9fafb;
+  }
+  /* Summary Section */
+  .summary-section {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin-top: 15px;
+    font-size: 10px;
+  }
+  .summary-left {
+    border: 1px solid #e5e7eb;
+    padding: 10px;
+  }
+  .summary-left .summary-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 4px 0;
+  }
+  .summary-right {
+    border: 1px solid #e5e7eb;
+    padding: 10px;
+  }
+  .summary-right .balance-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 4px 0;
+  }
+  .balance-row.employee-favor {
+    color: #333;
+  }
+  .balance-row.company-favor {
+    color: #dc2626;
+    font-weight: bold;
+  }
+  .balance-row .amount {
+    font-weight: bold;
+  }
+  /* Signatures */
+  .signatures {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 40px;
+    margin-top: 30px;
+  }
+  .signature-box {
+    text-align: center;
+  }
+  .signature-line {
+    border-top: 1px solid #333;
+    margin-top: 40px;
+    padding-top: 5px;
+    font-size: 10px;
+  }
+  .date-received {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 40px;
+    margin-top: 20px;
+    font-size: 10px;
+  }
+  .date-box, .received-box {
+    text-align: center;
+  }
+  .date-value {
+    margin-bottom: 5px;
+    font-weight: 500;
+  }
+`;
+
+// Format currency for expense advance (simpler format)
+function formatAdvanceCurrency(value: number, currency: 'HNL' | 'USD' = 'HNL', showSymbol: boolean = true): string {
+  if (value === 0 || value === undefined || value === null) return '-';
+  const formatted = value.toLocaleString('es-HN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  if (!showSymbol) return formatted;
+  return currency === 'USD' ? `$ ${formatted}` : `L ${formatted}`;
+}
+
+// Format short date for expense advance
+function formatAdvanceDate(dateInput: string | number): string {
+  if (!dateInput) return '';
+  const date = new Date(typeof dateInput === 'number' ? dateInput : Date.parse(dateInput));
+  if (isNaN(date.getTime())) return String(dateInput);
+
+  const days = ['dom.', 'lun.', 'mar.', 'mié.', 'jue.', 'vie.', 'sáb.'];
+  const months = ['ene.', 'feb.', 'mar.', 'abr.', 'may.', 'jun.', 'jul.', 'ago.', 'sep.', 'oct.', 'nov.', 'dic.'];
+
+  const dayName = days[date.getDay()];
+  const dayNum = String(date.getDate()).padStart(2, '0');
+  const monthName = months[date.getMonth()];
+
+  return `${dayName}-${dayNum}/${monthName}`;
+}
+
+// Generate viáticos table HTML
+function generateViaticosTableHtml(viaticos: ExpenseAdvanceViatico[], currency: 'HNL' | 'USD'): string {
+  const currencySymbol = currency === 'USD' ? '$' : 'L';
+  const lodgingLabel = currency === 'USD' ? 'Hotel' : 'Bus';
+
+  // Calculate totals
+  const totals = viaticos.reduce((acc, v) => ({
+    breakfast: acc.breakfast + (v.breakfast || 0),
+    lunch: acc.lunch + (v.lunch || 0),
+    dinner: acc.dinner + (v.dinner || 0),
+    busOrHotel: acc.busOrHotel + (v.busOrHotel || 0),
+    other: acc.other + (v.other || 0),
+    total: acc.total + v.total
+  }), { breakfast: 0, lunch: 0, dinner: 0, busOrHotel: 0, other: 0, total: 0 });
+
+  const rows = viaticos.map(v => `
+    <tr>
+      <td class="date-col">${v.date}</td>
+      <td>${v.location}</td>
+      <td class="currency-symbol">${v.breakfast ? currencySymbol : ''}</td>
+      <td class="number">${v.breakfast ? v.breakfast.toFixed(2) : ''}</td>
+      <td class="currency-symbol">${v.lunch ? currencySymbol : ''}</td>
+      <td class="number">${v.lunch ? v.lunch.toFixed(2) : ''}</td>
+      <td class="currency-symbol">${v.dinner ? currencySymbol : ''}</td>
+      <td class="number">${v.dinner ? v.dinner.toFixed(2) : ''}</td>
+      <td class="currency-symbol">${v.busOrHotel ? currencySymbol : ''}</td>
+      <td class="number">${v.busOrHotel ? v.busOrHotel.toFixed(2) : ''}</td>
+      <td class="currency-symbol">${v.other ? currencySymbol : ''}</td>
+      <td class="number">${v.other ? v.other.toFixed(2) : ''}</td>
+      <td class="currency-symbol">${currencySymbol}</td>
+      <td class="number">${v.total.toFixed(2)}</td>
+    </tr>
+  `).join('');
+
+  // Add empty rows to fill space (up to 7 rows)
+  const emptyRowsCount = Math.max(0, 7 - viaticos.length);
+  const emptyRows = Array(emptyRowsCount).fill(`
+    <tr>
+      <td class="date-col"></td>
+      <td></td>
+      <td class="currency-symbol">${currencySymbol}</td>
+      <td class="number empty">-</td>
+      <td class="currency-symbol">${currencySymbol}</td>
+      <td class="number empty">-</td>
+      <td class="currency-symbol">${currencySymbol}</td>
+      <td class="number empty">-</td>
+      <td class="currency-symbol">${currencySymbol}</td>
+      <td class="number empty">-</td>
+      <td class="currency-symbol">${currencySymbol}</td>
+      <td class="number empty">-</td>
+      <td class="currency-symbol">${currencySymbol}</td>
+      <td class="number empty">-</td>
+    </tr>
+  `).join('');
+
+  return `
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Fecha</th>
+          <th>Lugar/Concepto</th>
+          <th colspan="2">Desayuno</th>
+          <th colspan="2">Almuerzo</th>
+          <th colspan="2">Cena</th>
+          <th colspan="2">${lodgingLabel}</th>
+          <th colspan="2">Otros</th>
+          <th colspan="2">Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${rows}
+        ${emptyRows}
+        <tr class="total-row">
+          <td colspan="2"></td>
+          <td colspan="12" style="text-align: right;">
+            <strong>Total ${currencySymbol} ${totals.total.toFixed(2)}</strong>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  `;
+}
+
+// Generate gastos itinerario table HTML
+function generateGastosTableHtml(gastos: ExpenseAdvanceGasto[], currency: 'HNL' | 'USD'): string {
+  const currencySymbol = currency === 'USD' ? '$' : 'L';
+
+  const total = gastos.reduce((acc, g) => acc + g.total, 0);
+
+  const rows = gastos.map(g => `
+    <tr>
+      <td class="date-col">${g.date}</td>
+      <td>${g.location}</td>
+      <td>${g.concept}</td>
+      <td class="number">${g.quantity > 0 ? g.quantity : '-'}</td>
+      <td class="currency-symbol">${g.unitPrice > 0 ? currencySymbol : ''}</td>
+      <td class="number">${g.unitPrice > 0 ? g.unitPrice.toFixed(2) : ''}</td>
+      <td class="currency-symbol">${currencySymbol}</td>
+      <td class="number">${g.total.toFixed(2)}</td>
+    </tr>
+  `).join('');
+
+  // Add empty rows
+  const emptyRowsCount = Math.max(0, 5 - gastos.length);
+  const emptyRows = Array(emptyRowsCount).fill(`
+    <tr>
+      <td class="date-col"></td>
+      <td></td>
+      <td></td>
+      <td class="number empty">-</td>
+      <td class="currency-symbol">${currencySymbol}</td>
+      <td class="number empty">-</td>
+      <td class="currency-symbol">${currencySymbol}</td>
+      <td class="number empty">-</td>
+    </tr>
+  `).join('');
+
+  return `
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Fecha</th>
+          <th>Lugar</th>
+          <th>Concepto</th>
+          <th>Cantidad</th>
+          <th colspan="2">Precio c/u</th>
+          <th colspan="2">Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${rows}
+        ${emptyRows}
+        <tr class="total-row">
+          <td colspan="6"></td>
+          <td class="currency-symbol" style="text-align: right;"><strong>Total</strong></td>
+          <td class="number"><strong>${currencySymbol} ${total.toFixed(2)}</strong></td>
+        </tr>
+      </tbody>
+    </table>
+  `;
+}
+
+// Generate liquidación table HTML
+function generateLiquidacionTableHtml(liquidacion: ExpenseAdvanceLiquidacion[], currency: 'HNL' | 'USD'): string {
+  const currencySymbol = currency === 'USD' ? '$' : 'L';
+
+  const total = liquidacion.reduce((acc, l) => acc + l.totalInCurrency, 0);
+
+  const rows = liquidacion.map(l => `
+    <tr>
+      <td class="date-col">${l.date}</td>
+      <td>${l.location}</td>
+      <td>${l.concept}</td>
+      <td class="number">${l.receiptNumber || ''}</td>
+      <td class="currency-symbol">${l.currency === 'HNL' ? 'L.' : '$'}</td>
+      <td class="number">${l.originalValue > 0 ? l.originalValue.toFixed(2) : ''}</td>
+      <td class="currency-symbol">${currencySymbol}</td>
+      <td class="number">${l.totalInCurrency.toFixed(2)}</td>
+    </tr>
+  `).join('');
+
+  // Add empty rows for settlement
+  const emptyRowsCount = Math.max(0, 8 - liquidacion.length);
+  const emptyRows = Array(emptyRowsCount).fill(`
+    <tr>
+      <td class="date-col"></td>
+      <td></td>
+      <td></td>
+      <td class="number"></td>
+      <td class="currency-symbol"></td>
+      <td class="number"></td>
+      <td class="currency-symbol">${currencySymbol}</td>
+      <td class="number empty">-</td>
+    </tr>
+  `).join('');
+
+  return `
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Fecha</th>
+          <th>Lugar</th>
+          <th>Concepto</th>
+          <th>Rec/Fact #</th>
+          <th colspan="2">Valor</th>
+          <th colspan="2">Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${rows}
+        ${emptyRows}
+        <tr class="total-row">
+          <td colspan="6"></td>
+          <td class="currency-symbol" style="text-align: right;"><strong>Total</strong></td>
+          <td class="number"><strong>${currencySymbol} ${total.toFixed(2)}</strong></td>
+        </tr>
+      </tbody>
+    </table>
+  `;
+}
+
+export function generateExpenseAdvanceHtml(data: ExpenseAdvancePdfData): string {
+  const currencySymbol = data.currency === 'USD' ? '$' : 'L';
+  const currencyLabel = data.currency === 'USD' ? 'US$' : 'Lps.';
+
+  return `
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Anticipo de Viáticos ${data.advanceNumber}</title>
+  <style>${expenseAdvanceStyles}</style>
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="advance-header">
+      <div class="logo-area">
+        ${data.company.logo ? `<img src="${data.company.logo}" alt="Logo" />` : ''}
+      </div>
+      ${data.exchangeRate ? `
+      <div class="exchange-rate">
+        <span class="rate-label">Tasa</span>
+        <span class="rate-value">L ${data.exchangeRate.toFixed(4)}</span>
+        ${data.totalInAlternateCurrency ? `<div class="rate-value">L ${data.totalInAlternateCurrency.toLocaleString('es-HN', { minimumFractionDigits: 2 })}</div>` : ''}
+      </div>
+      ` : ''}
+      <div class="total-box">
+        <div class="total-label">Total:</div>
+        <div class="total-amount">${currencySymbol} ${data.totalAdvance.toLocaleString('es-HN', { minimumFractionDigits: 2 })}</div>
+      </div>
+    </div>
+
+    <!-- Document Title -->
+    <div class="document-title">
+      ANTICIPO DE VIÁTICOS <span class="currency-label">(${currencyLabel})</span>
+      <span class="amount">${currencySymbol} ${data.totalAdvance.toLocaleString('es-HN', { minimumFractionDigits: 2 })}</span>
+    </div>
+
+    <!-- Info Row -->
+    <div class="info-row">
+      <div class="info-cell">
+        <label>CLIENTE</label>
+        <span>${data.clientName}</span>
+      </div>
+      <div class="info-cell">
+        <label>ITINERARIO</label>
+        <span>${data.itineraryCode}</span>
+        <div class="route-info">${data.route}</div>
+      </div>
+      <div class="info-cell">
+        <label>GUÍA / CONDUCTOR</label>
+        <span>${data.driverName}</span>
+      </div>
+    </div>
+
+    <!-- VIÁTICOS Section -->
+    <div class="section-header">VIATICOS</div>
+    ${generateViaticosTableHtml(data.viaticos, data.currency)}
+
+    <!-- GASTOS ITINERARIO Section -->
+    <div class="section-header">GASTOS ITINERARIO</div>
+    ${generateGastosTableHtml(data.gastosItinerario, data.currency)}
+
+    <!-- LIQUIDACIÓN Section -->
+    <div class="section-header">LIQUIDACIÓN</div>
+    ${generateLiquidacionTableHtml(data.liquidacion || [], data.currency)}
+
+    <!-- Summary Section -->
+    <div class="summary-section">
+      <div class="summary-left">
+        <div class="summary-row">
+          <span>No necesita Recibo (Alimentación y Hotel)</span>
+          <span>${currencySymbol} ${(data.noReceiptTotal || data.viaticosTotal).toLocaleString('es-HN', { minimumFractionDigits: 2 })}</span>
+        </div>
+        <div class="summary-row">
+          <span>Presentar Recibos (Otros gastos)</span>
+          <span>${currencySymbol} ${(data.receiptRequiredTotal || data.gastosTotal).toLocaleString('es-HN', { minimumFractionDigits: 2 })}</span>
+        </div>
+      </div>
+      <div class="summary-right">
+        <div class="balance-row employee-favor">
+          <span>Saldo a Favor de Empleado</span>
+          <span class="amount">${currencySymbol} ${(data.balanceEmployeeFavor || 0).toLocaleString('es-HN', { minimumFractionDigits: 2 })}</span>
+        </div>
+        <div class="balance-row company-favor">
+          <span>Saldo a Favor de ${data.company.name}</span>
+          <span class="amount">${currencySymbol} ${(data.balanceCompanyFavor || 0).toLocaleString('es-HN', { minimumFractionDigits: 2 })}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Signatures -->
+    <div class="signatures">
+      <div class="signature-box">
+        <div class="signature-line">Preparado por</div>
+      </div>
+      <div class="signature-box">
+        <div class="signature-line">Aprobado por</div>
+      </div>
+    </div>
+
+    <div class="date-received">
+      <div class="date-box">
+        <div class="date-value">${data.documentDate}</div>
+        <div>Fecha</div>
+      </div>
+      <div class="received-box">
+        <div class="signature-line" style="margin-top: 20px;">Recibido conforme</div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
+  `;
+}
+
 export function generateItineraryHtml(data: ItineraryPdfData): string {
   // Generate vehicle summary for header if not provided
   const vehicleSummary = data.vehicleSummary ||

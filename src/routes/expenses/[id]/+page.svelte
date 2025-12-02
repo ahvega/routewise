@@ -27,7 +27,9 @@
 		CalendarMonthOutline,
 		EditOutline,
 		PaperPlaneOutline,
-		TrashBinOutline
+		TrashBinOutline,
+		FilePdfOutline,
+		DownloadOutline
 	} from 'flowbite-svelte-icons';
 	import { t } from '$lib/i18n';
 	import StatusBadge from '$lib/components/ui/StatusBadge.svelte';
@@ -250,6 +252,183 @@
 		} finally {
 			isSubmitting = false;
 		}
+	}
+
+	// Download PDF
+	let isDownloadingPdf = $state(false);
+
+	async function downloadPdf() {
+		if (!advance || !itinerary) return;
+
+		isDownloadingPdf = true;
+		try {
+			// Build PDF data from advance and itinerary
+			const pdfData = {
+				advanceNumber: advance.advanceNumber,
+				clientName: itinerary.clientId ? 'Cliente' : 'Walk-in', // We'll get this from the client query
+				itineraryCode: itinerary.itineraryNumber || itinerary.itineraryLongName || '',
+				route: `${itinerary.origin} - ${itinerary.destination}`,
+				driverName: driver ? `${driver.firstName} ${driver.lastName}` : 'Sin asignar',
+				currency: 'HNL' as const,
+				totalAdvance: advance.amountHnl,
+				mode: advance.status === 'settled' ? 'settlement' as const : 'advance' as const,
+				// Build viaticos from estimated values
+				viaticos: buildViaticosData(),
+				gastosItinerario: buildGastosData(),
+				liquidacion: advance.status === 'settled' ? buildLiquidacionData() : [],
+				viaticosTotal: (advance.estimatedMeals ?? 0) + (advance.estimatedLodging ?? 0),
+				gastosTotal: (advance.estimatedFuel ?? 0) + (advance.estimatedTolls ?? 0) + (advance.estimatedOther ?? 0),
+				balanceCompanyFavor: advance.balanceAmount && advance.balanceAmount > 0 ? advance.balanceAmount : 0,
+				balanceEmployeeFavor: advance.balanceAmount && advance.balanceAmount < 0 ? Math.abs(advance.balanceAmount) : 0,
+				documentDate: formatDate(advance.createdAt),
+				company: {
+					name: 'LAT Tours & Travel'
+				}
+			};
+
+			const response = await fetch('/api/pdf/expense-advance', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify(pdfData)
+			});
+
+			if (!response.ok) throw new Error('PDF generation failed');
+
+			const blob = await response.blob();
+			const url = URL.createObjectURL(blob);
+			const a = document.createElement('a');
+			a.href = url;
+			a.download = `anticipo-${advance.advanceNumber}.pdf`;
+			document.body.appendChild(a);
+			a.click();
+			document.body.removeChild(a);
+			URL.revokeObjectURL(url);
+
+			showSuccessToast($t('expenses.pdfDownloaded'));
+		} catch (error) {
+			console.error('Failed to download PDF:', error);
+			showErrorToast($t('expenses.pdfFailed'));
+		} finally {
+			isDownloadingPdf = false;
+		}
+	}
+
+	// Helper to build viáticos data for PDF
+	function buildViaticosData() {
+		if (!itinerary) return [];
+		const days = itinerary.estimatedDays || 1;
+		const mealsPerDay = (advance?.estimatedMeals ?? 0) / days;
+		const lodgingPerDay = (advance?.estimatedLodging ?? 0) / days;
+
+		// Create one row per day
+		const viaticos = [];
+		const startDate = new Date(itinerary.startDate);
+
+		for (let i = 0; i < days; i++) {
+			const date = new Date(startDate);
+			date.setDate(date.getDate() + i);
+			const dayOfWeek = ['dom.', 'lun.', 'mar.', 'mié.', 'jue.', 'vie.', 'sáb.'][date.getDay()];
+			const dayNum = String(date.getDate()).padStart(2, '0');
+			const month = ['ene.', 'feb.', 'mar.', 'abr.', 'may.', 'jun.', 'jul.', 'ago.', 'sep.', 'oct.', 'nov.', 'dic.'][date.getMonth()];
+
+			viaticos.push({
+				date: `${dayOfWeek}-${dayNum}/${month}`,
+				location: i === 0 ? itinerary.origin : (i === days - 1 ? itinerary.destination : itinerary.destination),
+				breakfast: mealsPerDay / 3,
+				lunch: mealsPerDay / 3,
+				dinner: mealsPerDay / 3,
+				busOrHotel: i < days - 1 ? lodgingPerDay : 0, // No lodging on last day
+				total: mealsPerDay + (i < days - 1 ? lodgingPerDay : 0)
+			});
+		}
+		return viaticos;
+	}
+
+	// Helper to build gastos data for PDF
+	function buildGastosData() {
+		if (!advance) return [];
+		const gastos = [];
+		const dateStr = itinerary ? formatAdvanceDate(itinerary.startDate) : '';
+
+		if (advance.estimatedFuel && advance.estimatedFuel > 0) {
+			gastos.push({
+				date: dateStr,
+				location: itinerary?.origin || '',
+				concept: 'Combustible',
+				quantity: 1,
+				unitPrice: advance.estimatedFuel,
+				total: advance.estimatedFuel
+			});
+		}
+		if (advance.estimatedTolls && advance.estimatedTolls > 0) {
+			gastos.push({
+				date: dateStr,
+				location: 'Ruta',
+				concept: 'Peajes',
+				quantity: 1,
+				unitPrice: advance.estimatedTolls,
+				total: advance.estimatedTolls
+			});
+		}
+		if (advance.estimatedOther && advance.estimatedOther > 0) {
+			gastos.push({
+				date: dateStr,
+				location: '',
+				concept: 'Otros / Imprevistos',
+				quantity: 1,
+				unitPrice: advance.estimatedOther,
+				total: advance.estimatedOther
+			});
+		}
+		return gastos;
+	}
+
+	// Helper to build liquidación data for PDF (settlement mode)
+	function buildLiquidacionData() {
+		if (!advance || advance.status !== 'settled') return [];
+		const liquidacion = [];
+		const dateStr = advance.settledAt ? formatAdvanceDate(advance.settledAt) : '';
+
+		if (advance.actualFuel && advance.actualFuel > 0) {
+			liquidacion.push({
+				date: dateStr,
+				location: itinerary?.origin || '',
+				concept: 'Combustible',
+				currency: 'HNL' as const,
+				originalValue: advance.actualFuel,
+				totalInCurrency: advance.actualFuel
+			});
+		}
+		if (advance.actualTolls && advance.actualTolls > 0) {
+			liquidacion.push({
+				date: dateStr,
+				location: 'Ruta',
+				concept: 'Peajes',
+				currency: 'HNL' as const,
+				originalValue: advance.actualTolls,
+				totalInCurrency: advance.actualTolls
+			});
+		}
+		if (advance.actualOther && advance.actualOther > 0) {
+			liquidacion.push({
+				date: dateStr,
+				location: '',
+				concept: 'Otros gastos',
+				currency: 'HNL' as const,
+				originalValue: advance.actualOther,
+				totalInCurrency: advance.actualOther
+			});
+		}
+		return liquidacion;
+	}
+
+	// Format date for advance PDF
+	function formatAdvanceDate(dateInput: number): string {
+		const date = new Date(dateInput);
+		const dayOfWeek = ['dom.', 'lun.', 'mar.', 'mié.', 'jue.', 'vie.', 'sáb.'][date.getDay()];
+		const dayNum = String(date.getDate()).padStart(2, '0');
+		const month = ['ene.', 'feb.', 'mar.', 'abr.', 'may.', 'jun.', 'jul.', 'ago.', 'sep.', 'oct.', 'nov.', 'dic.'][date.getMonth()];
+		return `${dayOfWeek}-${dayNum}/${month}`;
 	}
 </script>
 
@@ -542,6 +721,18 @@
 				<Card class="!p-4">
 					<h3 class="font-semibold text-gray-900 dark:text-white mb-4">{$t('common.actions')}</h3>
 					<div class="space-y-2">
+						<!-- PDF Download - available for all non-draft statuses -->
+						{#if advance.status !== 'draft' && advance.status !== 'cancelled'}
+							<Button color="light" class="w-full" onclick={downloadPdf} disabled={isDownloadingPdf}>
+								{#if isDownloadingPdf}
+									<Spinner size="4" class="mr-2" />
+								{:else}
+									<FilePdfOutline class="w-4 h-4 mr-2" />
+								{/if}
+								{$t('expenses.downloadPdf')}
+							</Button>
+						{/if}
+
 						{#if advance.status === 'draft'}
 							<Button color="light" href="/expenses/{advance._id}/edit" class="w-full">
 								<EditOutline class="w-4 h-4 mr-2" />

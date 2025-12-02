@@ -1055,7 +1055,12 @@
             "cash": "Efectivo",
             "transfer": "Transferencia",
             "check": "Cheque"
-        }
+        },
+        "downloadPdf": "Descargar PDF",
+        "pdfDownloaded": "PDF descargado exitosamente",
+        "pdfFailed": "Error al generar el PDF",
+        "confirmCancel": "¿Está seguro que desea cancelar este anticipo?",
+        "cancellationReason": "Razón de cancelación"
     },
     "reports": {
         "title": "Reportes",

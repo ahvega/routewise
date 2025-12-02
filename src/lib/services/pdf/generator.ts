@@ -1,6 +1,6 @@
 import puppeteer from 'puppeteer';
-import type { QuotationPdfData, InvoicePdfData } from './templates';
-import { generateQuotationHtml, generateInvoiceHtml } from './templates';
+import type { QuotationPdfData, InvoicePdfData, ExpenseAdvancePdfData, ItineraryPdfData } from './templates';
+import { generateQuotationHtml, generateInvoiceHtml, generateExpenseAdvanceHtml, generateItineraryHtml } from './templates';
 
 export interface PdfOptions {
   format?: 'A4' | 'Letter';
@@ -67,5 +67,15 @@ export async function generateInvoicePdf(data: InvoicePdfData): Promise<Buffer> 
   return generatePdf(html);
 }
 
-export { generateQuotationHtml, generateInvoiceHtml };
-export type { QuotationPdfData, InvoicePdfData };
+export async function generateExpenseAdvancePdf(data: ExpenseAdvancePdfData): Promise<Buffer> {
+  const html = generateExpenseAdvanceHtml(data);
+  return generatePdf(html);
+}
+
+export async function generateItineraryPdf(data: ItineraryPdfData): Promise<Buffer> {
+  const html = generateItineraryHtml(data);
+  return generatePdf(html);
+}
+
+export { generateQuotationHtml, generateInvoiceHtml, generateExpenseAdvanceHtml, generateItineraryHtml };
+export type { QuotationPdfData, InvoicePdfData, ExpenseAdvancePdfData, ItineraryPdfData };
