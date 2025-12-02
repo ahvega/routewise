@@ -13,27 +13,30 @@ const workos = new WorkOS(WORKOS_API_KEY);
 /**
  * Generate the authorization URL for WorkOS AuthKit
  * @param state - Optional state to pass through the auth flow
- * @param screenHint - Optional hint: 'sign-up' or 'sign-in' to force showing that screen
+ * @param options - Optional settings: screenHint to show specific screen, forceLogin to require re-authentication
  */
-export function getAuthorizationUrl(state?: string, screenHint?: 'sign-up' | 'sign-in'): string {
-	const params: {
-		clientId: string;
-		redirectUri: string;
-		provider: 'authkit';
-		state?: string;
-		screenHint?: 'sign-up' | 'sign-in';
-	} = {
+export function getAuthorizationUrl(
+	state?: string,
+	options?: { screenHint?: 'sign-up' | 'sign-in'; forceLogin?: boolean }
+): string {
+	// Build the base URL using WorkOS SDK
+	const baseUrl = workos.userManagement.getAuthorizationUrl({
 		clientId: WORKOS_CLIENT_ID,
 		redirectUri: WORKOS_REDIRECT_URI,
 		provider: 'authkit',
-		state
-	};
+		state,
+		screenHint: options?.screenHint
+	});
 
-	if (screenHint) {
-		params.screenHint = screenHint;
+	// If forceLogin is requested, append prompt=login to force re-authentication
+	// This is the OAuth2 standard way to bypass SSO and require fresh credentials
+	if (options?.forceLogin) {
+		const url = new URL(baseUrl);
+		url.searchParams.set('prompt', 'login');
+		return url.toString();
 	}
 
-	return workos.userManagement.getAuthorizationUrl(params);
+	return baseUrl;
 }
 
 /**
@@ -60,7 +63,9 @@ export async function authenticateWithCode(code: string): Promise<AuthSession> {
 		user,
 		accessToken: authResponse.accessToken,
 		refreshToken: authResponse.refreshToken,
-		expiresAt: Date.now() + 3600 * 1000 // 1 hour default
+		expiresAt: Date.now() + 3600 * 1000, // 1 hour default
+		// Capture sessionId for proper logout if available
+		sessionId: (authResponse as { sealedSession?: string }).sealedSession
 	};
 }
 

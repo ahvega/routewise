@@ -18,6 +18,7 @@ export interface AuthSession {
 	accessToken: string;
 	refreshToken: string;
 	expiresAt: number;
+	sessionId?: string; // WorkOS session ID for proper logout
 }
 
 export interface TenantUser {

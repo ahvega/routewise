@@ -81,6 +81,7 @@ export const GET: RequestHandler = async ({ url, cookies }) => {
 			accessToken: session.accessToken,
 			refreshToken: session.refreshToken,
 			expiresAt: session.expiresAt,
+			sessionId: session.sessionId, // For proper WorkOS logout
 			// Multi-tenant fields
 			tenantId,
 			tenantSlug,
