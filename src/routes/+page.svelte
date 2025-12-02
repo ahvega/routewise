@@ -273,7 +273,7 @@
 						<ExclamationCircleOutline class="w-5 h-5" />
 					{/snippet}
 					{#if alert.messageKey && alert.messageParams}
-						{$t(alert.messageKey, alert.messageParams)}
+						{$t(alert.messageKey, { values: alert.messageParams })}
 					{:else}
 						<span class="font-medium">{alert.title}:</span>
 						{alert.message}
@@ -866,7 +866,7 @@
 							<div>
 								{#if alert.messageKey && alert.messageParams}
 									<p class="font-medium text-amber-800 dark:text-amber-200 text-sm">
-										{$t(alert.messageKey, alert.messageParams)}
+										{$t(alert.messageKey, { values: alert.messageParams })}
 									</p>
 								{:else}
 									<p class="font-medium text-amber-800 dark:text-amber-200 text-sm">{alert.title}</p>
