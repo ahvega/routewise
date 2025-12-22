@@ -114,7 +114,7 @@
 			}),
 			labels: {
 				show: true,
-				style: { colors: '#d1d5db', fontSize: '10px' }
+				style: { colors: '#f3f4f6', fontSize: '10px' }
 			},
 			axisBorder: { show: false },
 			axisTicks: { show: false }
@@ -160,7 +160,7 @@
 		legend: {
 			position: 'right',
 			fontSize: '12px',
-			labels: { colors: '#d1d5db' }
+			labels: { colors: '#f3f4f6' }
 		},
 		dataLabels: { enabled: false },
 		plotOptions: {
@@ -169,13 +169,13 @@
 					size: '70%',
 					labels: {
 						show: true,
-						name: { show: true, colors: '#d1d5db' },
-						value: { show: true, fontSize: '16px', fontWeight: 600, color: '#f3f4f6' },
+						name: { show: true, colors: '#f3f4f6' },
+						value: { show: true, fontSize: '16px', fontWeight: 600, color: '#ffffff' },
 						total: {
 							show: true,
 							label: 'Total',
 							fontSize: '12px',
-							color: '#d1d5db'
+							color: '#f3f4f6'
 						}
 					}
 				}
