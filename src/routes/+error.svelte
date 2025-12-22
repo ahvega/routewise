@@ -2,6 +2,7 @@
 	import { page } from '$app/stores';
 	import { Button, Card } from 'flowbite-svelte';
 	import { ExclamationCircleOutline, HomeOutline, ArrowLeftOutline } from 'flowbite-svelte-icons';
+	import { t } from '$lib/i18n';
 </script>
 
 <svelte:head>
@@ -25,26 +26,26 @@
 		<!-- Error Title -->
 		<h2 class="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-4">
 			{#if $page.status === 404}
-				Page Not Found
+				{$t('errors.pageNotFound') || 'Página No Encontrada'}
 			{:else if $page.status === 403}
-				Access Denied
+				{$t('errors.accessDenied') || 'Acceso Denegado'}
 			{:else if $page.status === 500}
-				Server Error
+				{$t('errors.serverError') || 'Error del Servidor'}
 			{:else}
-				Something Went Wrong
+				{$t('errors.somethingWentWrong') || 'Algo Salió Mal'}
 			{/if}
 		</h2>
 
 		<!-- Error Message -->
 		<p class="text-gray-600 dark:text-gray-400 mb-8">
 			{#if $page.status === 404}
-				The page you're looking for doesn't exist or has been moved.
+				{$t('errors.pageNotFoundMessage') || 'La página que buscas no existe o ha sido movida.'}
 			{:else if $page.status === 403}
-				You don't have permission to access this resource.
+				{$t('errors.accessDeniedMessage') || 'No tienes permiso para acceder a este recurso.'}
 			{:else if $page.status === 500}
-				We're experiencing technical difficulties. Please try again later.
+				{$t('errors.serverErrorMessage') || 'Estamos experimentando dificultades técnicas. Por favor, intenta de nuevo más tarde.'}
 			{:else}
-				{$page.error?.message || 'An unexpected error occurred.'}
+				{$page.error?.message || $t('errors.unexpectedError') || 'Ocurrió un error inesperado.'}
 			{/if}
 		</p>
 
@@ -52,17 +53,17 @@
 		<div class="flex flex-col sm:flex-row gap-3 justify-center">
 			<Button color="light" onclick={() => history.back()}>
 				<ArrowLeftOutline class="w-4 h-4 mr-2" />
-				Go Back
+				{$t('errors.goBack') || 'Volver'}
 			</Button>
 			<Button href="/">
 				<HomeOutline class="w-4 h-4 mr-2" />
-				Home
+				{$t('errors.home') || 'Inicio'}
 			</Button>
 		</div>
 
 		<!-- Support Link -->
 		<p class="text-sm text-gray-500 dark:text-gray-500 mt-8">
-			Need help? Contact <a href="mailto:support@routewise.app" class="text-primary-600 dark:text-primary-400 hover:underline">support@routewise.app</a>
+			{$t('errors.needHelp') || '¿Necesitas ayuda? Contacta'} <a href="mailto:support@routewise.app" class="text-primary-600 dark:text-primary-400 hover:underline">support@routewise.app</a>
 		</p>
 	</Card>
 </div>

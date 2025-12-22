@@ -137,3 +137,15 @@ input[type="range"]:hover::-moz-range-thumb {
   background-color: #0ea5e9;
   border-color: #0ea5e9;
 }
+
+/* Button styling with Fira Extra Condensed */
+button,
+a[href][class*="bg-primary"],
+a[href][class*="bg-gray"],
+a[href][class*="rounded-lg"][class*="hover:bg"],
+.btn-style {
+  font-family: 'Fira Sans Extra Condensed', 'Manrope', ui-sans-serif, sans-serif;
+  font-weight: 300;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}

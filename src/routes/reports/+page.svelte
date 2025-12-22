@@ -115,13 +115,13 @@
 		over90: 'bg-red-700',
 	};
 
-	const agingLabels: Record<string, string> = {
-		current: 'Current',
-		days1_30: '1-30 Days',
-		days31_60: '31-60 Days',
-		days61_90: '61-90 Days',
-		over90: '90+ Days',
-	};
+	const agingLabels = $derived<Record<string, string>>({
+		current: $t('reports.current') || 'Al Corriente',
+		days1_30: $t('reports.aging1_30') || '1-30 Días',
+		days31_60: $t('reports.aging31_60') || '31-60 Días',
+		days61_90: $t('reports.aging61_90') || '61-90 Días',
+		over90: $t('reports.agingOver90') || '90+ Días',
+	});
 
 	// CSV Export functions
 	function downloadCSV(data: Record<string, unknown>[], filename: string, headers: string[]) {
@@ -368,7 +368,7 @@
 												></div>
 											</div>
 											<p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
-												{client.approved} approved of {client.quotations} quotations
+												{client.approved} {$t('reports.approved').toLowerCase()} de {client.quotations} {$t('reports.quotationsLower')}
 											</p>
 										</div>
 									</div>
@@ -410,7 +410,7 @@
 												></div>
 											</div>
 											<p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
-												{vehicle.approved} approved of {vehicle.quotations} quotations
+												{vehicle.approved} {$t('reports.approved').toLowerCase()} de {vehicle.quotations} {$t('reports.quotationsLower')}
 											</p>
 										</div>
 									</div>
@@ -471,26 +471,26 @@
 							<div class="flex justify-center gap-6 mt-4">
 								<div class="flex items-center gap-2">
 									<div class="w-3 h-3 bg-sky-400 rounded"></div>
-									<span class="text-xs text-gray-600 dark:text-gray-400">Approved</span>
+									<span class="text-xs text-gray-600 dark:text-gray-400">{$t('reports.approved') || 'Aprobado'}</span>
 								</div>
 								<div class="flex items-center gap-2">
 									<div class="w-3 h-3 bg-amber-400 rounded"></div>
-									<span class="text-xs text-gray-600 dark:text-gray-400">Invoiced</span>
+									<span class="text-xs text-gray-600 dark:text-gray-400">{$t('reports.invoiced') || 'Facturado'}</span>
 								</div>
 								<div class="flex items-center gap-2">
 									<div class="w-3 h-3 bg-emerald-500 rounded"></div>
-									<span class="text-xs text-gray-600 dark:text-gray-400">Collected</span>
+									<span class="text-xs text-gray-600 dark:text-gray-400">{$t('reports.collected') || 'Cobrado'}</span>
 								</div>
 							</div>
 
 							<!-- Summary table -->
 							<Table striped class="mt-6">
 								<TableHead>
-									<TableHeadCell>Month</TableHeadCell>
-									<TableHeadCell class="text-right">Quotations</TableHeadCell>
-									<TableHeadCell class="text-right">Approved</TableHeadCell>
-									<TableHeadCell class="text-right">Invoiced</TableHeadCell>
-									<TableHeadCell class="text-right">Collected</TableHeadCell>
+									<TableHeadCell>{$t('reports.month') || 'Mes'}</TableHeadCell>
+									<TableHeadCell class="text-right">{$t('reports.quotations') || 'Cotizaciones'}</TableHeadCell>
+									<TableHeadCell class="text-right">{$t('reports.approved') || 'Aprobado'}</TableHeadCell>
+									<TableHeadCell class="text-right">{$t('reports.invoiced') || 'Facturado'}</TableHeadCell>
+									<TableHeadCell class="text-right">{$t('reports.collected') || 'Cobrado'}</TableHeadCell>
 								</TableHead>
 								<TableBody>
 									{#each monthlyRevenue.slice().reverse() as month}
@@ -577,11 +577,11 @@
 							{#if receivables.invoices.length > 0}
 								<Table striped>
 									<TableHead>
-										<TableHeadCell>Invoice</TableHeadCell>
-										<TableHeadCell>Client</TableHeadCell>
-										<TableHeadCell class="text-right">Amount Due</TableHeadCell>
-										<TableHeadCell>Due Date</TableHeadCell>
-										<TableHeadCell>Status</TableHeadCell>
+										<TableHeadCell>{$t('reports.invoice') || 'Factura'}</TableHeadCell>
+										<TableHeadCell>{$t('reports.client') || 'Cliente'}</TableHeadCell>
+										<TableHeadCell class="text-right">{$t('reports.amountDue') || 'Monto Adeudado'}</TableHeadCell>
+										<TableHeadCell>{$t('reports.dueDate') || 'Fecha de Vencimiento'}</TableHeadCell>
+										<TableHeadCell>{$t('reports.status') || 'Estado'}</TableHeadCell>
 									</TableHead>
 									<TableBody>
 										{#each receivables.invoices.slice(0, 15) as invoice}
@@ -592,9 +592,9 @@
 												<TableBodyCell>{formatDate(invoice.dueDate)}</TableBodyCell>
 												<TableBodyCell>
 													{#if invoice.daysOverdue > 0}
-														<Badge color="red">{invoice.daysOverdue}d overdue</Badge>
+														<Badge color="red">{invoice.daysOverdue}d {$t('reports.overdue') || 'vencido'}</Badge>
 													{:else}
-														<Badge color="green">Current</Badge>
+														<Badge color="green">{$t('reports.current') || 'Al Corriente'}</Badge>
 													{/if}
 												</TableBodyCell>
 											</TableBodyRow>
@@ -629,32 +629,32 @@
 							<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
 								<div class="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg text-center">
 									<p class="text-2xl font-bold text-gray-900 dark:text-white">{driverUtil.summary.totalDrivers}</p>
-									<p class="text-sm text-gray-500 dark:text-gray-400">Total Drivers</p>
+									<p class="text-sm text-gray-500 dark:text-gray-400">{$t('reports.totalDrivers') || 'Total de Conductores'}</p>
 								</div>
 								<div class="p-4 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg text-center">
 									<p class="text-2xl font-bold text-emerald-800 dark:text-emerald-200">{driverUtil.summary.activeDrivers}</p>
-									<p class="text-sm text-emerald-700 dark:text-emerald-400">Active</p>
+									<p class="text-sm text-emerald-700 dark:text-emerald-400">{$t('reports.active') || 'Activo'}</p>
 								</div>
 								<div class="p-4 bg-sky-50 dark:bg-sky-900/20 rounded-lg text-center">
 									<p class="text-2xl font-bold text-sky-800 dark:text-sky-200">{driverUtil.summary.totalTrips}</p>
-									<p class="text-sm text-sky-700 dark:text-sky-400">Total Trips</p>
+									<p class="text-sm text-sky-700 dark:text-sky-400">{$t('reports.totalTrips') || 'Total de Viajes'}</p>
 								</div>
 								<div class="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg text-center">
 									<p class="text-2xl font-bold text-purple-800 dark:text-purple-200">{driverUtil.summary.avgTripsPerDriver}</p>
-									<p class="text-sm text-purple-700 dark:text-purple-400">Avg Trips/Driver</p>
+									<p class="text-sm text-purple-700 dark:text-purple-400">{$t('reports.avgTripsPerDriver') || 'Prom Viajes/Conductor'}</p>
 								</div>
 							</div>
 
 							<!-- Driver list -->
 							<Table striped>
 								<TableHead>
-									<TableHeadCell>Driver</TableHeadCell>
-									<TableHeadCell>Status</TableHeadCell>
-									<TableHeadCell class="text-right">Completed</TableHeadCell>
-									<TableHeadCell class="text-right">In Progress</TableHeadCell>
-									<TableHeadCell class="text-right">Scheduled</TableHeadCell>
-									<TableHeadCell class="text-right">Trip Days</TableHeadCell>
-									<TableHeadCell>Utilization</TableHeadCell>
+									<TableHeadCell>{$t('reports.driver') || 'Conductor'}</TableHeadCell>
+									<TableHeadCell>{$t('reports.status') || 'Estado'}</TableHeadCell>
+									<TableHeadCell class="text-right">{$t('reports.completed') || 'Completado'}</TableHeadCell>
+									<TableHeadCell class="text-right">{$t('reports.inProgress') || 'En Progreso'}</TableHeadCell>
+									<TableHeadCell class="text-right">{$t('reports.scheduled') || 'Programado'}</TableHeadCell>
+									<TableHeadCell class="text-right">{$t('reports.tripDays') || 'Días de Viaje'}</TableHeadCell>
+									<TableHeadCell>{$t('reports.utilization') || 'Utilización'}</TableHeadCell>
 								</TableHead>
 								<TableBody>
 									{#each driverUtil.drivers as driver}
@@ -702,31 +702,31 @@
 							<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
 								<div class="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg text-center">
 									<p class="text-2xl font-bold text-gray-900 dark:text-white">{vehicleUtil.summary.totalVehicles}</p>
-									<p class="text-sm text-gray-500 dark:text-gray-400">Total Vehicles</p>
+									<p class="text-sm text-gray-500 dark:text-gray-400">{$t('reports.totalVehicles') || 'Total de Vehículos'}</p>
 								</div>
 								<div class="p-4 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg text-center">
 									<p class="text-2xl font-bold text-emerald-800 dark:text-emerald-200">{vehicleUtil.summary.activeVehicles}</p>
-									<p class="text-sm text-emerald-700 dark:text-emerald-400">Active</p>
+									<p class="text-sm text-emerald-700 dark:text-emerald-400">{$t('reports.active') || 'Activo'}</p>
 								</div>
 								<div class="p-4 bg-sky-50 dark:bg-sky-900/20 rounded-lg text-center">
 									<p class="text-2xl font-bold text-sky-800 dark:text-sky-200">{vehicleUtil.summary.totalTrips}</p>
-									<p class="text-sm text-sky-700 dark:text-sky-400">Total Trips</p>
+									<p class="text-sm text-sky-700 dark:text-sky-400">{$t('reports.totalTrips') || 'Total de Viajes'}</p>
 								</div>
 								<div class="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg text-center">
 									<p class="text-2xl font-bold text-purple-800 dark:text-purple-200">{formatDistance(vehicleUtil.summary.totalDistance)}</p>
-									<p class="text-sm text-purple-700 dark:text-purple-400">Total Distance</p>
+									<p class="text-sm text-purple-700 dark:text-purple-400">{$t('reports.totalDistance') || 'Distancia Total'}</p>
 								</div>
 							</div>
 
 							<!-- Vehicle list -->
 							<Table striped>
 								<TableHead>
-									<TableHeadCell>Vehicle</TableHeadCell>
-									<TableHeadCell>Type</TableHeadCell>
-									<TableHeadCell>Status</TableHeadCell>
-									<TableHeadCell class="text-right">Trips</TableHeadCell>
-									<TableHeadCell class="text-right">Distance</TableHeadCell>
-									<TableHeadCell>Utilization</TableHeadCell>
+									<TableHeadCell>{$t('reports.vehicle') || 'Vehículo'}</TableHeadCell>
+									<TableHeadCell>{$t('reports.type') || 'Tipo'}</TableHeadCell>
+									<TableHeadCell>{$t('reports.status') || 'Estado'}</TableHeadCell>
+									<TableHeadCell class="text-right">{$t('reports.trips') || 'Viajes'}</TableHeadCell>
+									<TableHeadCell class="text-right">{$t('reports.distance') || 'Distancia'}</TableHeadCell>
+									<TableHeadCell>{$t('reports.utilization') || 'Utilización'}</TableHeadCell>
 								</TableHead>
 								<TableBody>
 									{#each vehicleUtil.vehicles as vehicle}
@@ -772,21 +772,21 @@
 							<!-- Summary -->
 							<div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
 								<div class="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
-									<p class="text-sm text-gray-500 dark:text-gray-400">Unique Routes</p>
+									<p class="text-sm text-gray-500 dark:text-gray-400">{$t('reports.uniqueRoutes') || 'Rutas Únicas'}</p>
 									<p class="text-2xl font-bold text-gray-900 dark:text-white">{routeAnalysis.totalUniqueRoutes}</p>
 								</div>
 								{#if routeAnalysis.mostPopular}
 									<div class="p-4 bg-sky-50 dark:bg-sky-900/20 rounded-lg">
-										<p class="text-sm text-sky-700 dark:text-sky-400">Most Popular</p>
+										<p class="text-sm text-sky-700 dark:text-sky-400">{$t('reports.mostPopular') || 'Más Popular'}</p>
 										<p class="text-lg font-bold text-sky-800 dark:text-sky-200 truncate">
 											{routeAnalysis.mostPopular.origin} → {routeAnalysis.mostPopular.destination}
 										</p>
-										<p class="text-xs text-sky-600 dark:text-sky-400">{routeAnalysis.mostPopular.count} quotations</p>
+										<p class="text-xs text-sky-600 dark:text-sky-400">{routeAnalysis.mostPopular.count} {$t('reports.quotationsLower') || 'cotizaciones'}</p>
 									</div>
 								{/if}
 								{#if routeAnalysis.highestValue}
 									<div class="p-4 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg">
-										<p class="text-sm text-emerald-700 dark:text-emerald-400">Highest Value</p>
+										<p class="text-sm text-emerald-700 dark:text-emerald-400">{$t('reports.highestValue') || 'Mayor Valor'}</p>
 										<p class="text-lg font-bold text-emerald-800 dark:text-emerald-200 truncate">
 											{routeAnalysis.highestValue.origin} → {routeAnalysis.highestValue.destination}
 										</p>
@@ -799,12 +799,12 @@
 							{#if routeAnalysis.routes.length > 0}
 								<Table striped>
 									<TableHead>
-										<TableHeadCell>Route</TableHeadCell>
-										<TableHeadCell class="text-right">Quotations</TableHeadCell>
-										<TableHeadCell class="text-right">Approved</TableHeadCell>
-										<TableHeadCell class="text-right">Revenue</TableHeadCell>
-										<TableHeadCell class="text-right">Avg Distance</TableHeadCell>
-										<TableHeadCell class="text-right">Conv. Rate</TableHeadCell>
+										<TableHeadCell>{$t('reports.route') || 'Ruta'}</TableHeadCell>
+										<TableHeadCell class="text-right">{$t('reports.quotations') || 'Cotizaciones'}</TableHeadCell>
+										<TableHeadCell class="text-right">{$t('reports.approved') || 'Aprobado'}</TableHeadCell>
+										<TableHeadCell class="text-right">{$t('reports.revenue') || 'Ingresos'}</TableHeadCell>
+										<TableHeadCell class="text-right">{$t('reports.avgDistance') || 'Distancia Prom'}</TableHeadCell>
+										<TableHeadCell class="text-right">{$t('reports.convRate') || 'Tasa de Conv.'}</TableHeadCell>
 									</TableHead>
 									<TableBody>
 										{#each routeAnalysis.routes.slice(0, 15) as route}
