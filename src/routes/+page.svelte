@@ -621,7 +621,15 @@
 										<span class="font-medium text-gray-900 dark:text-white text-sm">{activity.title}</span>
 										<StatusBadge status={activity.action} size="sm" />
 									</div>
-									<p class="text-xs text-gray-500 dark:text-gray-400 truncate">{activity.description}</p>
+									<p class="text-xs text-gray-500 dark:text-gray-400 truncate">
+										{#if activity.descriptionKey && activity.descriptionParams}
+											{$t(activity.descriptionKey, { values: activity.descriptionParams })}
+										{:else if activity.descriptionKey}
+											{$t(activity.descriptionKey)}
+										{:else}
+											{activity.description}
+										{/if}
+									</p>
 								</div>
 								<span class="text-xs text-gray-400 dark:text-gray-500 whitespace-nowrap">
 									{formatRelativeTime(activity.timestamp)}
@@ -868,6 +876,9 @@
 									<p class="font-medium text-amber-800 dark:text-amber-200 text-sm">
 										{$t(alert.messageKey, { values: alert.messageParams })}
 									</p>
+								{:else if alert.titleKey && alert.messageKey}
+									<p class="font-medium text-amber-800 dark:text-amber-200 text-sm">{$t(alert.titleKey)}</p>
+									<p class="text-xs text-amber-600 dark:text-amber-400">{$t(alert.messageKey)}</p>
 								{:else}
 									<p class="font-medium text-amber-800 dark:text-amber-200 text-sm">{alert.title}</p>
 									<p class="text-xs text-amber-600 dark:text-amber-400">{alert.message}</p>
@@ -879,8 +890,17 @@
 						<div class="flex items-start gap-3 p-3 bg-sky-50 dark:bg-sky-900/20 rounded-lg border border-sky-200 dark:border-sky-800">
 							<InfoCircleOutline class="w-5 h-5 text-sky-500 flex-shrink-0 mt-0.5" />
 							<div>
-								<p class="font-medium text-sky-800 dark:text-sky-200 text-sm">{alert.title}</p>
-								<p class="text-xs text-sky-600 dark:text-sky-400">{alert.message}</p>
+								{#if alert.messageKey && alert.messageParams}
+									<p class="font-medium text-sky-800 dark:text-sky-200 text-sm">
+										{$t(alert.messageKey, { values: alert.messageParams })}
+									</p>
+								{:else if alert.titleKey && alert.messageKey}
+									<p class="font-medium text-sky-800 dark:text-sky-200 text-sm">{$t(alert.titleKey)}</p>
+									<p class="text-xs text-sky-600 dark:text-sky-400">{$t(alert.messageKey)}</p>
+								{:else}
+									<p class="font-medium text-sky-800 dark:text-sky-200 text-sm">{alert.title}</p>
+									<p class="text-xs text-sky-600 dark:text-sky-400">{alert.message}</p>
+								{/if}
 							</div>
 						</div>
 					{/each}

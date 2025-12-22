@@ -190,6 +190,9 @@ export const getAlerts = query({
           entityId: invoice._id,
           entityType: "invoice",
           date: invoice.dueDate,
+          titleKey: "dashboard.severelyOverdueInvoice",
+          messageKey: "dashboard.severelyOverdueInvoiceMessage",
+          messageParams: { invoiceNumber: invoice.invoiceNumber, days: daysOverdue },
         });
       } else if (daysOverdue > 0) {
         alerts.push({
@@ -200,6 +203,9 @@ export const getAlerts = query({
           entityId: invoice._id,
           entityType: "invoice",
           date: invoice.dueDate,
+          titleKey: "dashboard.overdueInvoice",
+          messageKey: "dashboard.overdueInvoiceMessage",
+          messageParams: { invoiceNumber: invoice.invoiceNumber, days: daysOverdue },
         });
       }
     }
@@ -212,6 +218,9 @@ export const getAlerts = query({
         category: "advance",
         title: "Pending Advance Approvals",
         message: `${pendingAdvances.length} expense advance(s) waiting for approval`,
+        titleKey: "dashboard.pendingAdvanceApprovals",
+        messageKey: "dashboard.pendingAdvanceApprovalsMessage",
+        messageParams: { count: pendingAdvances.length },
       });
     }
 
@@ -223,6 +232,9 @@ export const getAlerts = query({
         category: "advance",
         title: "Unsettled Advances",
         message: `${unsettledAdvances.length} expense advance(s) need settlement`,
+        titleKey: "dashboard.unsettledAdvances",
+        messageKey: "dashboard.unsettledAdvancesMessage",
+        messageParams: { count: unsettledAdvances.length },
       });
     }
 
@@ -237,14 +249,34 @@ export const getAlerts = query({
       if (!itinerary.driverId) missing.push("driver");
       if (!itinerary.vehicleId) missing.push("vehicle");
 
+      // Determine which translation key to use based on what's missing
+      let messageKey = "dashboard.unassignedItineraryMessage";
+      let messageEn = "";
+
+      if (missing.length === 2) {
+        messageKey = "dashboard.unassignedItineraryBoth";
+        messageEn = `${itinerary.itineraryNumber} needs driver and vehicle assignment`;
+      } else if (missing[0] === "driver") {
+        messageKey = "dashboard.unassignedItineraryDriver";
+        messageEn = `${itinerary.itineraryNumber} needs driver assignment`;
+      } else {
+        messageKey = "dashboard.unassignedItineraryVehicle";
+        messageEn = `${itinerary.itineraryNumber} needs vehicle assignment`;
+      }
+
       alerts.push({
         type: "warning",
         category: "itinerary",
         title: "Unassigned Itinerary",
-        message: `${itinerary.itineraryNumber} needs ${missing.join(" and ")} assignment`,
+        message: messageEn,
         entityId: itinerary._id,
         entityType: "itinerary",
         date: itinerary.startDate,
+        titleKey: "dashboard.unassignedItinerary",
+        messageKey: messageKey,
+        messageParams: {
+          itineraryNumber: itinerary.itineraryNumber
+        },
       });
     }
 
@@ -276,6 +308,8 @@ export const getRecentActivity = query({
       description: string;
       entityId: string;
       timestamp: number;
+      descriptionKey?: string;
+      descriptionParams?: Record<string, string | number>;
     }> = [];
 
     // Add quotation activities
@@ -297,6 +331,8 @@ export const getRecentActivity = query({
           description: `Approved for L${q.salePriceHnl.toLocaleString()}`,
           entityId: q._id,
           timestamp: q.approvedAt,
+          descriptionKey: "dashboard.approvedFor",
+          descriptionParams: { amount: `L${q.salePriceHnl.toLocaleString()}` },
         });
       }
     }
@@ -320,6 +356,7 @@ export const getRecentActivity = query({
           description: "Trip started",
           entityId: i._id,
           timestamp: i.startedAt,
+          descriptionKey: "dashboard.tripStarted",
         });
       }
 
@@ -331,6 +368,7 @@ export const getRecentActivity = query({
           description: "Trip completed",
           entityId: i._id,
           timestamp: i.completedAt,
+          descriptionKey: "dashboard.tripCompleted",
         });
       }
     }
@@ -344,6 +382,8 @@ export const getRecentActivity = query({
         description: `Invoice for L${inv.totalHnl.toLocaleString()}`,
         entityId: inv._id,
         timestamp: inv.createdAt,
+        descriptionKey: "dashboard.invoiceFor",
+        descriptionParams: { amount: `L${inv.totalHnl.toLocaleString()}` },
       });
 
       if (inv.paidAt) {
@@ -354,6 +394,7 @@ export const getRecentActivity = query({
           description: "Payment completed",
           entityId: inv._id,
           timestamp: inv.paidAt,
+          descriptionKey: "dashboard.paymentCompleted",
         });
       }
     }
@@ -367,6 +408,8 @@ export const getRecentActivity = query({
         description: `Advance for L${a.amountHnl.toLocaleString()}`,
         entityId: a._id,
         timestamp: a.createdAt,
+        descriptionKey: "dashboard.advanceFor",
+        descriptionParams: { amount: `L${a.amountHnl.toLocaleString()}` },
       });
 
       if (a.disbursedAt) {
@@ -377,6 +420,7 @@ export const getRecentActivity = query({
           description: "Funds disbursed",
           entityId: a._id,
           timestamp: a.disbursedAt,
+          descriptionKey: "dashboard.fundsDisbursed",
         });
       }
 
@@ -388,6 +432,7 @@ export const getRecentActivity = query({
           description: "Expenses settled",
           entityId: a._id,
           timestamp: a.settledAt,
+          descriptionKey: "dashboard.expensesSettled",
         });
       }
     }
