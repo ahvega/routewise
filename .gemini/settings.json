@@ -1,19 +1,16 @@
 {
-	"$schema": "https://raw.githubusercontent.com/google-gemini/gemini-cli/main/schemas/settings.schema.json",
-	"mcpServers": {
-		"svelte": {
-			"url": "https://mcp.svelte.dev/mcp"
-		},
-		"flowbite-svelte": {
-			"type": "stdio",
-			"command": "node",
-			"args": ["e:\\MyDevTools\\flowbite-svelte-mcp\\build\\server.js"]
-		},
-		"convex": {
-			"type": "stdio",
-			"command": "npx",
-			"args": ["convex", "mcp", "start"]
-		}
-	}
+  "$schema": "https://raw.githubusercontent.com/google-gemini/gemini-cli/main/schemas/settings.schema.json",
+  "mcpServers": {
+    "svelte": {
+      "url": "https://mcp.svelte.dev/mcp"
+    },
+    "convex": {
+      "command": "npx",
+      "args": [
+        "convex",
+        "mcp",
+        "start"
+      ]
+    }
+  }
 }
-
