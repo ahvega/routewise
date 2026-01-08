@@ -28,6 +28,7 @@
 
 # Convex
 .convex/
+convex/_generated/
 
 # production
 /build
