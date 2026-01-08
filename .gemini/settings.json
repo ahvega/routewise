@@ -1,0 +1,16 @@
+{
+  "$schema": "https://raw.githubusercontent.com/google-gemini/gemini-cli/main/schemas/settings.schema.json",
+  "mcpServers": {
+    "svelte": {
+      "url": "https://mcp.svelte.dev/mcp"
+    },
+    "convex": {
+      "command": "npx",
+      "args": [
+        "convex",
+        "mcp",
+        "start"
+      ]
+    }
+  }
+}

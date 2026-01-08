@@ -18,10 +18,16 @@
 /blob-report/
 /playwright/.cache/
 
-# next.js
+# next.js (legacy)
 /.next/
 /out/
 .next
+
+# SvelteKit
+.svelte-kit/
+
+# Convex
+.convex/
 
 # production
 /build
@@ -30,7 +36,6 @@
 # misc
 .DS_Store
 *.pem
-.vscode/
 .idea/
 *.swp
 *.swo
@@ -109,5 +114,39 @@ geocoding-cache/
 quotations-export/
 temp-exports/
 user-data/
-experimental/
+
+# Legacy Next.js (in legacy/ folder)
+legacy/node_modules/
+legacy/.next/
+legacy/experimental/
+legacy/.old/
+
+# Windows special files
+nul
+
+# legacy / old artifacts and potential secrets
+legacy/
 .old/
+*.old.html
+*.backup.html
+
+# Environment / secrets
+.env
+.env.*
+*.env.local
+
+# Development / Testing
+.gemini/
+.claude/
+.windsurf/
+next-steps.txt
+fixes-to-do.node_modules
+DEPLOYMENT_TEST_VERSION.md
+PT_MIGRATION_TO_SAAS_PLAN.md
+DEVELOPMENT.md
+DEVELOPMENT_ROADMAP.md
+CLAUDE.md
+AGENTS.md
+GEMINI.md
+SALES_PROCESS_WORKFLOW.md
+

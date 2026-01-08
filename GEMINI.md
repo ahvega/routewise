@@ -1,98 +1,293 @@
-# Project Overview
+# GEMINI.md
 
-This is a Next.js web application designed for generating transportation quotations. It's built with a modern tech stack including React, TypeScript, and Tailwind CSS. The application calculates travel costs based on various parameters, vehicle types, and routes.
+This file provides guidance to Gemini when working with code in this repository.
 
-## Features
+## Project Overview
 
-*   **Quotation Form:** A comprehensive form to input trip details, including origin, destination, base location, and group size.
-*   **Route Calculation:** Integrates with Google Maps and Distance Matrix APIs to calculate accurate routes, distances, and travel times.
-*   **Cost Calculation Engine:** A sophisticated engine that calculates detailed costs for fuel, driver expenses (meals and lodging), and vehicle operational costs.
-*   **Pricing Module:** A flexible pricing module that allows for configurable markup percentages to generate sale prices in both USD and a local currency (HNL).
-*   **Vehicle Management:** A system for managing a fleet of vehicles with different capacities and specifications.
-*   **Parameter Management:** A system for managing configurable parameters like fuel prices, meal costs, and exchange rates.
-*   **Interactive Map:** An interactive map that displays the calculated route, including origin, destination, and base location markers.
+RouteWise is a transportation quotation SaaS platform for tour companies and fleet operators in Honduras. It calculates trip costs for multiple vehicle types, displays routes via Google Maps, and generates pricing options with different profit margins.
 
-## Key Technologies
+**Key Features**: Route calculation with Google Maps API, multi-tier pricing (10-30% markup), currency conversion (HNL/USD), toll/fuel/meal cost calculations, multi-tenant support, responsive mobile/desktop UI with dark mode.
 
-*   **Framework:** Next.js
-*   **Language:** TypeScript
-*   **Styling:** Tailwind CSS & daisyUI
-*   **State Management:** React Context API
-*   **Form Handling:** React Hook Form
-*   **Schema Validation:** Zod
-*   **Maps Integration:** Google Maps JavaScript API
+## Tech Stack
 
-## Architecture
+- **Framework**: SvelteKit 2.x with Svelte 5 (runes syntax)
+- **Styling**: TailwindCSS 4 with @tailwindcss/vite plugin
+- **UI Components**: Flowbite-svelte 1.x (Tailwind-based component library)
+- **Icons**: Flowbite-svelte-icons
+- **Backend/Database**: Convex (reactive document DB, real-time sync)
+- **Authentication**: WorkOS AuthKit
+- **Maps**: Google Maps JavaScript API
 
-The application follows a modular architecture with a clear separation of concerns. It utilizes a service layer for business logic and external API integrations, custom hooks for state management, and React components for the UI.
+## Project Structure
 
-### High-Level Architecture
-
-```mermaid
-graph TB
-    UI[React UI Components] --> Hooks[Custom React Hooks]
-    Hooks --> Services[Service Layer]
-    Services --> APIs[External APIs]
-    Services --> Storage[Local Storage/State]
-
-    subgraph "External APIs"
-        GoogleMaps[Google Maps API]
-        GoogleDistance[Google Distance Matrix API]
-        ExchangeRate[Exchange Rate API]
-    end
-
-    subgraph "Core Services"
-        RouteService[Route Calculator Service]
-        CostService[Cost Calculation Service]
-        VehicleService[Vehicle Management Service]
-        ParameterService[Parameter Management Service]
-    end
-
-    subgraph "UI Layer"
-        QuotationForm[Quotation Form]
-        ResultsDisplay[Results Display]
-        MapComponent[Interactive Map]
-        AdminPanel[Parameter Management]
-    end
+```text
+/                        # SvelteKit project root
+├── src/
+│   ├── lib/
+│   │   ├── components/  # Svelte components
+│   │   ├── auth/        # WorkOS authentication
+│   │   ├── types/       # TypeScript type definitions
+│   │   ├── utils/       # Utility functions
+│   │   ├── services/    # Business logic services
+│   │   └── stores/      # Svelte stores (using runes)
+│   ├── routes/          # SvelteKit file-based routing
+│   ├── app.css          # TailwindCSS styles
+│   └── app.d.ts         # SvelteKit type definitions
+├── convex/              # Convex database schema and functions
+└── static/              # Static assets
 ```
 
-# Building and Running
+## Development Commands
 
-To get the application up and running, follow these steps:
+```bash
+npm run dev        # Start dev server (localhost:5173)
+npm run build      # Production build
+npm run check      # TypeScript and Svelte checks
+npm run test       # Run tests in watch mode
+npm run quality    # Run type checks + tests (use before commits)
+npx convex dev     # Start Convex development server
+```
 
-1.  **Install Dependencies:**
-    ```bash
-    npm install
-    ```
+## Development Server Scripts (PowerShell)
 
-2.  **Run the Development Server:**
-    ```bash
-    npm run dev
-    ```
-    This will start the application in development mode at `http://localhost:3000`.
+### Start Servers: `start-srv.ps1`
 
-3.  **Build for Production:**
-    ```bash
-    npm run build
-    ```
-    This will create an optimized production build of the application.
+```powershell
+.\start-srv.ps1              # Full restart with Convex update
+.\start-srv.ps1 -SkipUpdate  # Skip Convex package update
+.\start-srv.ps1 -SkipConvex  # Start only SvelteKit
+.\start-srv.ps1 -SkipSvelte  # Start only Convex
+```
 
-4.  **Start the Production Server:**
-    ```bash
-    npm run start
-    ```
-    This will start the application in production mode.
+**Actions**: Updates Convex → Kills ports 3210/5173/5174 → Starts both servers
 
-5.  **Linting and Type-Checking:**
-    ```bash
-    npm run lint
-    npm run type-check
-    ```
-    These commands will check the code for any linting errors and type errors.
+### Stop Servers: `stop-srv.ps1`
 
-# Development Conventions
+```powershell
+.\stop-srv.ps1  # Stop all dev servers
+```
 
-*   **Styling:** The project uses Tailwind CSS for styling. It also uses daisyUI, a Tailwind CSS component library, for some of the UI components.
-*   **State Management:** The global application state is managed using React's Context API. The `AppContext` provides the state and dispatch function to all components wrapped in the `AppProvider`.
-*   **Data Fetching:** The application fetches data from a remote API with a fallback to local JSON files. The data loading logic is located in the `src/lib/dataLoader.ts` file.
-*   **Code Structure:** The code is organized by feature. Each feature has its own directory in the `src/components` directory. The services are located in the `src/services` directory.
+**Actions**: Kills processes on ports 3210 (Convex), 5173/5174 (SvelteKit)
+
+### Quick Reference
+
+| Scenario | Command |
+|----------|---------|
+| Start fresh | `.\start-srv.ps1` |
+| Quick restart | `.\start-srv.ps1 -SkipUpdate` |
+| Stop all | `.\stop-srv.ps1` |
+
+## Svelte 5 Runes
+
+The project uses Svelte 5's runes syntax for reactivity:
+
+```svelte
+<script lang="ts">
+  let count = $state(0);             // Reactive state
+  let doubled = $derived(count * 2); // Computed value
+
+  $effect(() => {                    // Side effects
+    console.log('Count changed:', count);
+  });
+
+  let { data } = $props();           // Component props
+</script>
+```
+
+## Svelte MCP Server (Official Documentation)
+
+This project has access to the **Official Svelte MCP Server** (`https://mcp.svelte.dev/mcp`) providing up-to-date Svelte 5 and SvelteKit documentation. **Use this when writing Svelte code.**
+
+### Available Tools
+
+| Tool | Description | When to Use |
+|------|-------------|-------------|
+| `list-sections` | List available doc sections | Discover what docs exist |
+| `get-documentation` | Get full documentation | Retrieve specific topic docs |
+| `svelte-autofixer` | Analyze code for issues | **ALWAYS** before delivering code |
+| `playground-link` | Generate playground link | Share code examples |
+
+### Required Workflow
+
+```text
+1. list-sections → Find relevant documentation
+2. get-documentation → Get detailed docs
+3. Write code using documented patterns
+4. svelte-autofixer → Validate code (repeat until clean)
+5. Deliver validated code
+```
+
+### Documentation Categories
+
+**Svelte 5**: Runes, template syntax, components, styling
+**SvelteKit**: Routing, load functions, form actions, hooks
+
+### Quick Reference
+
+| Task | Section |
+|------|---------|
+| State management | `svelte/runes` |
+| Routing | `kit/routing` |
+| Data loading | `kit/load` |
+| Form handling | `kit/form-actions` |
+
+## Convex MCP Server (Database Operations)
+
+This project has access to the **Convex MCP Server** for direct interaction with the Convex deployment. **Use this when working with database operations, debugging functions, or managing environment variables.**
+
+### Available Tools
+
+| Tool | Description |
+|------|-------------|
+| `status` | Get deployment selector (**always call first**) |
+| `tables` | List all tables with schemas |
+| `data` | Browse documents in a table |
+| `runOneoffQuery` | Execute read-only JS queries |
+| `functionSpec` | Get function metadata |
+| `run` | Execute deployed functions |
+| `logs` | Get recent function logs |
+| `envList/Get/Set/Remove` | Manage environment variables |
+
+### Required Workflow
+
+```text
+1. status → Get deployment selector
+2. Use other tools with the deployment selector
+```
+
+### Tool Categories
+
+**Data**: `tables`, `data`, `runOneoffQuery` (read-only)
+**Functions**: `functionSpec`, `run`, `logs`
+**Environment**: `envList`, `envGet`, `envSet`, `envRemove`
+
+### Quick Reference
+
+| Task | Tools |
+|------|-------|
+| View schema | `status` → `tables` |
+| Browse data | `status` → `data` |
+| Run function | `status` → `run` |
+| Debug | `status` → `logs` |
+
+## Flowbite-Svelte MCP Server
+
+This project has access to the **Flowbite-Svelte MCP Server** which provides AI assistants with comprehensive component documentation. **ALWAYS use this MCP server when implementing UI components** to ensure correct, up-to-date syntax.
+
+### Why Use the MCP Server
+
+- **Up-to-date docs**: Local copy of official LLM-optimized documentation
+- **Correct Svelte 5 syntax**: Examples use runes (`$state`, `$derived`, `$props`)
+- **Proper imports**: Exact import statements for each component
+- **Props and events**: Complete TypeScript prop definitions
+
+### Available MCP Tools
+
+| Tool | Description | Parameters |
+|------|-------------|------------|
+| `findComponent` | Find component by name/term | `query` (e.g., "Button", "modal") |
+| `getComponentDoc` | Get full documentation | `component` (doc path) |
+| `getComponentList` | List all available docs | None |
+| `searchDocs` | Full-text search in docs | `query` (search term) |
+
+### Tool Usage Workflow
+
+**IMPORTANT**: Always follow this workflow:
+
+```text
+Step 1: findComponent → query: "button"
+        Returns: { match: "buttons", docUrl: "buttons", components: ["Button", "GradientButton"] }
+
+Step 2: getComponentDoc → component: "buttons"
+        Returns: Full documentation with imports, examples, props
+
+Step 3: Implement using the documented syntax
+```
+
+### Component Categories (75+ components)
+
+**Components**: Navbar, Sidebar, Modal, Dialog, Table, Card, Badge, Alert, Toast, Dropdown, Tabs, Pagination, etc.
+
+**Forms**: Input, Textarea, Select, MultiSelect, Checkbox, Radio, Toggle, Datepicker, Timepicker, etc.
+
+**Typography**: Heading, P, A, List, Blockquote, Hr, Img
+
+**Extended**: CommandPalette, KanbanBoard, VirtualList, Tour, SplitPane
+
+### Svelte 5 Syntax Reference
+
+**CRITICAL**: Always use Svelte 5 runes syntax:
+
+| Old (Svelte 4) | New (Svelte 5) |
+|----------------|----------------|
+| `export let value` | `let { value } = $props()` |
+| `let count = 0` | `let count = $state(0)` |
+| `$: doubled = count * 2` | `let doubled = $derived(count * 2)` |
+| `on:click={handler}` | `onclick={handler}` |
+
+### Quick Reference
+
+| Need | Query |
+|------|-------|
+| Modal/Dialog | `findComponent → "modal"` |
+| Form inputs | `findComponent → "input"` |
+| Data table | `findComponent → "table"` |
+| Navigation | `findComponent → "navbar"` |
+| Notifications | `findComponent → "toast"` |
+
+## Code Quality Standards
+
+- **TypeScript**: Strict mode enabled, no implicit `any`
+- **Naming**: PascalCase for types/components, camelCase for functions
+- **Imports**: Use `$lib` alias for library imports
+- **Components**: Prefer Flowbite-svelte over custom components
+- **Commits**: Follow Conventional Commits (`feat:`, `fix:`, `refactor:`)
+
+## Puppeteer MCP Server (Browser Testing)
+
+This project has access to the **Puppeteer MCP Server** via Docker MCP for browser automation and visual testing.
+
+### Available Puppeteer Tools
+
+| Tool | Description | Parameters |
+|------|-------------|------------|
+| `puppeteer_navigate` | Navigate to a URL | `url` (required), `launchOptions` (optional) |
+| `puppeteer_screenshot` | Take a screenshot | `name` (required), `selector`, `width`, `height` |
+| `puppeteer_click` | Click an element | `selector` (CSS selector) |
+| `puppeteer_fill` | Fill an input field | `selector`, `value` |
+| `puppeteer_select` | Select from dropdown | `selector`, `value` |
+| `puppeteer_hover` | Hover over element | `selector` |
+| `puppeteer_evaluate` | Execute JavaScript | `script` (JS code string) |
+
+### When to Use Puppeteer Testing
+
+1. **After completing UI features** - Verify visual appearance and interactions
+2. **Testing user flows** - Multi-step processes like form submissions, navigation
+3. **Debugging layout issues** - Take screenshots to inspect CSS/styling problems
+4. **Verifying responsive design** - Test different viewport sizes
+
+### Browser Testing Workflow
+
+```text
+1. Ensure dev server is running: npm run dev (localhost:5173)
+2. puppeteer_navigate → url: "http://localhost:5173/your-route"
+3. puppeteer_screenshot → name: "feature-verification"
+4. Interact: puppeteer_click, puppeteer_fill, etc.
+5. Verify: Take screenshots or use puppeteer_evaluate
+```
+
+### Integration with TDD Flow
+
+```text
+TDD Flow (Enhanced)
+├── 1. Write unit/component tests (vitest)
+├── 2. Implement the feature
+├── 3. Run npm run quality (type check + unit tests)
+├── 4. Browser verification with Puppeteer MCP tools
+└── 5. Commit with conventional commit message
+```
+
+## Related Documentation
+
+- See `CLAUDE.md` for comprehensive project documentation
+- See `AGENTS.md` for agent-specific instructions

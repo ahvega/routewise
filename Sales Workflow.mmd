@@ -1,0 +1,59 @@
+flowchart LR
+    %% Top-level stages
+    subgraph Q[Quotation]
+        direction TB
+        Q_Draft[Draft]
+        Q_Sent[Sent]
+        Q_Approved[Approved]
+        Q_Rejected[Rejected]
+        Q_Expired[Expired]
+
+        Q_Draft --> Q_Sent
+        Q_Sent --> Q_Approved
+        Q_Sent --> Q_Rejected
+        Q_Sent --> Q_Expired
+    end
+
+    subgraph I[Itinerary]
+        direction TB
+        I_Scheduled[Scheduled]
+        I_Awaiting[Awaiting Details]
+        I_Ready[Ready]
+        I_InProgress[In Progress]
+        I_Completed[Completed]
+        I_Cancelled[Cancelled]
+
+        I_Scheduled --> I_Awaiting
+        I_Awaiting --> I_Ready
+        I_Ready --> I_InProgress
+        I_InProgress --> I_Completed
+        I_Ready --> I_Cancelled
+    end
+
+    subgraph INV[Invoice]
+        direction TB
+        Inv_Draft[Draft]
+        Inv_Sent[Sent]
+        Inv_Partial[Partial]
+        Inv_Paid[Paid]
+        Inv_Overdue[Overdue]
+        Inv_Cancelled[Cancelled/Void]
+
+        Inv_Draft --> Inv_Sent
+        Inv_Sent --> Inv_Partial
+        Inv_Partial --> Inv_Paid
+        Inv_Sent --> Inv_Overdue
+        Inv_Sent --> Inv_Cancelled
+    end
+
+    subgraph P[Payment]
+        direction TB
+        Pay_Paid[Paid]
+    end
+
+    %% Cross-entity triggers
+    Q_Approved -- "Auto-trigger" --> I_Scheduled
+    Q_Approved -- "Auto-trigger" --> Inv_Draft
+
+    I_Completed --> Inv_Sent
+    Inv_Paid --> Pay_Paid

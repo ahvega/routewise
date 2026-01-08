@@ -1,0 +1,151 @@
+@import 'tailwindcss';
+
+/* Flowbite-svelte theming */
+@plugin 'flowbite/plugin';
+
+/* Dark mode as default */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* IMPORTANT: Include Flowbite Svelte component styles */
+@source "../node_modules/flowbite-svelte/dist";
+@source "../node_modules/flowbite-svelte-icons/dist";
+@source "../node_modules/@flowbite-svelte-plugins/chart/dist";
+
+/* Custom theme colors for RouteWise */
+@theme {
+  --color-primary-50: #f0f9ff;
+  --color-primary-100: #e0f2fe;
+  --color-primary-200: #bae6fd;
+  --color-primary-300: #7dd3fc;
+  --color-primary-400: #38bdf8;
+  --color-primary-500: #0ea5e9;
+  --color-primary-600: #0284c7;
+  --color-primary-700: #0369a1;
+  --color-primary-800: #075985;
+  --color-primary-900: #0c4a6e;
+
+  /* Custom font families */
+  --font-sans: 'Manrope', ui-sans-serif, system-ui, sans-serif;
+  --font-display: 'Fira Sans Extra Condensed', 'Manrope', ui-sans-serif, sans-serif;
+  --font-mono: 'Atkinson Hyperlegible Mono', ui-monospace, monospace;
+}
+
+/* Global typography */
+html, body {
+  font-family: 'Manrope', ui-sans-serif, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Tables use condensed font for data density */
+table,
+thead,
+tbody,
+th,
+td,
+.table-cell {
+  font-family: 'Fira Sans Extra Condensed', 'Manrope', ui-sans-serif, sans-serif;
+}
+
+/* Form inputs use monospace for clarity */
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="number"],
+input[type="tel"],
+input[type="url"],
+input[type="search"],
+input[type="date"],
+input[type="datetime-local"],
+input[type="time"],
+textarea,
+select,
+.form-input,
+.form-select,
+.form-textarea {
+  font-family: 'Atkinson Hyperlegible Mono', ui-monospace, monospace;
+}
+
+/* Container and card padding improvements */
+.card-padding {
+  padding: 1.5rem;
+}
+
+/* Flowbite card overrides for better spacing */
+:global(.card) {
+  padding: 1.5rem;
+}
+
+/* Ensure proper content spacing */
+main {
+  padding: 1.5rem;
+}
+
+@media (min-width: 768px) {
+  main {
+    padding: 2rem;
+  }
+}
+
+/* Range slider thumb styling for visibility */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 8px;
+  background: #374151;
+  border-radius: 4px;
+  outline: none;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  background: #0ea5e9;
+  border-radius: 50%;
+  cursor: pointer;
+  border: 2px solid #ffffff;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+input[type="range"]::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  background: #0ea5e9;
+  border-radius: 50%;
+  cursor: pointer;
+  border: 2px solid #ffffff;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+input[type="range"]:hover::-webkit-slider-thumb {
+  background: #38bdf8;
+}
+
+input[type="range"]:hover::-moz-range-thumb {
+  background: #38bdf8;
+}
+
+/* Light mode adjustments */
+:root:not(.dark) input[type="range"] {
+  background: #d1d5db;
+}
+
+/* Toggle switch dark mode visibility fix */
+.dark [type='checkbox']:checked {
+  background-color: #0ea5e9;
+  border-color: #0ea5e9;
+}
+
+/* Button styling with Fira Extra Condensed */
+button,
+a[href][class*="bg-primary"],
+a[href][class*="bg-gray"],
+a[href][class*="rounded-lg"][class*="hover:bg"],
+.btn-style {
+  font-family: 'Fira Sans Extra Condensed', 'Manrope', ui-sans-serif, sans-serif;
+  font-weight: 300;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}

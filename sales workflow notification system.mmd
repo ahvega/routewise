@@ -1,0 +1,103 @@
+flowchart TB
+    %% Roles
+    Staff[Staff]
+    Client[Client]
+    Driver[Driver]
+
+    %% Channels
+    subgraph Channels
+        InApp[In-app]
+        Email[Email]
+        WhatsApp[WhatsApp*]
+    end
+
+    %% Events
+    subgraph Quotation_Events[Quotation Events]
+        QS[Quotation sent]
+        QF3[Quotation follow-up (3d)]
+        QF7[Quotation follow-up (7d)]
+        QA[Quotation approved]
+        QR[Quotation rejected]
+        QX[Quotation expired]
+    end
+
+    subgraph Itinerary_Events[Itinerary Events]
+        IC[Itinerary created]
+        TDR[Trip details requested]
+        TDC[Trip details completed]
+        TT_I[Trip tomorrow (incomplete)]
+        TT_C[Trip tomorrow (complete)]
+    end
+
+    subgraph Invoice_Events[Invoice Events]
+        InvC[Invoice created]
+        InvS[Invoice sent]
+        InvO3[Invoice overdue (3d)]
+        InvO7[Invoice overdue (7d)]
+        PayR[Payment received]
+    end
+
+    %% Quotation routing
+    QS --> Client
+    QS --> Email
+
+    QF3 --> Staff
+    QF3 --> InApp
+
+    QF7 --> Staff
+    QF7 --> Client
+    QF7 --> InApp
+    QF7 --> Email
+
+    QA --> Staff
+    QA --> InApp
+    QA --> Email
+
+    QR --> Staff
+    QR --> InApp
+
+    QX --> Staff
+    QX --> InApp
+
+    %% Itinerary routing
+    IC --> Staff
+    IC --> InApp
+
+    TDR --> Client
+    TDR --> Email
+    TDR --> WhatsApp
+
+    TDC --> Staff
+    TDC --> InApp
+    TDC --> Email
+
+    TT_I --> Staff
+    TT_I --> InApp
+
+    TT_C --> Client
+    TT_C --> Driver
+    TT_C --> Email
+    TT_C --> WhatsApp
+
+    %% Invoice routing
+    InvC --> Staff
+    InvC --> InApp
+
+    InvS --> Client
+    InvS --> Email
+
+    InvO3 --> Staff
+    InvO3 --> InApp
+
+    InvO7 --> Staff
+    InvO7 --> Client
+    InvO7 --> InApp
+    InvO7 --> Email
+
+    PayR --> Staff
+    PayR --> InApp
+
+    %% Note
+    classDef note fill=#fff3cd,stroke=#f0ad4e,color=#000;
+    NoteWhatsApp["*WhatsApp available on Plus/Premium plans"]:::note
+    WhatsApp --- NoteWhatsApp
