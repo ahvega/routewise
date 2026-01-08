@@ -16,6 +16,7 @@ export interface ServiceLine {
 export interface QuotationPdfData {
   quotationNumber: string;
   quotationSequence?: number;
+  quotationFileSafeName?: string; // For PDF filename: "2512-C00005-CTA-Juan_Perez_x_08"
   date: string;
   validUntil: string;
   // New standardized fields
@@ -695,6 +696,33 @@ function formatShortDate(dateInput: string | number): string {
   return `${day}/${month}/${year}`;
 }
 
+// Calculate end date from start date and number of days
+function calculateEndDate(startDate: string | number, days: number): Date | null {
+  if (!startDate || !days || days < 1) return null;
+  const date = new Date(typeof startDate === 'number' ? startDate : Number(startDate) || Date.parse(startDate));
+  if (isNaN(date.getTime())) return null;
+  // End date is start date + (days - 1), since day 1 is the departure date
+  date.setDate(date.getDate() + days - 1);
+  return date;
+}
+
+// Format date range for service line (start - end)
+function formatDateRange(startDate: string | number | undefined, days: number): string {
+  if (!startDate) return '';
+  const start = new Date(typeof startDate === 'number' ? startDate : Number(startDate) || Date.parse(startDate));
+  if (isNaN(start.getTime())) return '';
+
+  const endDate = calculateEndDate(startDate, days);
+  const startFormatted = formatShortDate(startDate);
+
+  if (endDate && days > 1) {
+    const endFormatted = formatShortDate(endDate.getTime());
+    return `${startFormatted} - ${endFormatted}`;
+  }
+
+  return startFormatted;
+}
+
 // Generate itinerary code: QuotationNumber-ClientCode-GroupLeader x Pax
 function generateItineraryCode(data: QuotationPdfData): string {
   // Get quotation number (without prefix if present)
@@ -718,10 +746,11 @@ function generateItineraryCode(data: QuotationPdfData): string {
 function generateServiceLineHtml(data: QuotationPdfData): string {
   const description = `Servicio de Transporte: ${data.trip.estimatedDays} Días | ${data.trip.totalDistance.toLocaleString()} Kms`;
   const route = `${data.trip.origin} - ${data.trip.destination}${data.trip.returnDate ? ` - ${data.trip.origin}` : ''}`;
+  // Calculate date range: if returnDate exists use it, otherwise calculate from departureDate + days
   const dates = data.trip.departureDate
     ? (data.trip.returnDate
       ? `${formatShortDate(data.trip.departureDate)} - ${formatShortDate(data.trip.returnDate)}`
-      : formatShortDate(data.trip.departureDate))
+      : formatDateRange(data.trip.departureDate, data.trip.estimatedDays))
     : '';
   const vehicle = `01 ${data.vehicle.name} x ${data.vehicle.capacity}`;
 
@@ -744,13 +773,21 @@ function generateServiceLineHtml(data: QuotationPdfData): string {
 
 // Generate multi-vehicle service lines
 function generateMultiServiceLinesHtml(serviceLines: ServiceLine[]): string {
-  return serviceLines.map(line => `
+  return serviceLines.map(line => {
+    // If dates is a single date (no " - "), calculate the date range from days
+    const dateRange = line.dates
+      ? (line.dates.includes(' - ')
+        ? line.dates
+        : formatDateRange(line.dates, line.days))
+      : '';
+
+    return `
     <tr>
       <td>
         <div class="service-description">${line.description}</div>
         <div class="service-details">
           <div>- Ruta: ${line.route}</div>
-          ${line.dates ? `<div>- Días: ${String(line.days).padStart(2, '0')}: ${line.dates}</div>` : ''}
+          ${dateRange ? `<div>- Días: ${String(line.days).padStart(2, '0')}: ${dateRange}</div>` : ''}
           <div>- Vehículo: ${line.vehicleName}</div>
         </div>
       </td>
@@ -758,13 +795,15 @@ function generateMultiServiceLinesHtml(serviceLines: ServiceLine[]): string {
       <td class="text-right">${formatCurrency(line.unitPrice, 'HNL')}</td>
       <td class="text-right">${formatCurrency(line.totalPrice, 'HNL')}</td>
     </tr>
-  `).join('');
+  `;
+  }).join('');
 }
 
 export function generateQuotationHtml(data: QuotationPdfData): string {
-  // Payment conditions display
-  const paymentLabel = data.paymentConditions === 'contado' ? 'Contado'
-    : data.paymentConditions?.replace('credito_', 'Crédito ').replace('_', ' ') + ' días' || 'Contado';
+  // Payment conditions display (fix: check for undefined before concatenation)
+  const paymentLabel = !data.paymentConditions || data.paymentConditions === 'contado'
+    ? 'Contado'
+    : data.paymentConditions.replace('credito_', 'Crédito ').replace('_', ' ') + ' días';
 
   // Tax display (Honduras ISV)
   const taxPercentage = data.pricing.taxPercentage ?? 0;
@@ -945,9 +984,10 @@ export function generateInvoiceHtml(data: InvoicePdfData): string {
   const paymentStatus = data.amountDue <= 0 ? 'paid' : data.amountPaid > 0 ? 'partial' : 'unpaid';
   const statusLabel = paymentStatus === 'paid' ? 'PAGADA' : paymentStatus === 'partial' ? 'PAGO PARCIAL' : 'PENDIENTE';
 
-  // Payment conditions display
-  const paymentLabel = data.paymentConditions === 'contado' ? 'Contado'
-    : data.paymentConditions?.replace('credito_', 'Crédito ').replace('_', ' ') + ' días' || 'Contado';
+  // Payment conditions display (fix: check for undefined before concatenation)
+  const paymentLabel = !data.paymentConditions || data.paymentConditions === 'contado'
+    ? 'Contado'
+    : data.paymentConditions.replace('credito_', 'Crédito ').replace('_', ' ') + ' días';
 
   // Tax display (Honduras ISV)
   const taxLabel = data.taxRate > 0 ? `ISV ${data.taxRate}%` : 'Exento de ISV 0.00%';

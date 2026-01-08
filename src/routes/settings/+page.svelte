@@ -19,6 +19,7 @@
 	import { api } from '$convex/_generated/api';
 	import { tenantStore } from '$lib/stores';
 	import { StatusBadge } from '$lib/components/ui';
+	import { ClientCodeMigration } from '$lib/components/admin';
 	import { t } from '$lib/i18n';
 	import {
 		LATIN_AMERICAN_CURRENCIES,
@@ -1028,6 +1029,19 @@
 						<p class="text-gray-500 dark:text-gray-400">{$t('settings.organization.notAvailable')}</p>
 					{/if}
 				</Card>
+			</TabItem>
+
+			<TabItem title="Mantenimiento">
+				<div class="mt-4 space-y-6">
+					<h4 class="text-xl font-semibold text-gray-900 dark:text-white">
+						Herramientas de Mantenimiento
+					</h4>
+
+					<!-- Client Code Migration -->
+					{#if tenantStore.tenantId}
+						<ClientCodeMigration tenantId={tenantStore.tenantId} />
+					{/if}
+				</div>
 			</TabItem>
 
 			<TabItem title={$t('settings.tabs.about')}>

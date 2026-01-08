@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { query, mutation } from "./_generated/server";
+import { query, mutation, internalMutation } from "./_generated/server";
 
 // Helper to generate client code from name (4 letters)
 function generateClientCode(name: string): string {
@@ -160,5 +160,99 @@ export const remove = mutation({
   args: { id: v.id("clients") },
   handler: async (ctx, args) => {
     await ctx.db.delete(args.id);
+  },
+});
+
+// ============================================================
+// CLIENT CODE MIGRATION
+// ============================================================
+
+// Get clients without a client code (for migration)
+export const getClientsWithoutCode = query({
+  args: { tenantId: v.id("tenants") },
+  handler: async (ctx, args) => {
+    const clients = await ctx.db
+      .query("clients")
+      .withIndex("by_tenant", (q) => q.eq("tenantId", args.tenantId))
+      .collect();
+
+    return clients.filter((c) => !c.clientCode);
+  },
+});
+
+// Generate preview code from name (exposed for UI preview)
+export const previewClientCode = query({
+  args: {
+    type: v.string(),
+    companyName: v.optional(v.string()),
+    firstName: v.optional(v.string()),
+    lastName: v.optional(v.string()),
+  },
+  handler: async (_ctx, args) => {
+    const clientName = args.type === 'company'
+      ? args.companyName || ''
+      : `${args.firstName || ''} ${args.lastName || ''}`.trim();
+
+    if (!clientName) return null;
+    return generateClientCode(clientName);
+  },
+});
+
+// Migrate client codes for a tenant (internal use)
+export const migrateClientCodes = internalMutation({
+  args: { tenantId: v.id("tenants") },
+  handler: async (ctx, args) => {
+    const clients = await ctx.db
+      .query("clients")
+      .withIndex("by_tenant", (q) => q.eq("tenantId", args.tenantId))
+      .collect();
+
+    let migrated = 0;
+    for (const client of clients) {
+      if (!client.clientCode) {
+        const clientName = client.type === 'company'
+          ? client.companyName || ''
+          : `${client.firstName || ''} ${client.lastName || ''}`.trim();
+
+        if (clientName) {
+          const code = generateClientCode(clientName);
+          await ctx.db.patch(client._id, { clientCode: code });
+          migrated++;
+        }
+      }
+    }
+
+    return { total: clients.length, migrated };
+  },
+});
+
+// Public mutation to trigger migration (can be called from admin UI)
+export const runClientCodeMigration = mutation({
+  args: { tenantId: v.id("tenants") },
+  handler: async (ctx, args) => {
+    const clients = await ctx.db
+      .query("clients")
+      .withIndex("by_tenant", (q) => q.eq("tenantId", args.tenantId))
+      .collect();
+
+    let migrated = 0;
+    const results: Array<{ id: string; name: string; code: string }> = [];
+
+    for (const client of clients) {
+      if (!client.clientCode) {
+        const clientName = client.type === 'company'
+          ? client.companyName || ''
+          : `${client.firstName || ''} ${client.lastName || ''}`.trim();
+
+        if (clientName) {
+          const code = generateClientCode(clientName);
+          await ctx.db.patch(client._id, { clientCode: code });
+          migrated++;
+          results.push({ id: client._id, name: clientName, code });
+        }
+      }
+    }
+
+    return { total: clients.length, migrated, results };
   },
 });

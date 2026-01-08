@@ -115,11 +115,14 @@ async function getNextSequenceNumber(ctx: any, tenantId: string): Promise<number
 
 // Document naming convention: YYMM-X#####-CODE-Leader_x_Pax
 // X = C (Cotización), I (Itinerario), F (Factura)
-// Example: 2512-C00005-HOTR-Carlos_Perez_x_08
+// Example: 2512-C00005-HOTR-Carlos_Perez_x_08 (file-safe)
+// Example: 2512-C00005-CTA-Juan Pérez x 08 (display)
 
 interface DocumentNumberParts {
-  documentNumber: string;
-  longName: string; // Full descriptive name for display
+  documentNumber: string;       // Short format: "2512-C00005"
+  displayName: string;          // Display format with spaces: "2512-C00005-CTA-Juan Pérez x 08"
+  fileSafeName: string;         // File-safe format with underscores: "2512-C00005-CTA-Juan_Perez_x_08"
+  longName: string;             // Deprecated alias for fileSafeName (backwards compat)
   sequence: number;
 }
 
@@ -140,14 +143,44 @@ function getYYMMPrefix(): string {
   return `${year}${month}`;
 }
 
-// Sanitize group leader name for document naming
-function sanitizeLeaderName(name: string | null | undefined): string {
-  if (!name || !name.trim()) return 'Grupo';
+// Format group leader name for display (preserves spaces and Spanish characters)
+function formatLeaderNameDisplay(name: string | null | undefined): string {
+  if (!name?.trim()) return 'Grupo';
   return name
     .trim()
-    .replace(/[^a-zA-ZáéíóúñÁÉÍÓÚÑ\s]/g, '') // Allow Spanish characters
-    .replace(/\s+/g, '_')
+    .replace(/[^a-zA-ZáéíóúñÁÉÍÓÚÑ\s]/g, '') // Allow Spanish chars, remove others
+    .replace(/\s+/g, ' ') // Normalize multiple spaces to single space
     .substring(0, 25);
+}
+
+// Format group leader name for file system (underscores, no diacritics)
+function formatLeaderNameFileSafe(name: string | null | undefined): string {
+  if (!name?.trim()) return 'Grupo';
+  return name
+    .trim()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '') // Remove diacritics for file safety
+    .replace(/[^a-zA-Z\s]/g, '') // Only allow letters and spaces
+    .replace(/\s+/g, '_') // Replace spaces with underscores
+    .substring(0, 25);
+}
+
+// Build the full document name with specified format
+function buildDocumentName(
+  documentNumber: string,
+  clientCode: string | null,
+  leaderName: string,
+  groupSize: number,
+  useSpaces: boolean
+): string {
+  const parts = [documentNumber];
+  if (clientCode) parts.push(clientCode);
+
+  const separator = useSpaces ? ' x ' : '_x_';
+  const groupSizePadded = String(groupSize).padStart(2, '0');
+  parts.push(`${leaderName}${separator}${groupSizePadded}`);
+
+  return parts.join('-');
 }
 
 // Generate document number in new format: YYMM-X#####-CODE-Leader_x_Pax
@@ -171,22 +204,33 @@ async function generateDocumentNumber(
   // Use client code or empty for individuals
   const code = clientCode || '';
 
-  // Sanitize group leader name
-  const leaderPart = sanitizeLeaderName(groupLeaderName);
-
-  // Pad group size to 2 digits
-  const groupSizePadded = String(groupSize).padStart(2, '0');
-
   // Short document number: 2512-C00005
   const documentNumber = `${yymmPrefix}-${typePrefix}${paddedSeq}`;
 
-  // Long name with all parts: 2512-C00005-HOTR-Carlos_Perez_x_08
-  const longNameParts = [documentNumber];
-  if (code) longNameParts.push(code);
-  longNameParts.push(`${leaderPart}_x_${groupSizePadded}`);
-  const longName = longNameParts.join('-');
+  // Format leader name for both variants
+  const leaderDisplay = formatLeaderNameDisplay(groupLeaderName);
+  const leaderFileSafe = formatLeaderNameFileSafe(groupLeaderName);
 
-  return { documentNumber, longName, sequence };
+  // Build both name variants
+  const displayName = buildDocumentName(documentNumber, code, leaderDisplay, groupSize, true);
+  const fileSafeName = buildDocumentName(documentNumber, code, leaderFileSafe, groupSize, false);
+
+  return {
+    documentNumber,
+    displayName,
+    fileSafeName,
+    longName: fileSafeName, // Deprecated alias for backwards compat
+    sequence,
+  };
+}
+
+// Quotation number generation result type
+interface QuotationNumberResult {
+  quotationNumber: string;
+  quotationDisplayName: string;
+  quotationFileSafeName: string;
+  quotationLongName: string; // Deprecated alias for backwards compat
+  sequence: number;
 }
 
 // Generate quotation number (wrapper for backwards compatibility)
@@ -196,8 +240,8 @@ async function generateQuotationNumber(
   clientCode: string | null,
   groupLeaderName: string | null,
   groupSize: number
-): Promise<{ quotationNumber: string; quotationLongName: string; sequence: number }> {
-  const { documentNumber, longName, sequence } = await generateDocumentNumber(
+): Promise<QuotationNumberResult> {
+  const { documentNumber, displayName, fileSafeName, longName, sequence } = await generateDocumentNumber(
     ctx,
     tenantId,
     'QUOTATION',
@@ -208,7 +252,9 @@ async function generateQuotationNumber(
 
   return {
     quotationNumber: documentNumber,
-    quotationLongName: longName,
+    quotationDisplayName: displayName,
+    quotationFileSafeName: fileSafeName,
+    quotationLongName: longName, // Deprecated alias
     sequence,
   };
 }
@@ -370,7 +416,13 @@ export const create = mutation({
     }
 
     // Generate quotation number with new format
-    const { quotationNumber, quotationLongName, sequence } = await generateQuotationNumber(
+    const {
+      quotationNumber,
+      quotationDisplayName,
+      quotationFileSafeName,
+      quotationLongName,
+      sequence
+    } = await generateQuotationNumber(
       ctx,
       args.tenantId,
       clientCode,
@@ -381,7 +433,9 @@ export const create = mutation({
     const quotationId = await ctx.db.insert("quotations", {
       ...args,
       quotationNumber,
-      quotationLongName,
+      quotationDisplayName,
+      quotationFileSafeName,
+      quotationLongName, // Deprecated alias
       quotationSequence: sequence,
       assignedToInitials,
       createdAt: now,

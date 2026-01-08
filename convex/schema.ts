@@ -243,7 +243,9 @@ export default defineSchema({
   quotations: defineTable({
     tenantId: v.id("tenants"),
     quotationNumber: v.string(), // Short format: 2512-C00005
-    quotationLongName: v.optional(v.string()), // Full format: 2512-C00005-HOTR-Carlos_Perez_x_08
+    quotationLongName: v.optional(v.string()), // Full format: 2512-C00005-HOTR-Carlos_Perez_x_08 (deprecated, kept for compat)
+    quotationDisplayName: v.optional(v.string()), // Display format with spaces: 2512-C00005-CTA-Juan Pérez x 08
+    quotationFileSafeName: v.optional(v.string()), // File-safe format with underscores: 2512-C00005-CTA-Juan_Perez_x_08
     quotationSequence: v.optional(v.number()), // The sequential number (e.g., 5)
     clientId: v.optional(v.id("clients")),
     vehicleId: v.optional(v.id("vehicles")),
@@ -356,7 +358,9 @@ export default defineSchema({
   itineraries: defineTable({
     tenantId: v.id("tenants"),
     itineraryNumber: v.string(), // Short format: 2512-I00005
-    itineraryLongName: v.optional(v.string()), // Full format: 2512-I00005-HOTR-Carlos_Perez_x_08
+    itineraryLongName: v.optional(v.string()), // Full format: 2512-I00005-HOTR-Carlos_Perez_x_08 (deprecated, kept for compat)
+    itineraryDisplayName: v.optional(v.string()), // Display format with spaces: 2512-I00005-CTA-Juan Pérez x 08
+    itineraryFileSafeName: v.optional(v.string()), // File-safe format with underscores: 2512-I00005-CTA-Juan_Perez_x_08
     itinerarySequence: v.optional(v.number()), // Sequential number
     quotationId: v.optional(v.id("quotations")),
     clientId: v.optional(v.id("clients")),

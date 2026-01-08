@@ -90,11 +90,14 @@ export const byQuotation = query({
 });
 
 // Document naming convention: YYMM-I#####-CODE-Leader_x_Pax
-// Example: 2512-I00005-HOTR-Carlos_Perez_x_08
+// Example: 2512-I00005-HOTR-Carlos_Perez_x_08 (file-safe)
+// Example: 2512-I00005-CTA-Juan Pérez x 08 (display)
 
 interface ItineraryNumberParts {
-  itineraryNumber: string;
-  itineraryLongName: string;
+  itineraryNumber: string;        // Short format: "2512-I00005"
+  itineraryDisplayName: string;   // Display format with spaces: "2512-I00005-CTA-Juan Pérez x 08"
+  itineraryFileSafeName: string;  // File-safe format with underscores: "2512-I00005-CTA-Juan_Perez_x_08"
+  itineraryLongName: string;      // Deprecated alias for fileSafeName (backwards compat)
   sequence: number;
 }
 
@@ -106,14 +109,44 @@ function getYYMMPrefix(): string {
   return `${year}${month}`;
 }
 
-// Sanitize group leader name for document naming
-function sanitizeLeaderName(name: string | null | undefined): string {
-  if (!name || !name.trim()) return 'Grupo';
+// Format group leader name for display (preserves spaces and Spanish characters)
+function formatLeaderNameDisplay(name: string | null | undefined): string {
+  if (!name?.trim()) return 'Grupo';
   return name
     .trim()
     .replace(/[^a-zA-ZáéíóúñÁÉÍÓÚÑ\s]/g, '')
+    .replace(/\s+/g, ' ')
+    .substring(0, 25);
+}
+
+// Format group leader name for file system (underscores, no diacritics)
+function formatLeaderNameFileSafe(name: string | null | undefined): string {
+  if (!name?.trim()) return 'Grupo';
+  return name
+    .trim()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z\s]/g, '')
     .replace(/\s+/g, '_')
     .substring(0, 25);
+}
+
+// Build the full document name with specified format
+function buildItineraryName(
+  itineraryNumber: string,
+  clientCode: string | null,
+  leaderName: string,
+  groupSize: number,
+  useSpaces: boolean
+): string {
+  const parts = [itineraryNumber];
+  if (clientCode) parts.push(clientCode);
+
+  const separator = useSpaces ? ' x ' : '_x_';
+  const groupSizePadded = String(groupSize).padStart(2, '0');
+  parts.push(`${leaderName}${separator}${groupSizePadded}`);
+
+  return parts.join('-');
 }
 
 // Get next sequence number for itineraries
@@ -157,19 +190,25 @@ async function generateItineraryNumber(
   const paddedSeq = String(sequence).padStart(5, '0');
   const yymmPrefix = getYYMMPrefix();
   const code = clientCode || '';
-  const leaderPart = sanitizeLeaderName(groupLeaderName);
-  const groupSizePadded = String(groupSize).padStart(2, '0');
 
   // Short number: 2512-I00005
   const itineraryNumber = `${yymmPrefix}-I${paddedSeq}`;
 
-  // Long name: 2512-I00005-HOTR-Carlos_Perez_x_08
-  const longNameParts = [itineraryNumber];
-  if (code) longNameParts.push(code);
-  longNameParts.push(`${leaderPart}_x_${groupSizePadded}`);
-  const itineraryLongName = longNameParts.join('-');
+  // Format leader name for both variants
+  const leaderDisplay = formatLeaderNameDisplay(groupLeaderName);
+  const leaderFileSafe = formatLeaderNameFileSafe(groupLeaderName);
 
-  return { itineraryNumber, itineraryLongName, sequence };
+  // Build both name variants
+  const itineraryDisplayName = buildItineraryName(itineraryNumber, code, leaderDisplay, groupSize, true);
+  const itineraryFileSafeName = buildItineraryName(itineraryNumber, code, leaderFileSafe, groupSize, false);
+
+  return {
+    itineraryNumber,
+    itineraryDisplayName,
+    itineraryFileSafeName,
+    itineraryLongName: itineraryFileSafeName, // Deprecated alias for backwards compat
+    sequence,
+  };
 }
 
 // Legacy function for backwards compatibility
@@ -233,7 +272,13 @@ export const createFromQuotation = mutation({
     }
 
     // Generate itinerary number with new format
-    const { itineraryNumber, itineraryLongName, sequence } = await generateItineraryNumber(
+    const {
+      itineraryNumber,
+      itineraryDisplayName,
+      itineraryFileSafeName,
+      itineraryLongName,
+      sequence
+    } = await generateItineraryNumber(
       ctx,
       quotation.tenantId,
       clientCode,
@@ -247,7 +292,9 @@ export const createFromQuotation = mutation({
     return await ctx.db.insert("itineraries", {
       tenantId: quotation.tenantId,
       itineraryNumber,
-      itineraryLongName,
+      itineraryDisplayName,
+      itineraryFileSafeName,
+      itineraryLongName, // Deprecated alias
       itinerarySequence: sequence,
       quotationId: args.quotationId,
       clientId: quotation.clientId,
@@ -331,7 +378,13 @@ export const create = mutation({
     }
 
     // Generate itinerary number with new format
-    const { itineraryNumber, itineraryLongName, sequence } = await generateItineraryNumber(
+    const {
+      itineraryNumber,
+      itineraryDisplayName,
+      itineraryFileSafeName,
+      itineraryLongName,
+      sequence
+    } = await generateItineraryNumber(
       ctx,
       args.tenantId,
       clientCode,
@@ -342,7 +395,9 @@ export const create = mutation({
     return await ctx.db.insert("itineraries", {
       ...args,
       itineraryNumber,
-      itineraryLongName,
+      itineraryDisplayName,
+      itineraryFileSafeName,
+      itineraryLongName, // Deprecated alias
       itinerarySequence: sequence,
       status: 'scheduled',
       createdAt: now,

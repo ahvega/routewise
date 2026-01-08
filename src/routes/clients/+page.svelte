@@ -18,7 +18,8 @@
 		CheckCircleOutline,
 		CloseCircleOutline,
 		BuildingOutline,
-		UserOutline
+		UserOutline,
+		RefreshOutline
 	} from 'flowbite-svelte-icons';
 	import { useQuery, useConvexClient } from 'convex-svelte';
 	import { api } from '$convex/_generated/api';
@@ -87,6 +88,24 @@
 		notes: '',
 		status: 'active'
 	});
+
+	// Query for code preview (must be after formData declaration)
+	const codePreviewQuery = useQuery(
+		api.clients.previewClientCode,
+		() => ({
+			type: formData.type,
+			companyName: formData.companyName || undefined,
+			firstName: formData.firstName || undefined,
+			lastName: formData.lastName || undefined,
+		})
+	);
+
+	// Generate code button handler
+	function generateClientCode() {
+		if (codePreviewQuery.data) {
+			formData.clientCode = codePreviewQuery.data;
+		}
+	}
 
 	// Toast state
 	let showToast = $state(false);
@@ -415,14 +434,31 @@
 				</div>
 				<div>
 					<Label for="clientCode">Código</Label>
-					<Input
-						id="clientCode"
-						bind:value={formData.clientCode}
-						placeholder="AUTO"
-						maxlength="4"
-						class="uppercase font-mono"
-					/>
-					<p class="text-xs text-gray-500 mt-1">4 letras, ej: HOTR</p>
+					<div class="flex gap-1">
+						<Input
+							id="clientCode"
+							bind:value={formData.clientCode}
+							placeholder={codePreviewQuery.data || 'AUTO'}
+							maxlength="4"
+							class="uppercase font-mono flex-1"
+						/>
+						<Button
+							size="sm"
+							color="alternative"
+							onclick={generateClientCode}
+							disabled={!codePreviewQuery.data}
+							title="Generar código"
+						>
+							<RefreshOutline class="w-4 h-4" />
+						</Button>
+					</div>
+					<p class="text-xs text-gray-500 mt-1">
+						{#if codePreviewQuery.data && !formData.clientCode}
+							Sugerido: <span class="font-mono font-semibold">{codePreviewQuery.data}</span>
+						{:else}
+							4 letras, ej: HOTR
+						{/if}
+					</p>
 				</div>
 			</div>
 		{:else}
@@ -437,14 +473,31 @@
 				</div>
 				<div>
 					<Label for="clientCode">Código</Label>
-					<Input
-						id="clientCode"
-						bind:value={formData.clientCode}
-						placeholder="AUTO"
-						maxlength="4"
-						class="uppercase font-mono"
-					/>
-					<p class="text-xs text-gray-500 mt-1">4 letras</p>
+					<div class="flex gap-1">
+						<Input
+							id="clientCode"
+							bind:value={formData.clientCode}
+							placeholder={codePreviewQuery.data || 'AUTO'}
+							maxlength="4"
+							class="uppercase font-mono flex-1"
+						/>
+						<Button
+							size="sm"
+							color="alternative"
+							onclick={generateClientCode}
+							disabled={!codePreviewQuery.data}
+							title="Generar código"
+						>
+							<RefreshOutline class="w-4 h-4" />
+						</Button>
+					</div>
+					<p class="text-xs text-gray-500 mt-1">
+						{#if codePreviewQuery.data && !formData.clientCode}
+							Sugerido: <span class="font-mono font-semibold">{codePreviewQuery.data}</span>
+						{:else}
+							4 letras
+						{/if}
+					</p>
 				</div>
 			</div>
 		{/if}

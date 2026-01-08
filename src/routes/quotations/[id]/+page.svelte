@@ -85,6 +85,13 @@
 	);
 
 	const quotation = $derived(quotationQuery.data);
+
+	// Query the user who created the quotation (for sales agent initials on PDF)
+	const creatorUserQuery = useQuery(
+		api.users.get,
+		() => quotation?.createdBy ? { id: quotation.createdBy } : 'skip'
+	);
+	const creatorUser = $derived(creatorUserQuery.data);
 	const vehicles = $derived(vehiclesQuery.data || []);
 	const clients = $derived(clientsQuery.data || []);
 	const drivers = $derived(driversQuery.data || []);
@@ -136,6 +143,16 @@
 			return client.companyName || 'Unnamed Company';
 		}
 		return [client.firstName, client.lastName].filter(Boolean).join(' ') || 'Unnamed';
+	}
+
+	// Generate initials from a full name (e.g., "Juan Pérez" -> "JP")
+	function getInitials(fullName: string | undefined | null): string {
+		if (!fullName) return '';
+		return fullName
+			.split(' ')
+			.filter(Boolean)
+			.map(word => word[0]?.toUpperCase() || '')
+			.join('');
 	}
 
 	function formatCurrency(value: number): string {
@@ -337,9 +354,12 @@
 
 		return {
 			quotationNumber: quotation.quotationNumber,
+			quotationFileSafeName: quotation.quotationFileSafeName,
 			date: quotation.createdAt.toString(), // Pass timestamp as string
 			validUntil: quotation.validUntil ? quotation.validUntil.toString() : '',
 			groupLeaderName: quotation.groupLeaderName,
+			salesAgentInitials: quotation.assignedToInitials || getInitials(creatorUser?.fullName),
+			paymentConditions: quotation.paymentConditions,
 			client: {
 				name: getClientName(clientData),
 				code: clientData?.clientCode || undefined,
@@ -423,7 +443,7 @@
 			const url = URL.createObjectURL(blob);
 			const link = document.createElement('a');
 			link.href = url;
-			link.download = `cotizacion-${quotation!.quotationNumber}.pdf`;
+			link.download = `cotizacion-${quotation!.quotationFileSafeName || quotation!.quotationNumber}.pdf`;
 			document.body.appendChild(link);
 			link.click();
 			document.body.removeChild(link);
@@ -518,7 +538,7 @@
 			</Button>
 			{#if quotation}
 				<div>
-					<h1 class="text-2xl font-bold text-gray-900 dark:text-white">{quotation.quotationNumber}</h1>
+					<h1 class="text-2xl font-bold text-gray-900 dark:text-white">{quotation.quotationDisplayName || quotation.quotationNumber}</h1>
 					<p class="text-gray-600 dark:text-gray-400">{formatDate(quotation.createdAt)}</p>
 				</div>
 			{/if}
@@ -988,7 +1008,7 @@
 			<div class="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
 				<p class="text-sm text-gray-600 dark:text-gray-400 mb-2">{$t('quotations.emailPreview')}:</p>
 				<p class="font-medium text-gray-900 dark:text-white">
-					{$t('quotations.title')} {quotation.quotationNumber}
+					{$t('quotations.title')} {quotation.quotationDisplayName || quotation.quotationNumber}
 				</p>
 				<p class="text-sm text-gray-500 dark:text-gray-400">
 					{quotation.origin} → {quotation.destination}

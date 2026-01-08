@@ -13,11 +13,14 @@ export const POST: RequestHandler = async ({ request }) => {
 
     const pdfBuffer = await generateQuotationPdf(data);
 
+    // Use file-safe name for filename, fallback to quotation number
+    const filename = data.quotationFileSafeName || data.quotationNumber;
+
     return new Response(new Uint8Array(pdfBuffer), {
       status: 200,
       headers: {
         'Content-Type': 'application/pdf',
-        'Content-Disposition': `attachment; filename="cotizacion-${data.quotationNumber}.pdf"`,
+        'Content-Disposition': `attachment; filename="cotizacion-${filename}.pdf"`,
         'Content-Length': pdfBuffer.length.toString()
       }
     });
