@@ -225,6 +225,88 @@ export const setTenantOwner = mutation({
   },
 });
 
+// Upgrade a user to superuser (admin role + enterprise plan with all features)
+export const upgradeSuperuser = mutation({
+  args: {
+    email: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const now = Date.now();
+
+    // Find user by email
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_email", (q) => q.eq("email", args.email))
+      .first();
+
+    if (!user) {
+      throw new Error(`User not found: ${args.email}`);
+    }
+
+    // Get their tenant
+    const tenant = await ctx.db.get(user.tenantId);
+    if (!tenant) {
+      throw new Error("Tenant not found for user");
+    }
+
+    // Enterprise plan limits (unlimited = -1)
+    const enterpriseLimits = {
+      maxUsers: -1,
+      maxVehicles: -1,
+      maxDrivers: -1,
+      maxQuotationsPerMonth: -1,
+      maxEmailsPerMonth: -1,
+    };
+
+    // All features enabled
+    const enterpriseFeatures = {
+      emailEnabled: true,
+      pdfExport: true,
+      customBranding: true,
+      apiAccess: true,
+      advancedReports: true,
+      multiCurrency: true,
+    };
+
+    // Update user role to admin
+    await ctx.db.patch(user._id, {
+      role: 'admin',
+      updatedAt: now,
+    });
+
+    // Update tenant to enterprise plan with lifetime access
+    await ctx.db.patch(user.tenantId, {
+      plan: 'enterprise',
+      status: 'active',
+      subscriptionStatus: 'active',
+      billingCycle: 'lifetime',
+      currentPeriodStart: now,
+      currentPeriodEnd: undefined, // Lifetime = no end
+      // Unlimited limits
+      ...enterpriseLimits,
+      // All features
+      features: enterpriseFeatures,
+      // Set user as owner
+      ownerId: user._id,
+      // Clear any trial info
+      trialStartedAt: undefined,
+      trialEndsAt: undefined,
+      updatedAt: now,
+    });
+
+    return {
+      success: true,
+      userId: user._id,
+      tenantId: user.tenantId,
+      email: args.email,
+      role: 'admin',
+      plan: 'enterprise',
+      features: enterpriseFeatures,
+      limits: enterpriseLimits,
+    };
+  },
+});
+
 // Add subscription fields to existing tenant (for tenants created before multi-tenant)
 export const backfillSubscriptionFields = mutation({
   args: {

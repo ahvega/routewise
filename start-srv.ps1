@@ -77,9 +77,9 @@ Write-Host ""
 if (-not $SkipConvex) {
     Write-Host "[3/4] Starting Convex dev server (port 3210)..." -ForegroundColor Yellow
 
-    $convexJob = Start-Process -FilePath "cmd.exe" `
-        -ArgumentList "/c", "title Convex Dev Server && npx convex dev" `
-        -WorkingDirectory $PSScriptRoot `
+    $convexScript = Join-Path $PSScriptRoot "node_modules\.bin\convex.ps1"
+    $convexJob = Start-Process -FilePath "powershell.exe" `
+        -ArgumentList "-NoExit", "-Command", "Set-Location '$PSScriptRoot'; `$Host.UI.RawUI.WindowTitle = 'Convex Dev Server'; & '$convexScript' dev" `
         -PassThru
 
     Write-Host "  Convex server starting in new window (PID: $($convexJob.Id))" -ForegroundColor Green
@@ -96,9 +96,9 @@ Write-Host ""
 if (-not $SkipSvelte) {
     Write-Host "[4/4] Starting SvelteKit dev server (port 5173)..." -ForegroundColor Yellow
 
-    $svelteJob = Start-Process -FilePath "cmd.exe" `
-        -ArgumentList "/c", "title SvelteKit Dev Server && npm run dev" `
-        -WorkingDirectory $PSScriptRoot `
+    $viteScript = Join-Path $PSScriptRoot "node_modules\.bin\vite.ps1"
+    $svelteJob = Start-Process -FilePath "powershell.exe" `
+        -ArgumentList "-NoExit", "-Command", "Set-Location '$PSScriptRoot'; `$Host.UI.RawUI.WindowTitle = 'SvelteKit Dev Server'; & '$viteScript' dev" `
         -PassThru
 
     Write-Host "  SvelteKit server starting in new window (PID: $($svelteJob.Id))" -ForegroundColor Green
