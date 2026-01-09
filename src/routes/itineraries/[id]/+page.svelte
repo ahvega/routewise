@@ -755,9 +755,31 @@
 						<h3 class="font-semibold text-gray-900 dark:text-white">{$t('itineraries.columns.date')}</h3>
 					</div>
 					<div class="space-y-2 text-sm">
-						<div class="flex justify-between">
-							<span class="text-gray-600 dark:text-gray-400">{$t('itineraries.details.startDate')}</span>
-							<span class="text-gray-900 dark:text-white font-medium">{formatDate(itinerary.startDate)}</span>
+						<div>
+							<Label for="start-date" class="text-xs text-gray-500 dark:text-gray-400">{$t('itineraries.details.startDate')}</Label>
+							<Input
+								id="start-date"
+								type="date"
+								size="sm"
+								value={new Date(itinerary.startDate).toISOString().split('T')[0]}
+								disabled={itinerary.status !== 'scheduled'}
+								onchange={async (e) => {
+									const newDate = e.currentTarget?.value;
+									if (newDate && itinerary) {
+										try {
+											await client.mutation(api.itineraries.update, {
+												id: itinerary._id,
+												startDate: new Date(newDate).getTime()
+											});
+											showToastMessage($t('common.saved'), 'success');
+										} catch (err) {
+											console.error('Failed to update start date:', err);
+											showToastMessage($t('errors.unknown'), 'error');
+										}
+									}
+								}}
+								class="mt-1"
+							/>
 						</div>
 						{#if itinerary.endDate}
 							<div class="flex justify-between">

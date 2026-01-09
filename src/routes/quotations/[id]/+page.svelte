@@ -242,20 +242,28 @@
 	}
 
 	function openConvertModal() {
-		// Set default start date to tomorrow
-		const tomorrow = new Date();
-		tomorrow.setDate(tomorrow.getDate() + 1);
-		convertStartDate = tomorrow.toISOString().split('T')[0];
+		// Use quotation's departure date if available, otherwise default to tomorrow
+		if (quotation?.departureDate) {
+			convertStartDate = new Date(quotation.departureDate).toISOString().split('T')[0];
+		} else {
+			const tomorrow = new Date();
+			tomorrow.setDate(tomorrow.getDate() + 1);
+			convertStartDate = tomorrow.toISOString().split('T')[0];
+		}
 		convertDriverId = '';
 		convertVehicleId = quotation?.vehicleId || '';
 		showConvertModal = true;
 	}
 
 	function openApprovalModal() {
-		// Set default start date to tomorrow
-		const tomorrow = new Date();
-		tomorrow.setDate(tomorrow.getDate() + 1);
-		approvalStartDate = tomorrow.toISOString().split('T')[0];
+		// Use quotation's departure date if available, otherwise default to tomorrow
+		if (quotation?.departureDate) {
+			approvalStartDate = new Date(quotation.departureDate).toISOString().split('T')[0];
+		} else {
+			const tomorrow = new Date();
+			tomorrow.setDate(tomorrow.getDate() + 1);
+			approvalStartDate = tomorrow.toISOString().split('T')[0];
+		}
 		approvalCreateItinerary = true;
 		approvalCreateInvoice = true;
 		showApprovalModal = true;
@@ -629,6 +637,31 @@
 								<p class="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">{$t('quotations.new.destination')}</p>
 								<p class="font-medium text-gray-900 dark:text-white">{quotation.destination}</p>
 							</div>
+						</div>
+
+						<!-- Departure Date - Editable -->
+						<div class="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+							<Label for="departure-date" class="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">{$t('quotations.new.departureDate')}</Label>
+							<Input
+								id="departure-date"
+								type="date"
+								value={quotation.departureDate ? new Date(quotation.departureDate).toISOString().split('T')[0] : ''}
+								onchange={async (e) => {
+									const newDate = e.currentTarget?.value;
+									if (newDate && quotation) {
+										try {
+											await client.mutation(api.quotations.update, {
+												id: quotation._id,
+												departureDate: new Date(newDate).getTime()
+											});
+											showToastMessage($t('common.saved'), 'success');
+										} catch (err) {
+											showToastMessage($t('errors.unknown'), 'error');
+										}
+									}
+								}}
+								class="mt-1"
+							/>
 						</div>
 
 						<div class="grid grid-cols-2 md:grid-cols-4 gap-4">
