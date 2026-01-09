@@ -312,6 +312,8 @@ export const createFromQuotation = mutation({
       startDate: args.startDate,
       endDate: args.endDate,
       estimatedDays: quotation.estimatedDays,
+      // Trip Leader (copied from quotation's group leader)
+      tripLeaderName: quotation.groupLeaderName,
       // Pickup/Dropoff
       pickupLocation: args.pickupLocation || quotation.origin,
       pickupTime: args.pickupTime,
@@ -392,13 +394,17 @@ export const create = mutation({
       args.groupSize
     );
 
+    // Destructure groupLeaderName to map it to tripLeaderName
+    const { groupLeaderName, ...restArgs } = args;
+
     return await ctx.db.insert("itineraries", {
-      ...args,
+      ...restArgs,
       itineraryNumber,
       itineraryDisplayName,
       itineraryFileSafeName,
       itineraryLongName, // Deprecated alias
       itinerarySequence: sequence,
+      tripLeaderName: groupLeaderName, // Map to schema field name
       status: 'scheduled',
       createdAt: now,
       updatedAt: now,
