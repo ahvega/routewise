@@ -125,4 +125,42 @@ export function getLogoutUrl(sessionId: string): string {
 	return workos.userManagement.getLogoutUrl({ sessionId });
 }
 
+/**
+ * Revoke a session by invalidating the refresh token
+ * This ensures the refresh token cannot be used to obtain new access tokens
+ */
+export async function revokeSession(accessToken: string): Promise<void> {
+	// Extract user ID from the access token to list and revoke their sessions
+	// The accessToken is a JWT, we can decode it to get the user ID
+	try {
+		// Decode the JWT payload (without verification - we just need the sub claim)
+		const payload = JSON.parse(
+			Buffer.from(accessToken.split('.')[1], 'base64').toString()
+		);
+		const userId = payload.sub;
+
+		if (userId) {
+			// List all active sessions for the user and revoke them
+			const sessions = await workos.userManagement.listSessions(userId);
+
+			// Revoke all active sessions for this user
+			for (const session of sessions.data) {
+				if (session.id) {
+					try {
+						await workos.userManagement.revokeSession({
+							sessionId: session.id
+						});
+					} catch (e) {
+						console.error('Failed to revoke session:', session.id, e);
+					}
+				}
+			}
+		}
+	} catch (e) {
+		// If we can't decode the token or revoke sessions, log and continue
+		console.error('Error in revokeSession:', e);
+		throw e;
+	}
+}
+
 export { workos };

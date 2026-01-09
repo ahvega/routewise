@@ -5,6 +5,17 @@ import { refreshSession } from '$lib/auth/workos.server';
 const REFRESH_BUFFER = 5 * 60 * 1000;
 
 export const handle: Handle = async ({ event, resolve }) => {
+	// Check if logout is in progress - if so, skip all session handling
+	// This prevents race conditions where session refresh could restore a logged-out session
+	const logoutPending = event.cookies.get('logout_pending');
+	if (logoutPending) {
+		// Clear the logout marker and ensure session is cleared
+		event.cookies.delete('logout_pending', { path: '/' });
+		event.cookies.delete('session', { path: '/' });
+		// Don't set any user/session - user will see logged-out state
+		return resolve(event);
+	}
+
 	// Get session from cookie
 	const sessionCookie = event.cookies.get('session');
 
