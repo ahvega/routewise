@@ -219,7 +219,7 @@
 				{#snippet row(itinerary)}
 					<TableBodyCell>
 						<div class="font-mono font-medium text-gray-900 dark:text-white">
-							{itinerary.itineraryNumber}
+							{itinerary.itineraryDisplayName || itinerary.itineraryNumber}
 						</div>
 						<div class="text-xs text-gray-500 dark:text-gray-400">
 							{getClientName(itinerary.clientId)}

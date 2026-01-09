@@ -13,11 +13,14 @@ export const POST: RequestHandler = async ({ request }) => {
 
     const pdfBuffer = await generateItineraryPdf(data);
 
+    // Use file-safe name for filename, fallback to itinerary code
+    const filename = data.itineraryFileSafeName || data.itineraryCode;
+
     return new Response(new Uint8Array(pdfBuffer), {
       status: 200,
       headers: {
         'Content-Type': 'application/pdf',
-        'Content-Disposition': `attachment; filename="itinerario-${data.itineraryCode}.pdf"`,
+        'Content-Disposition': `attachment; filename="itinerario-${filename}.pdf"`,
         'Content-Length': pdfBuffer.length.toString()
       }
     });

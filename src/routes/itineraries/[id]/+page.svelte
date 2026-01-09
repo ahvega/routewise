@@ -420,7 +420,7 @@
 			</Button>
 			{#if itinerary}
 				<div>
-					<h1 class="text-2xl font-bold text-gray-900 dark:text-white">{itinerary.itineraryNumber}</h1>
+					<h1 class="text-2xl font-bold text-gray-900 dark:text-white">{itinerary.itineraryDisplayName || itinerary.itineraryNumber}</h1>
 					<p class="text-gray-600 dark:text-gray-400">{formatDate(itinerary.startDate)}</p>
 				</div>
 			{/if}

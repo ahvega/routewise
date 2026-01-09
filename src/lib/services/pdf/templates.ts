@@ -185,6 +185,7 @@ export interface ItineraryActivity {
 export interface ItineraryPdfData {
   // Itinerary identification
   itineraryCode: string; // e.g., "C254-1607-ALTIA-Henry Gomez x 40 SAPMI 2C1D"
+  itineraryFileSafeName?: string; // For PDF filename: "2512-I00001-CTA-Juan_Perez_x_08"
   shortDescription: string; // e.g., "Traslados en San Pedro Sula"
   mainDate: string; // Primary date shown in header
 
