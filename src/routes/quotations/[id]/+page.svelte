@@ -34,7 +34,15 @@
 	import { useQuery, useConvexClient } from 'convex-svelte';
 	import { api } from '$convex/_generated/api';
 	import { tenantStore } from '$lib/stores';
-	import { StatusBadge } from '$lib/components/ui';
+	import {
+		StatusBadge,
+		ActionMenuCard,
+		createViewAction,
+		createCallAction,
+		createEmailAction,
+		filterActions,
+		type ActionItem
+	} from '$lib/components/ui';
 	import { t } from '$lib/i18n';
 	import type { Id } from '$convex/_generated/dataModel';
 	import type { QuotationPdfData } from '$lib/services/pdf';
@@ -344,6 +352,26 @@
 		} finally {
 			isConverting = false;
 		}
+	}
+
+	// Build actions for vehicle card
+	function getVehicleActions(): ActionItem[] {
+		if (!vehicle) return [];
+		return filterActions([
+			createViewAction(`/vehicles`, $t('vehicles.viewVehicle'))
+		]);
+	}
+
+	// Build actions for client card
+	function getClientActions(): ActionItem[] {
+		if (!clientData) return [];
+		return filterActions([
+			createViewAction(`/clients`, $t('clients.viewClient')),
+			clientData.phone
+				? { ...createCallAction(clientData.phone, $t('common.call'))!, dividerBefore: true }
+				: null,
+			createEmailAction(clientData.email, $t('common.email'))
+		]);
 	}
 
 	function buildPdfData(): QuotationPdfData | null {
@@ -853,9 +881,15 @@
 				<!-- Vehicle Info -->
 				{#if vehicle}
 					<Card class="max-w-none !p-6">
-						<div class="flex items-center gap-2 mb-3">
-							<TruckOutline class="w-5 h-5 text-gray-500" />
-							<h3 class="text-lg font-semibold text-gray-900 dark:text-white">{$t('quotations.new.vehicleSelection')}</h3>
+						<div class="flex items-center justify-between mb-3">
+							<div class="flex items-center gap-2">
+								<TruckOutline class="w-5 h-5 text-gray-500" />
+								<h3 class="text-lg font-semibold text-gray-900 dark:text-white">{$t('quotations.new.vehicleSelection')}</h3>
+							</div>
+							<ActionMenuCard
+								triggerId="vehicle-actions-{vehicle._id}"
+								actions={getVehicleActions()}
+							/>
 						</div>
 						<div class="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
 							<p class="font-medium text-gray-900 dark:text-white">{vehicle.name}</p>
@@ -873,9 +907,17 @@
 
 				<!-- Client Info -->
 				<Card class="max-w-none !p-6">
-					<div class="flex items-center gap-2 mb-3">
-						<UserOutline class="w-5 h-5 text-gray-500" />
-						<h3 class="text-lg font-semibold text-gray-900 dark:text-white">{$t('quotations.new.clientSelection')}</h3>
+					<div class="flex items-center justify-between mb-3">
+						<div class="flex items-center gap-2">
+							<UserOutline class="w-5 h-5 text-gray-500" />
+							<h3 class="text-lg font-semibold text-gray-900 dark:text-white">{$t('quotations.new.clientSelection')}</h3>
+						</div>
+						{#if clientData}
+							<ActionMenuCard
+								triggerId="client-actions-{clientData._id}"
+								actions={getClientActions()}
+							/>
+						{/if}
 					</div>
 					{#if clientData}
 						<div class="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
