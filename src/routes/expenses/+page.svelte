@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { useQuery } from 'convex-svelte';
+	import { useQuery, useConvexClient } from 'convex-svelte';
 	import { api } from '$convex/_generated/api';
 	import type { Id } from '$convex/_generated/dataModel';
 	import {
@@ -10,23 +10,39 @@
 		TableBody,
 		TableBodyRow,
 		TableBodyCell,
-		Button,
 		Select,
 		Input,
-		Spinner
+		Spinner,
+		Toast
 	} from 'flowbite-svelte';
 	import {
-		PlusOutline,
-		EyeOutline,
 		SearchOutline,
 		CashOutline,
 		ClockOutline,
 		CheckCircleOutline,
-		ExclamationCircleOutline
+		ExclamationCircleOutline,
+		CloseCircleOutline,
+		FilePdfOutline,
+		PaperPlaneOutline,
+		FilterOutline
 	} from 'flowbite-svelte-icons';
 	import { t } from '$lib/i18n';
-	import StatusBadge from '$lib/components/ui/StatusBadge.svelte';
+	import {
+		StatusBadge,
+		ActionMenu,
+		createViewAction,
+		createCallAction,
+		createDeleteAction,
+		createApproveAction,
+		createDisburseAction,
+		createSettleAction,
+		createCancelAction,
+		filterActions,
+		type ActionItem
+	} from '$lib/components/ui';
 	import { tenantStore } from '$lib/stores';
+
+	const client = useConvexClient();
 
 	let statusFilter = $state('');
 	let searchQuery = $state('');
@@ -127,6 +143,117 @@
 		{ value: 'settled', name: $t('expenses.status.settled') },
 		{ value: 'cancelled', name: $t('common.cancelled') }
 	];
+
+	// Filter by card click
+	function filterByStatus(status: string) {
+		statusFilter = status;
+		searchQuery = '';
+	}
+
+	function clearFilters() {
+		statusFilter = '';
+		searchQuery = '';
+	}
+
+	// Active filter indicator
+	const activeFilter = $derived(statusFilter);
+
+	// Toast state
+	let showToast = $state(false);
+	let toastMessage = $state('');
+	let toastType = $state<'success' | 'error'>('success');
+
+	function showToastMessage(message: string, type: 'success' | 'error') {
+		toastMessage = message;
+		toastType = type;
+		showToast = true;
+		setTimeout(() => (showToast = false), 3000);
+	}
+
+	// Get driver contact info
+	function getDriverContact(driverId: Id<'drivers'> | undefined): { phone?: string } {
+		if (!driverId) return {};
+		const driver = driverMap.get(driverId);
+		if (!driver) return {};
+		return { phone: driver.phone || undefined };
+	}
+
+	// Status update functions
+	async function updateStatus(id: Id<'expenseAdvances'>, status: string) {
+		try {
+			await client.mutation(api.expenseAdvances.updateStatus, { id, status });
+			showToastMessage($t('expenses.updateSuccess'), 'success');
+		} catch (error) {
+			console.error('Failed to update status:', error);
+			showToastMessage($t('expenses.updateFailed'), 'error');
+		}
+	}
+
+	async function handleDelete(id: Id<'expenseAdvances'>) {
+		if (!confirm($t('expenses.deleteConfirm'))) return;
+
+		try {
+			await client.mutation(api.expenseAdvances.remove, { id });
+			showToastMessage($t('expenses.deleteSuccess'), 'success');
+		} catch (error) {
+			console.error('Failed to delete advance:', error);
+			showToastMessage($t('expenses.deleteFailed'), 'error');
+		}
+	}
+
+	// Build actions for an expense advance row
+	function getAdvanceActions(advance: typeof advances[0]): ActionItem[] {
+		const driverContact = getDriverContact(advance.driverId);
+
+		return filterActions([
+			// View action
+			createViewAction(`/expenses/${advance._id}`, $t('expenses.viewAdvance')),
+
+			// Contact actions (with divider)
+			driverContact.phone
+				? { ...createCallAction(driverContact.phone, $t('common.callDriver'))!, dividerBefore: true }
+				: null,
+
+			// PDF action (only for approved/disbursed/settled)
+			['approved', 'disbursed', 'settled'].includes(advance.status) ? {
+				id: 'pdf',
+				label: $t('common.downloadPdf'),
+				icon: FilePdfOutline as any,
+				href: `/expenses/${advance._id}?pdf=true`,
+				dividerBefore: true
+			} : null,
+
+			// Status actions (with divider)
+			advance.status === 'draft' ? {
+				id: 'submit',
+				label: $t('expenses.submit'),
+				icon: PaperPlaneOutline as any,
+				onClick: () => updateStatus(advance._id, 'pending'),
+				dividerBefore: true
+			} : null,
+
+			advance.status === 'pending'
+				? { ...createApproveAction(() => updateStatus(advance._id, 'approved')), dividerBefore: true }
+				: null,
+
+			advance.status === 'approved'
+				? createDisburseAction(() => updateStatus(advance._id, 'disbursed'))
+				: null,
+
+			advance.status === 'disbursed'
+				? createSettleAction(() => updateStatus(advance._id, 'settled'))
+				: null,
+
+			['pending', 'approved'].includes(advance.status)
+				? createCancelAction(() => updateStatus(advance._id, 'cancelled'))
+				: null,
+
+			// Delete action (only for draft or cancelled)
+			['draft', 'cancelled'].includes(advance.status)
+				? createDeleteAction(() => handleDelete(advance._id), false, $t('common.delete'))
+				: null
+		]);
+	}
 </script>
 
 <svelte:head>
@@ -145,58 +272,94 @@
 	<!-- Stats Cards -->
 	{#if stats}
 		<div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-			<Card class="!p-4">
-				<div class="flex items-center gap-3">
-					<div class="p-2 bg-amber-100 dark:bg-amber-900/40 rounded-lg">
-						<ClockOutline class="w-5 h-5 text-amber-600 dark:text-amber-400" />
+			<Card class="p-4! {activeFilter === 'pending' ? 'ring-2 ring-amber-500' : ''}">
+				<div class="flex items-start justify-between">
+					<div class="flex items-center gap-3">
+						<div class="p-2 bg-amber-100 dark:bg-amber-900/40 rounded-lg">
+							<ClockOutline class="w-5 h-5 text-amber-600 dark:text-amber-400" />
+						</div>
+						<div>
+							<p class="text-sm text-gray-500 dark:text-gray-400">{$t('expenses.stats.pending')}</p>
+							<p class="text-xl font-bold text-amber-600 dark:text-amber-400">{stats.pendingCount}</p>
+						</div>
 					</div>
-					<div>
-						<p class="text-sm text-gray-500 dark:text-gray-400">{$t('expenses.stats.pending')}</p>
-						<p class="text-xl font-bold text-gray-900 dark:text-white">{stats.pendingCount}</p>
-					</div>
+					<button
+						onclick={() => filterByStatus('pending')}
+						class="p-1.5 rounded-lg transition-colors {activeFilter === 'pending' ? 'bg-amber-100 text-amber-600 dark:bg-amber-900 dark:text-amber-400' : 'text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-300'}"
+						title={$t('common.filter')}
+					>
+						<FilterOutline class="w-4 h-4" />
+					</button>
 				</div>
 			</Card>
 
-			<Card class="!p-4">
-				<div class="flex items-center gap-3">
-					<div class="p-2 bg-sky-100 dark:bg-sky-900/40 rounded-lg">
-						<CashOutline class="w-5 h-5 text-sky-600 dark:text-sky-400" />
+			<Card class="p-4! {activeFilter === 'disbursed' ? 'ring-2 ring-sky-500' : ''}">
+				<div class="flex items-start justify-between">
+					<div class="flex items-center gap-3">
+						<div class="p-2 bg-sky-100 dark:bg-sky-900/40 rounded-lg">
+							<CashOutline class="w-5 h-5 text-sky-600 dark:text-sky-400" />
+						</div>
+						<div>
+							<p class="text-sm text-gray-500 dark:text-gray-400">{$t('expenses.stats.disbursed')}</p>
+							<p class="text-xl font-bold text-sky-600 dark:text-sky-400">{stats.disbursedCount}</p>
+						</div>
 					</div>
-					<div>
-						<p class="text-sm text-gray-500 dark:text-gray-400">{$t('expenses.stats.disbursed')}</p>
-						<p class="text-xl font-bold text-gray-900 dark:text-white">{stats.disbursedCount}</p>
-					</div>
+					<button
+						onclick={() => filterByStatus('disbursed')}
+						class="p-1.5 rounded-lg transition-colors {activeFilter === 'disbursed' ? 'bg-sky-100 text-sky-600 dark:bg-sky-900 dark:text-sky-400' : 'text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-300'}"
+						title={$t('common.filter')}
+					>
+						<FilterOutline class="w-4 h-4" />
+					</button>
 				</div>
 			</Card>
 
-			<Card class="!p-4">
-				<div class="flex items-center gap-3">
-					<div class="p-2 bg-emerald-100 dark:bg-emerald-900/40 rounded-lg">
-						<CheckCircleOutline class="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+			<Card class="p-4! {activeFilter === 'settled' ? 'ring-2 ring-emerald-500' : ''}">
+				<div class="flex items-start justify-between">
+					<div class="flex items-center gap-3">
+						<div class="p-2 bg-emerald-100 dark:bg-emerald-900/40 rounded-lg">
+							<CheckCircleOutline class="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+						</div>
+						<div>
+							<p class="text-sm text-gray-500 dark:text-gray-400">{$t('expenses.stats.settled')}</p>
+							<p class="text-xl font-bold text-emerald-600 dark:text-emerald-400">{stats.settledCount}</p>
+						</div>
 					</div>
-					<div>
-						<p class="text-sm text-gray-500 dark:text-gray-400">{$t('expenses.stats.settled')}</p>
-						<p class="text-xl font-bold text-gray-900 dark:text-white">{stats.settledCount}</p>
-					</div>
+					<button
+						onclick={() => filterByStatus('settled')}
+						class="p-1.5 rounded-lg transition-colors {activeFilter === 'settled' ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900 dark:text-emerald-400' : 'text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-300'}"
+						title={$t('common.filter')}
+					>
+						<FilterOutline class="w-4 h-4" />
+					</button>
 				</div>
 			</Card>
 
-			<Card class="!p-4">
-				<div class="flex items-center gap-3">
-					<div class="p-2 bg-rose-100 dark:bg-rose-900/40 rounded-lg">
-						<ExclamationCircleOutline class="w-5 h-5 text-rose-600 dark:text-rose-400" />
+			<Card class="p-4! {activeFilter === '' ? 'ring-2 ring-primary-500' : ''}">
+				<div class="flex items-start justify-between">
+					<div class="flex items-center gap-3">
+						<div class="p-2 bg-rose-100 dark:bg-rose-900/40 rounded-lg">
+							<ExclamationCircleOutline class="w-5 h-5 text-rose-600 dark:text-rose-400" />
+						</div>
+						<div>
+							<p class="text-sm text-gray-500 dark:text-gray-400">{$t('expenses.stats.outstanding')}</p>
+							<p class="text-xl font-bold text-rose-600 dark:text-rose-400">{formatCurrency(stats.totalOutstanding)}</p>
+						</div>
 					</div>
-					<div>
-						<p class="text-sm text-gray-500 dark:text-gray-400">{$t('expenses.stats.outstanding')}</p>
-						<p class="text-xl font-bold text-gray-900 dark:text-white">{formatCurrency(stats.totalOutstanding)}</p>
-					</div>
+					<button
+						onclick={() => clearFilters()}
+						class="p-1.5 rounded-lg transition-colors {activeFilter === '' ? 'bg-primary-100 text-primary-600 dark:bg-primary-900 dark:text-primary-400' : 'text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-300'}"
+						title={$t('common.clearFilters')}
+					>
+						<FilterOutline class="w-4 h-4" />
+					</button>
 				</div>
 			</Card>
 		</div>
 	{/if}
 
 	<!-- Filters -->
-	<Card class="max-w-none !p-4">
+	<Card class="max-w-none p-4!">
 		<div class="flex flex-col md:flex-row gap-4">
 			<div class="flex-1">
 				<Input
@@ -217,7 +380,7 @@
 	</Card>
 
 	<!-- Advances Table -->
-	<Card class="max-w-none !p-0 overflow-hidden">
+	<Card class="max-w-none p-0! overflow-hidden">
 		{#if advancesQuery.isLoading}
 			<div class="flex items-center justify-center p-8">
 				<Spinner size="8" />
@@ -237,13 +400,20 @@
 					<TableHeadCell class="text-right">{$t('expenses.columns.amount')}</TableHeadCell>
 					<TableHeadCell>{$t('expenses.columns.status')}</TableHeadCell>
 					<TableHeadCell>{$t('expenses.columns.date')}</TableHeadCell>
-					<TableHeadCell class="text-center">{$t('common.actions')}</TableHeadCell>
 				</TableHead>
 				<TableBody>
 					{#each filteredAdvances as advance}
 						<TableBodyRow>
-							<TableBodyCell class="font-medium text-gray-900 dark:text-white">
-								{advance.advanceNumber}
+							<TableBodyCell>
+								<div class="flex items-center justify-between gap-2">
+									<span class="font-medium text-gray-900 dark:text-white">
+										{advance.advanceNumber}
+									</span>
+									<ActionMenu
+										triggerId="actions-{advance._id}"
+										actions={getAdvanceActions(advance)}
+									/>
+								</div>
 							</TableBodyCell>
 							<TableBodyCell>
 								<div class="max-w-[200px]">
@@ -264,16 +434,6 @@
 							<TableBodyCell class="text-gray-500 dark:text-gray-400">
 								{formatDate(advance.createdAt)}
 							</TableBodyCell>
-							<TableBodyCell class="text-center">
-								<Button
-									href="/expenses/{advance._id}"
-									size="xs"
-									color="light"
-									class="!p-2"
-								>
-									<EyeOutline class="w-4 h-4" />
-								</Button>
-							</TableBodyCell>
 						</TableBodyRow>
 					{/each}
 				</TableBody>
@@ -281,3 +441,17 @@
 		{/if}
 	</Card>
 </div>
+
+<!-- Toast notifications -->
+{#if showToast}
+	<Toast class="fixed bottom-4 right-4" color={toastType === 'success' ? 'green' : 'red'}>
+		{#snippet icon()}
+			{#if toastType === 'success'}
+				<CheckCircleOutline class="w-5 h-5" />
+			{:else}
+				<CloseCircleOutline class="w-5 h-5" />
+			{/if}
+		{/snippet}
+		{toastMessage}
+	</Toast>
+{/if}

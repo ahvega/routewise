@@ -655,7 +655,7 @@
 			<Spinner size="8" />
 		</div>
 	{:else if !advance}
-		<Card class="!p-8 text-center">
+		<Card class="p-8! text-center">
 			<ExclamationCircleOutline class="w-12 h-12 text-gray-400 mx-auto mb-4" />
 			<p class="text-gray-500 dark:text-gray-400">{$t('expenses.notFound')}</p>
 		</Card>
@@ -664,7 +664,7 @@
 			<!-- Main Content -->
 			<div class="lg:col-span-2 space-y-6">
 				<!-- Advance Header -->
-				<Card class="max-w-none !p-6">
+				<Card class="max-w-none p-6!">
 					<div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
 						<div>
 							<h1 class="text-2xl font-bold text-gray-900 dark:text-white">
@@ -712,7 +712,7 @@
 
 				<!-- Estimated Breakdown with Accordion -->
 				{#if advance.status !== 'settled'}
-					<Card class="max-w-none !p-6">
+					<Card class="max-w-none p-6!">
 						<div class="flex items-center justify-between mb-4">
 							<h3 class="text-lg font-semibold text-gray-900 dark:text-white">
 								{$t('expenses.estimatedBreakdown')}
@@ -780,28 +780,28 @@
 								<div class="space-y-3">
 									<Table striped={true} class="text-sm">
 										<TableHead>
-											<TableHeadCell class="!py-2">Día</TableHeadCell>
-											<TableHeadCell class="!py-2 text-right">Desayuno</TableHeadCell>
-											<TableHeadCell class="!py-2 text-right">Almuerzo</TableHeadCell>
-											<TableHeadCell class="!py-2 text-right">Cena</TableHeadCell>
-											<TableHeadCell class="!py-2 text-right">Total</TableHeadCell>
+											<TableHeadCell class="py-2!">Día</TableHeadCell>
+											<TableHeadCell class="py-2! text-right">Desayuno</TableHeadCell>
+											<TableHeadCell class="py-2! text-right">Almuerzo</TableHeadCell>
+											<TableHeadCell class="py-2! text-right">Cena</TableHeadCell>
+											<TableHeadCell class="py-2! text-right">Total</TableHeadCell>
 										</TableHead>
 										<TableBody>
 											{#each Array(tripDays) as _, i}
 												<TableBodyRow>
-													<TableBodyCell class="!py-1">Día {i + 1}</TableBodyCell>
-													<TableBodyCell class="!py-1 text-right">{formatCurrency(breakfastPerDay)}</TableBodyCell>
-													<TableBodyCell class="!py-1 text-right">{formatCurrency(lunchPerDay)}</TableBodyCell>
-													<TableBodyCell class="!py-1 text-right">{formatCurrency(dinnerPerDay)}</TableBodyCell>
-													<TableBodyCell class="!py-1 text-right font-medium">{formatCurrency(mealsPerDay)}</TableBodyCell>
+													<TableBodyCell class="py-1!">Día {i + 1}</TableBodyCell>
+													<TableBodyCell class="py-1! text-right">{formatCurrency(breakfastPerDay)}</TableBodyCell>
+													<TableBodyCell class="py-1! text-right">{formatCurrency(lunchPerDay)}</TableBodyCell>
+													<TableBodyCell class="py-1! text-right">{formatCurrency(dinnerPerDay)}</TableBodyCell>
+													<TableBodyCell class="py-1! text-right font-medium">{formatCurrency(mealsPerDay)}</TableBodyCell>
 												</TableBodyRow>
 											{/each}
 											<TableBodyRow class="font-bold bg-gray-50 dark:bg-gray-700">
-												<TableBodyCell class="!py-1">Total</TableBodyCell>
-												<TableBodyCell class="!py-1 text-right">{formatCurrency(breakfastPerDay * tripDays)}</TableBodyCell>
-												<TableBodyCell class="!py-1 text-right">{formatCurrency(lunchPerDay * tripDays)}</TableBodyCell>
-												<TableBodyCell class="!py-1 text-right">{formatCurrency(dinnerPerDay * tripDays)}</TableBodyCell>
-												<TableBodyCell class="!py-1 text-right">{formatCurrency(advance.estimatedMeals ?? 0)}</TableBodyCell>
+												<TableBodyCell class="py-1!">Total</TableBodyCell>
+												<TableBodyCell class="py-1! text-right">{formatCurrency(breakfastPerDay * tripDays)}</TableBodyCell>
+												<TableBodyCell class="py-1! text-right">{formatCurrency(lunchPerDay * tripDays)}</TableBodyCell>
+												<TableBodyCell class="py-1! text-right">{formatCurrency(dinnerPerDay * tripDays)}</TableBodyCell>
+												<TableBodyCell class="py-1! text-right">{formatCurrency(advance.estimatedMeals ?? 0)}</TableBodyCell>
 											</TableBodyRow>
 										</TableBody>
 									</Table>
@@ -826,21 +826,21 @@
 									{#if tripDays > 1}
 										<Table striped={true} class="text-sm">
 											<TableHead>
-												<TableHeadCell class="!py-2">Noche</TableHeadCell>
-												<TableHeadCell class="!py-2">Ubicación</TableHeadCell>
-												<TableHeadCell class="!py-2 text-right">Costo</TableHeadCell>
+												<TableHeadCell class="py-2!">Noche</TableHeadCell>
+												<TableHeadCell class="py-2!">Ubicación</TableHeadCell>
+												<TableHeadCell class="py-2! text-right">Costo</TableHeadCell>
 											</TableHead>
 											<TableBody>
 												{#each Array(Math.max(0, tripDays - 1)) as _, i}
 													<TableBodyRow>
-														<TableBodyCell class="!py-1">Noche {i + 1}</TableBodyCell>
-														<TableBodyCell class="!py-1 text-gray-500">{itinerary?.destination || '-'}</TableBodyCell>
-														<TableBodyCell class="!py-1 text-right">{formatCurrency(lodgingPerNight)}</TableBodyCell>
+														<TableBodyCell class="py-1!">Noche {i + 1}</TableBodyCell>
+														<TableBodyCell class="py-1! text-gray-500">{itinerary?.destination || '-'}</TableBodyCell>
+														<TableBodyCell class="py-1! text-right">{formatCurrency(lodgingPerNight)}</TableBodyCell>
 													</TableBodyRow>
 												{/each}
 												<TableBodyRow class="font-bold bg-gray-50 dark:bg-gray-700">
-													<TableBodyCell class="!py-1" colspan={2}>Total ({tripDays - 1} noches)</TableBodyCell>
-													<TableBodyCell class="!py-1 text-right">{formatCurrency(advance.estimatedLodging ?? 0)}</TableBodyCell>
+													<TableBodyCell class="py-1!" colspan={2}>Total ({tripDays - 1} noches)</TableBodyCell>
+													<TableBodyCell class="py-1! text-right">{formatCurrency(advance.estimatedLodging ?? 0)}</TableBodyCell>
 												</TableBodyRow>
 											</TableBody>
 										</Table>
@@ -906,7 +906,7 @@
 															color="red"
 															outline
 															size="xs"
-															class="!p-1"
+															class="p-1!"
 															onclick={() => removeTollLine(line.id)}
 														>
 															<TrashBinOutline class="w-3 h-3" />
@@ -1005,7 +1005,7 @@
 															color="red"
 															outline
 															size="xs"
-															class="!p-1"
+															class="p-1!"
 															onclick={() => removeOtherLine(line.id)}
 														>
 															<TrashBinOutline class="w-3 h-3" />
@@ -1081,7 +1081,7 @@
 
 				<!-- Actual Breakdown (for settled) -->
 				{#if advance.status === 'settled'}
-					<Card class="!p-6">
+					<Card class="p-6!">
 						<h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">
 							{$t('expenses.actualBreakdown')}
 						</h3>
@@ -1134,7 +1134,7 @@
 
 					<!-- Balance Settlement -->
 					{#if advance.balanceAmount !== undefined && !advance.balanceSettled}
-						<Card class="!p-6 border-2 {advance.balanceAmount >= 0 ? 'border-emerald-500' : 'border-rose-500'}">
+						<Card class="p-6! border-2 {advance.balanceAmount >= 0 ? 'border-emerald-500' : 'border-rose-500'}">
 							<h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">
 								{$t('expenses.pendingBalance')}
 							</h3>
@@ -1157,7 +1157,7 @@
 				{/if}
 
 				<!-- Timeline -->
-				<Card class="max-w-none !p-6">
+				<Card class="max-w-none p-6!">
 					<h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">
 						{$t('expenses.sections.timeline')}
 					</h3>
@@ -1237,7 +1237,7 @@
 			<!-- Sidebar -->
 			<div class="space-y-6">
 				<!-- Actions -->
-				<Card class="!p-4">
+				<Card class="p-4!">
 					<h3 class="font-semibold text-gray-900 dark:text-white mb-4">{$t('common.actions')}</h3>
 					<div class="space-y-2">
 						<!-- PDF Download - available for all non-draft statuses -->
@@ -1300,7 +1300,7 @@
 
 				<!-- Itinerary Info -->
 				{#if itinerary}
-					<Card class="!p-4">
+					<Card class="p-4!">
 						<h3 class="font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
 							<TruckOutline class="w-5 h-5" />
 							{$t('itineraries.title')}
@@ -1336,7 +1336,7 @@
 
 				<!-- Driver Info -->
 				{#if driver}
-					<Card class="!p-4">
+					<Card class="p-4!">
 						<h3 class="font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
 							<UserOutline class="w-5 h-5" />
 							{$t('drivers.driver')}
@@ -1354,7 +1354,7 @@
 
 				<!-- Notes -->
 				{#if advance.notes}
-					<Card class="!p-4">
+					<Card class="p-4!">
 						<h3 class="font-semibold text-gray-900 dark:text-white mb-2">{$t('common.notes')}</h3>
 						<p class="text-sm text-gray-600 dark:text-gray-400">{advance.notes}</p>
 					</Card>

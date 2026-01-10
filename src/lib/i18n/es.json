@@ -50,7 +50,7 @@
         "notes": "Notas",
         "back": "Volver",
         "saved": "Guardado exitosamente",
-        "email": "Correo",
+        "email": "Enviar Email",
         "send": "Enviar",
         "sendEmail": "Enviar Correo",
         "emailSent": "Correo enviado exitosamente",
@@ -58,7 +58,13 @@
         "downloadPdf": "Descargar PDF",
         "close": "Cerrar",
         "total": "Total",
-        "number": "Número"
+        "number": "Número",
+        "call": "Llamar",
+        "callClient": "Llamar Cliente",
+        "emailClient": "Email Cliente",
+        "callDriver": "Llamar Conductor",
+        "duplicate": "Duplicar",
+        "copy": "Copia"
     },
     "statuses": {
         "active": "Activo",
@@ -98,7 +104,14 @@
         "disbursed": "Desembolsado",
         "settled": "Liquidado",
         "confirmed": "Confirmada",
-        "available": "Disponible"
+        "available": "Disponible",
+        "suspended": "Suspendido",
+        "trial_expired": "Prueba Expirada",
+        "trialing": "En Prueba",
+        "past_due": "Pago Vencido",
+        "used": "Usado",
+        "revoked": "Revocado",
+        "accepted": "Aceptada"
     },
     "footer": {
         "allRightsReserved": "Derechos reservados.",
@@ -373,6 +386,7 @@
             "comercialB": "Comercial B (Microbuses)",
             "particular": "Particular"
         },
+        "callEmergencyContact": "Llamar Contacto de Emergencia",
         "limits": {
             "driverLimitReached": "¡Límite de conductores alcanzado!",
             "upgradeToAddMore": "Actualiza tu plan para agregar más conductores."
@@ -825,6 +839,8 @@
             "completed": "Completado",
             "cancelled": "Cancelado"
         },
+        "callTripLeader": "Llamar Líder de Grupo",
+        "emailTripLeader": "Email Líder de Grupo",
         "details": {
             "title": "Detalles de Recogida y Entrega",
             "exactAddresses": "Direcciones de Origen y Destino",

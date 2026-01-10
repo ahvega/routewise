@@ -1,12 +1,31 @@
 <script lang="ts">
-	import { Button, Card, Spinner, Table, TableHead, TableHeadCell, TableBody, TableBodyRow, TableBodyCell, Select, Input } from 'flowbite-svelte';
-	import { PlusOutline, SearchOutline, EyeOutline } from 'flowbite-svelte-icons';
-	import { useQuery } from 'convex-svelte';
+	import { Card, Spinner, Table, TableHead, TableHeadCell, TableBody, TableBodyRow, TableBodyCell, Select, Input, Toast } from 'flowbite-svelte';
+	import {
+		SearchOutline,
+		CheckCircleOutline,
+		CloseCircleOutline,
+		FilePdfOutline,
+		EnvelopeOutline,
+		CashOutline,
+		FilterOutline
+	} from 'flowbite-svelte-icons';
+	import { useQuery, useConvexClient } from 'convex-svelte';
 	import { api } from '$convex/_generated/api';
 	import { tenantStore } from '$lib/stores';
-	import { StatusBadge } from '$lib/components/ui';
+	import {
+		StatusBadge,
+		ActionMenu,
+		createViewAction,
+		createCallAction,
+		createEmailAction,
+		createDeleteAction,
+		filterActions,
+		type ActionItem
+	} from '$lib/components/ui';
 	import { t } from '$lib/i18n';
 	import type { Id } from '$convex/_generated/dataModel';
+
+	const client = useConvexClient();
 
 	// Queries
 	const invoicesQuery = useQuery(
@@ -117,6 +136,136 @@
 			.filter((i) => i.paymentStatus !== 'paid')
 			.reduce((sum, i) => sum + i.amountDue, 0)
 	});
+
+	// Filter by card click
+	function filterByStatus(status: string, paymentStatus: string = '') {
+		statusFilter = status;
+		paymentStatusFilter = paymentStatus;
+		searchTerm = '';
+	}
+
+	function clearFilters() {
+		statusFilter = '';
+		paymentStatusFilter = '';
+		searchTerm = '';
+	}
+
+	// Check if a specific filter is active
+	const activeFilter = $derived(
+		paymentStatusFilter === 'overdue' ? 'overdue' :
+		paymentStatusFilter === 'unpaid' ? 'unpaid' :
+		statusFilter || paymentStatusFilter || ''
+	);
+
+	// Toast state
+	let showToast = $state(false);
+	let toastMessage = $state('');
+	let toastType = $state<'success' | 'error'>('success');
+
+	function showToastMessage(message: string, type: 'success' | 'error') {
+		toastMessage = message;
+		toastType = type;
+		showToast = true;
+		setTimeout(() => (showToast = false), 3000);
+	}
+
+	// Get client contact info
+	function getClientContact(clientId: Id<'clients'> | undefined): { phone?: string; email?: string } {
+		if (!clientId) return {};
+		const clientData = clients.find((c) => c._id === clientId);
+		if (!clientData) return {};
+		return {
+			phone: clientData.phone || undefined,
+			email: clientData.email || undefined
+		};
+	}
+
+	// Status update functions
+	async function updateStatus(id: Id<'invoices'>, status: string) {
+		try {
+			await client.mutation(api.invoices.updateStatus, { id, status });
+			showToastMessage($t('invoices.updateSuccess'), 'success');
+		} catch (error) {
+			console.error('Failed to update status:', error);
+			showToastMessage($t('invoices.updateFailed'), 'error');
+		}
+	}
+
+	async function markAsPaid(id: Id<'invoices'>) {
+		try {
+			await client.mutation(api.invoices.markAsPaid, { id });
+			showToastMessage($t('invoices.markedAsPaid'), 'success');
+		} catch (error) {
+			console.error('Failed to mark as paid:', error);
+			showToastMessage($t('invoices.updateFailed'), 'error');
+		}
+	}
+
+	async function handleDelete(id: Id<'invoices'>) {
+		if (!confirm($t('invoices.deleteConfirm'))) return;
+
+		try {
+			await client.mutation(api.invoices.remove, { id });
+			showToastMessage($t('invoices.deleteSuccess'), 'success');
+		} catch (error) {
+			console.error('Failed to delete invoice:', error);
+			showToastMessage($t('invoices.deleteFailed'), 'error');
+		}
+	}
+
+	// Build actions for an invoice row
+	function getInvoiceActions(invoice: typeof invoices[0]): ActionItem[] {
+		const contact = getClientContact(invoice.clientId);
+
+		return filterActions([
+			// View action
+			createViewAction(`/invoices/${invoice._id}`, $t('invoices.viewInvoice')),
+
+			// Contact actions (with divider)
+			contact.phone
+				? { ...createCallAction(contact.phone, $t('common.callClient'))!, dividerBefore: true }
+				: null,
+			createEmailAction(contact.email, $t('common.emailClient')),
+
+			// PDF/Email actions (with divider)
+			{
+				id: 'pdf',
+				label: $t('common.downloadPdf'),
+				icon: FilePdfOutline as any,
+				href: `/invoices/${invoice._id}?pdf=true`,
+				dividerBefore: true
+			},
+			contact.email ? {
+				id: 'sendEmail',
+				label: $t('invoices.sendViaEmail'),
+				icon: EnvelopeOutline as any,
+				onClick: () => console.log('Send email to:', contact.email)
+			} : null,
+
+			// Status actions (with divider)
+			invoice.status === 'draft' ? {
+				id: 'send',
+				label: $t('invoices.markAsSent'),
+				icon: EnvelopeOutline as any,
+				onClick: () => updateStatus(invoice._id, 'sent'),
+				dividerBefore: true
+			} : null,
+
+			['unpaid', 'partial'].includes(invoice.paymentStatus) && invoice.status !== 'cancelled' ? {
+				id: 'markPaid',
+				label: $t('invoices.markAsPaid'),
+				icon: CashOutline as any,
+				onClick: () => markAsPaid(invoice._id),
+				color: 'success' as const,
+				dividerBefore: invoice.status !== 'draft'
+			} : null,
+
+			// Delete action (only for draft)
+			invoice.status === 'draft'
+				? createDeleteAction(() => handleDelete(invoice._id), false, $t('common.delete'))
+				: null
+		]);
+	}
 </script>
 
 <svelte:head>
@@ -139,26 +288,63 @@
 	{:else}
 		<!-- Stats Cards -->
 		<div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-			<Card class="max-w-none !p-4">
-				<p class="text-sm font-medium text-gray-500 dark:text-gray-400">{$t('invoices.stats.total')}</p>
-				<p class="text-2xl font-bold text-gray-900 dark:text-white">{stats.total}</p>
+			<Card class="max-w-none p-4! {activeFilter === '' ? 'ring-2 ring-primary-500' : ''}">
+				<div class="flex items-start justify-between">
+					<div>
+						<p class="text-sm font-medium text-gray-500 dark:text-gray-400">{$t('invoices.stats.total')}</p>
+						<p class="text-2xl font-bold text-gray-900 dark:text-white">{stats.total}</p>
+					</div>
+					<button
+						onclick={() => clearFilters()}
+						class="p-1.5 rounded-lg transition-colors {activeFilter === '' ? 'bg-primary-100 text-primary-600 dark:bg-primary-900 dark:text-primary-400' : 'text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-300'}"
+						title={$t('common.clearFilters')}
+					>
+						<FilterOutline class="w-4 h-4" />
+					</button>
+				</div>
 			</Card>
-			<Card class="max-w-none !p-4">
-				<p class="text-sm font-medium text-gray-500 dark:text-gray-400">{$t('invoices.stats.unpaid')}</p>
-				<p class="text-2xl font-bold text-amber-600 dark:text-amber-400">{stats.unpaid}</p>
+			<Card class="max-w-none p-4! {activeFilter === 'unpaid' ? 'ring-2 ring-amber-500' : ''}">
+				<div class="flex items-start justify-between">
+					<div>
+						<p class="text-sm font-medium text-gray-500 dark:text-gray-400">{$t('invoices.stats.unpaid')}</p>
+						<p class="text-2xl font-bold text-amber-600 dark:text-amber-400">{stats.unpaid}</p>
+					</div>
+					<button
+						onclick={() => filterByStatus('', 'unpaid')}
+						class="p-1.5 rounded-lg transition-colors {activeFilter === 'unpaid' ? 'bg-amber-100 text-amber-600 dark:bg-amber-900 dark:text-amber-400' : 'text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-300'}"
+						title={$t('common.filter')}
+					>
+						<FilterOutline class="w-4 h-4" />
+					</button>
+				</div>
 			</Card>
-			<Card class="max-w-none !p-4">
-				<p class="text-sm font-medium text-gray-500 dark:text-gray-400">{$t('invoices.stats.overdue')}</p>
-				<p class="text-2xl font-bold text-rose-600 dark:text-rose-400">{stats.overdue}</p>
+			<Card class="max-w-none p-4! {activeFilter === 'overdue' ? 'ring-2 ring-rose-500' : ''}">
+				<div class="flex items-start justify-between">
+					<div>
+						<p class="text-sm font-medium text-gray-500 dark:text-gray-400">{$t('invoices.stats.overdue')}</p>
+						<p class="text-2xl font-bold text-rose-600 dark:text-rose-400">{stats.overdue}</p>
+					</div>
+					<button
+						onclick={() => filterByStatus('', 'overdue')}
+						class="p-1.5 rounded-lg transition-colors {activeFilter === 'overdue' ? 'bg-rose-100 text-rose-600 dark:bg-rose-900 dark:text-rose-400' : 'text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-300'}"
+						title={$t('common.filter')}
+					>
+						<FilterOutline class="w-4 h-4" />
+					</button>
+				</div>
 			</Card>
-			<Card class="max-w-none !p-4">
-				<p class="text-sm font-medium text-gray-500 dark:text-gray-400">{$t('invoices.stats.receivables')}</p>
-				<p class="text-2xl font-bold text-blue-600 dark:text-blue-400">{formatCurrency(stats.totalReceivables)}</p>
+			<Card class="max-w-none p-4!">
+				<div class="flex items-start justify-between">
+					<div>
+						<p class="text-sm font-medium text-gray-500 dark:text-gray-400">{$t('invoices.stats.receivables')}</p>
+						<p class="text-2xl font-bold text-blue-600 dark:text-blue-400">{formatCurrency(stats.totalReceivables)}</p>
+					</div>
+				</div>
 			</Card>
 		</div>
 
 		<!-- Filters -->
-		<Card class="max-w-none !p-4">
+		<Card class="max-w-none p-4!">
 			<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
 				<div class="relative">
 					<Input
@@ -175,7 +361,7 @@
 
 		<!-- Invoices Table -->
 		{#if filteredInvoices.length === 0}
-			<Card class="max-w-none !p-8 text-center">
+			<Card class="max-w-none p-8! text-center">
 				<p class="text-gray-500 dark:text-gray-400">
 					{searchTerm || statusFilter || paymentStatusFilter
 						? $t('invoices.noResults')
@@ -186,7 +372,7 @@
 				</p>
 			</Card>
 		{:else}
-			<Card class="max-w-none !p-0 overflow-hidden">
+			<Card class="max-w-none p-0! overflow-hidden">
 				<Table hoverable striped>
 					<TableHead>
 						<TableHeadCell>{$t('invoices.columns.number')}</TableHeadCell>
@@ -197,12 +383,19 @@
 						<TableHeadCell class="text-right">{$t('invoices.columns.balance')}</TableHeadCell>
 						<TableHeadCell>{$t('invoices.columns.status')}</TableHeadCell>
 						<TableHeadCell>{$t('invoices.columns.payment')}</TableHeadCell>
-						<TableHeadCell></TableHeadCell>
 					</TableHead>
 					<TableBody>
 						{#each filteredInvoices as invoice}
 							<TableBodyRow>
-								<TableBodyCell class="font-medium">{invoice.invoiceNumber}</TableBodyCell>
+								<TableBodyCell>
+									<div class="flex items-center justify-between gap-2">
+										<span class="font-medium">{invoice.invoiceNumber}</span>
+										<ActionMenu
+											triggerId="actions-{invoice._id}"
+											actions={getInvoiceActions(invoice)}
+										/>
+									</div>
+								</TableBodyCell>
 								<TableBodyCell>{getClientName(invoice.clientId)}</TableBodyCell>
 								<TableBodyCell>{formatDate(invoice.invoiceDate)}</TableBodyCell>
 								<TableBodyCell class={isOverdue(invoice) ? 'text-rose-600 dark:text-rose-400' : ''}>
@@ -222,11 +415,6 @@
 								<TableBodyCell>
 									<StatusBadge status={isOverdue(invoice) ? 'overdue' : invoice.paymentStatus} variant="payment" />
 								</TableBodyCell>
-								<TableBodyCell>
-									<Button href="/invoices/{invoice._id}" size="xs" color="light">
-										<EyeOutline class="w-4 h-4" />
-									</Button>
-								</TableBodyCell>
 							</TableBodyRow>
 						{/each}
 					</TableBody>
@@ -235,3 +423,17 @@
 		{/if}
 	{/if}
 </div>
+
+<!-- Toast notifications -->
+{#if showToast}
+	<Toast class="fixed bottom-4 right-4" color={toastType === 'success' ? 'green' : 'red'}>
+		{#snippet icon()}
+			{#if toastType === 'success'}
+				<CheckCircleOutline class="w-5 h-5" />
+			{:else}
+				<CloseCircleOutline class="w-5 h-5" />
+			{/if}
+		{/snippet}
+		{toastMessage}
+	</Toast>
+{/if}

@@ -51,7 +51,20 @@
 		"back": "Back",
 		"saved": "Saved successfully",
 		"total": "Total",
-		"number": "Number"
+		"number": "Number",
+		"email": "Send Email",
+		"send": "Send",
+		"sendEmail": "Send Email",
+		"emailSent": "Email sent successfully",
+		"downloadComplete": "Download complete",
+		"downloadPdf": "Download PDF",
+		"close": "Close",
+		"call": "Call",
+		"callClient": "Call Client",
+		"emailClient": "Email Client",
+		"callDriver": "Call Driver",
+		"duplicate": "Duplicate",
+		"copy": "Copy"
 	},
 	"statuses": {
 		"active": "Active",
@@ -91,7 +104,14 @@
 		"disbursed": "Disbursed",
 		"settled": "Settled",
 		"confirmed": "Confirmed",
-		"available": "Available"
+		"available": "Available",
+		"suspended": "Suspended",
+		"trial_expired": "Trial Expired",
+		"trialing": "Trialing",
+		"past_due": "Past Due",
+		"used": "Used",
+		"revoked": "Revoked",
+		"accepted": "Accepted"
 	},
 	"footer": {
 		"allRightsReserved": "All rights reserved.",
@@ -342,6 +362,7 @@
 			"comercialB": "Commercial B (Vans)",
 			"particular": "Regular"
 		},
+		"callEmergencyContact": "Call Emergency Contact",
 		"limits": {
 			"driverLimitReached": "Driver limit reached!",
 			"upgradeToAddMore": "Upgrade your plan to add more drivers."
@@ -768,6 +789,8 @@
 			"completed": "Completed",
 			"cancelled": "Cancelled"
 		},
+		"callTripLeader": "Call Trip Leader",
+		"emailTripLeader": "Email Trip Leader",
 		"details": {
 			"title": "Pickup & Dropoff Details",
 			"exactAddresses": "Origin & Destination Addresses",

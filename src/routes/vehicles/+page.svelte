@@ -17,12 +17,25 @@
 		TrashBinOutline,
 		CheckCircleOutline,
 		CloseCircleOutline,
-		TruckOutline
+		TruckOutline,
+		FilterOutline
 	} from 'flowbite-svelte-icons';
 	import { useQuery, useConvexClient } from 'convex-svelte';
 	import { api } from '$convex/_generated/api';
 	import { tenantStore } from '$lib/stores';
-	import { StatusBadge, DataTable, UnitInput, ComboboxInput, type Column } from '$lib/components/ui';
+	import {
+		StatusBadge,
+		DataTable,
+		UnitInput,
+		ComboboxInput,
+		ActionMenu,
+		createEditAction,
+		createDeleteAction,
+		createDuplicateAction,
+		filterActions,
+		type Column,
+		type ActionItem
+	} from '$lib/components/ui';
 	import type { Id } from '$convex/_generated/dataModel';
 	import { t } from '$lib/i18n';
 	import { InfoCircleSolid } from 'flowbite-svelte-icons';
@@ -271,13 +284,55 @@
 			sortable: true,
 			filterOptions: ['active', 'inactive', 'maintenance'],
 			filterPlaceholder: $t('vehicles.filters.statusPlaceholder')
-		},
-		{
-			key: 'actions',
-			label: $t('common.actions'),
-			sortable: false
 		}
 	]);
+
+	// Build actions for a vehicle row
+	function getVehicleActions(vehicle: typeof vehicles[0]): ActionItem[] {
+		return filterActions([
+			// Edit action
+			createEditAction(() => openEditModal(vehicle), $t('common.edit')),
+
+			// Duplicate action
+			createDuplicateAction(() => handleDuplicate(vehicle), $t('common.duplicate')),
+
+			// Delete action
+			createDeleteAction(() => handleDelete(vehicle._id), false, $t('common.delete'))
+		]);
+	}
+
+	// Handle duplicate vehicle
+	async function handleDuplicate(vehicle: typeof vehicles[0]) {
+		if (!tenantStore.tenantId) return;
+
+		try {
+			await client.mutation(api.vehicles.create, {
+				tenantId: tenantStore.tenantId,
+				name: `${vehicle.name} (${$t('common.copy')})`,
+				make: vehicle.make || undefined,
+				model: vehicle.model || undefined,
+				year: vehicle.year || undefined,
+				licensePlate: undefined, // Don't copy license plate
+				passengerCapacity: vehicle.passengerCapacity,
+				fuelCapacity: vehicle.fuelCapacity,
+				fuelCapacityUnit: vehicle.fuelCapacityUnit || 'gallons',
+				fuelEfficiency: vehicle.fuelEfficiency,
+				fuelEfficiencyUnit: vehicle.fuelEfficiencyUnit,
+				costPerDistance: vehicle.costPerDistance,
+				costPerDistanceCurrency: vehicle.costPerDistanceCurrency || localCurrency,
+				costPerDay: vehicle.costPerDay,
+				costPerDayCurrency: vehicle.costPerDayCurrency || localCurrency,
+				distanceUnit: vehicle.distanceUnit,
+				ownership: vehicle.ownership,
+				status: 'active',
+				baseLocation: vehicle.baseLocation || undefined
+			});
+			showToastMessage($t('vehicles.duplicateSuccess'), 'success');
+		} catch (error) {
+			console.error('Failed to duplicate vehicle:', error);
+			showToastMessage($t('vehicles.duplicateFailed'), 'error');
+		}
+	}
 
 	function openCreateModal() {
 		isEditing = false;
@@ -399,16 +454,46 @@
 
 	const vehicles = $derived(vehiclesQuery.data || []);
 	const isLoading = $derived(vehiclesQuery.isLoading);
+
+	// Status filter state
+	let statusFilter = $state('');
+
+	// Stats
+	const stats = $derived({
+		total: vehicles.length,
+		active: vehicles.filter((v) => v.status === 'active').length,
+		inactive: vehicles.filter((v) => v.status === 'inactive').length,
+		maintenance: vehicles.filter((v) => v.status === 'maintenance').length
+	});
+
+	// Filter functions
+	function filterByStatus(status: string) {
+		statusFilter = status;
+	}
+
+	function clearFilters() {
+		statusFilter = '';
+	}
+
+	// Active filter indicator
+	const activeFilter = $derived(statusFilter);
+
+	// Pre-filtered vehicles for DataTable
+	const filteredVehicles = $derived(
+		statusFilter
+			? vehicles.filter((v) => v.status === statusFilter)
+			: vehicles
+	);
 </script>
 
 <div class="space-y-6">
-	<div class="flex justify-between items-center">
+	<div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
 		<div>
 			<h1 class="text-3xl font-bold text-gray-900 dark:text-white">{$t('vehicles.title')}</h1>
 			<p class="text-gray-600 dark:text-gray-400 mt-1">
-				{$t('vehicles.subtitle', { values: { count: vehicles.length } })}
+				{$t('vehicles.subtitle', { values: { count: stats.total } })}
 				{#if tenant && tenant.maxVehicles !== -1}
-					<span class="text-sm">({vehicles.length} / {tenant.maxVehicles})</span>
+					<span class="text-sm">({stats.total} / {tenant.maxVehicles})</span>
 				{/if}
 			</p>
 		</div>
@@ -431,6 +516,72 @@
 		</Alert>
 	{/if}
 
+	{#if !isLoading}
+		<!-- Stats Cards -->
+		<div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+			<Card class="max-w-none p-4! {activeFilter === '' ? 'ring-2 ring-primary-500' : ''}">
+				<div class="flex items-start justify-between">
+					<div>
+						<p class="text-sm font-medium text-gray-500 dark:text-gray-400">{$t('common.all')}</p>
+						<p class="text-2xl font-bold text-gray-900 dark:text-white">{stats.total}</p>
+					</div>
+					<button
+						onclick={() => clearFilters()}
+						class="p-1.5 rounded-lg transition-colors {activeFilter === '' ? 'bg-primary-100 text-primary-600 dark:bg-primary-900 dark:text-primary-400' : 'text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-300'}"
+						title={$t('common.clearFilters')}
+					>
+						<FilterOutline class="w-4 h-4" />
+					</button>
+				</div>
+			</Card>
+			<Card class="max-w-none p-4! {activeFilter === 'active' ? 'ring-2 ring-emerald-500' : ''}">
+				<div class="flex items-start justify-between">
+					<div>
+						<p class="text-sm font-medium text-gray-500 dark:text-gray-400">{$t('statuses.active')}</p>
+						<p class="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{stats.active}</p>
+					</div>
+					<button
+						onclick={() => filterByStatus('active')}
+						class="p-1.5 rounded-lg transition-colors {activeFilter === 'active' ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900 dark:text-emerald-400' : 'text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-300'}"
+						title={$t('common.filter')}
+					>
+						<FilterOutline class="w-4 h-4" />
+					</button>
+				</div>
+			</Card>
+			<Card class="max-w-none p-4! {activeFilter === 'maintenance' ? 'ring-2 ring-yellow-500' : ''}">
+				<div class="flex items-start justify-between">
+					<div>
+						<p class="text-sm font-medium text-gray-500 dark:text-gray-400">{$t('statuses.maintenance')}</p>
+						<p class="text-2xl font-bold text-yellow-600 dark:text-yellow-400">{stats.maintenance}</p>
+					</div>
+					<button
+						onclick={() => filterByStatus('maintenance')}
+						class="p-1.5 rounded-lg transition-colors {activeFilter === 'maintenance' ? 'bg-yellow-100 text-yellow-600 dark:bg-yellow-900 dark:text-yellow-400' : 'text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-300'}"
+						title={$t('common.filter')}
+					>
+						<FilterOutline class="w-4 h-4" />
+					</button>
+				</div>
+			</Card>
+			<Card class="max-w-none p-4! {activeFilter === 'inactive' ? 'ring-2 ring-gray-500' : ''}">
+				<div class="flex items-start justify-between">
+					<div>
+						<p class="text-sm font-medium text-gray-500 dark:text-gray-400">{$t('statuses.inactive')}</p>
+						<p class="text-2xl font-bold text-gray-600 dark:text-gray-300">{stats.inactive}</p>
+					</div>
+					<button
+						onclick={() => filterByStatus('inactive')}
+						class="p-1.5 rounded-lg transition-colors {activeFilter === 'inactive' ? 'bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-300' : 'text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-300'}"
+						title={$t('common.filter')}
+					>
+						<FilterOutline class="w-4 h-4" />
+					</button>
+				</div>
+			</Card>
+		</div>
+	{/if}
+
 	<Card class="max-w-none !p-6">
 		{#if isLoading}
 			<div class="flex justify-center py-12">
@@ -446,18 +597,35 @@
 					{$t('vehicles.addVehicle')}
 				</Button>
 			</div>
+		{:else if filteredVehicles.length === 0}
+			<div class="text-center py-12">
+				<p class="text-gray-500 dark:text-gray-400 mb-4">
+					{$t('common.noResults')}
+				</p>
+				<Button color="alternative" onclick={() => clearFilters()}>
+					{$t('common.clearFilters')}
+				</Button>
+			</div>
 		{:else}
-			<DataTable data={vehicles} {columns}>
+			<DataTable data={filteredVehicles} {columns}>
 				{#snippet row(vehicle)}
 					<TableBodyCell>
-						<div class="font-medium text-gray-900 dark:text-white">
-							{vehicle.name}
-						</div>
-						{#if vehicle.make || vehicle.model}
-							<div class="text-sm text-gray-500 dark:text-gray-400">
-								{[vehicle.make, vehicle.model, vehicle.year].filter(Boolean).join(' ')}
+						<div class="flex items-center justify-between gap-2">
+							<div>
+								<div class="font-medium text-gray-900 dark:text-white">
+									{vehicle.name}
+								</div>
+								{#if vehicle.make || vehicle.model}
+									<div class="text-sm text-gray-500 dark:text-gray-400">
+										{[vehicle.make, vehicle.model, vehicle.year].filter(Boolean).join(' ')}
+									</div>
+								{/if}
 							</div>
-						{/if}
+							<ActionMenu
+								triggerId="actions-{vehicle._id}"
+								actions={getVehicleActions(vehicle)}
+							/>
+						</div>
 					</TableBodyCell>
 					<TableBodyCell>
 						{vehicle.passengerCapacity} {$t('vehicles.fields.passengers')}
@@ -476,16 +644,6 @@
 					</TableBodyCell>
 					<TableBodyCell>
 						<StatusBadge status={vehicle.status} />
-					</TableBodyCell>
-					<TableBodyCell>
-						<div class="flex gap-2">
-							<Button size="xs" color="light" onclick={() => openEditModal(vehicle)}>
-								<PenOutline class="w-4 h-4" />
-							</Button>
-							<Button size="xs" color="red" outline onclick={() => handleDelete(vehicle._id)}>
-								<TrashBinOutline class="w-4 h-4" />
-							</Button>
-						</div>
 					</TableBodyCell>
 				{/snippet}
 			</DataTable>

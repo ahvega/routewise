@@ -35,6 +35,13 @@
 		UserOutline,
 		BriefcaseOutline
 	} from 'flowbite-svelte-icons';
+	import {
+		ActionMenu,
+		createEmailAction,
+		createDeleteAction,
+		filterActions,
+		type ActionItem
+	} from '$lib/components/ui';
 
 	let { data } = $props();
 	const client = useConvexClient();
@@ -275,6 +282,25 @@
 				return 'blue';
 		}
 	}
+
+	// Check if user can be removed (not self, not last admin)
+	function canRemoveUser(user: typeof users[0]): boolean {
+		if (user.role !== 'admin') return true;
+		return users.filter(u => u.role === 'admin').length > 1;
+	}
+
+	// Build actions for a user row
+	function getUserActions(user: typeof users[0]): ActionItem[] {
+		return filterActions([
+			// Email action
+			createEmailAction(user.email, $t('common.email')),
+
+			// Remove action (only if allowed)
+			canRemoveUser(user)
+				? createDeleteAction(() => handleRemoveUser(user._id), false, $t('settings.team.removeUser'))
+				: null
+		]);
+	}
 </script>
 
 <svelte:head>
@@ -344,24 +370,29 @@
 						<TableHeadCell>{$t('settings.team.role')}</TableHeadCell>
 						<TableHeadCell>{$t('settings.team.status')}</TableHeadCell>
 						<TableHeadCell>{$t('settings.team.joined')}</TableHeadCell>
-						<TableHeadCell class="text-right">{$t('common.actions')}</TableHeadCell>
 					</TableHead>
 					<TableBody>
 						{#each users as user}
 							<TableBodyRow>
 								<TableBodyCell>
-									<div class="flex items-center gap-3">
-										{#if user.avatarUrl}
-											<Avatar src={user.avatarUrl} size="sm" />
-										{:else}
-											<Avatar size="sm">
-												<UserOutline class="w-4 h-4" />
-											</Avatar>
-										{/if}
-										<div>
-											<p class="font-medium text-gray-900 dark:text-white">{user.fullName}</p>
-											<p class="text-sm text-gray-500">{user.email}</p>
+									<div class="flex items-center justify-between gap-2">
+										<div class="flex items-center gap-3">
+											{#if user.avatarUrl}
+												<Avatar src={user.avatarUrl} size="sm" />
+											{:else}
+												<Avatar size="sm">
+													<UserOutline class="w-4 h-4" />
+												</Avatar>
+											{/if}
+											<div>
+												<p class="font-medium text-gray-900 dark:text-white">{user.fullName}</p>
+												<p class="text-sm text-gray-500">{user.email}</p>
+											</div>
 										</div>
+										<ActionMenu
+											triggerId="actions-{user._id}"
+											actions={getUserActions(user)}
+										/>
 									</div>
 								</TableBodyCell>
 								<TableBodyCell>
@@ -376,19 +407,6 @@
 								</TableBodyCell>
 								<TableBodyCell>
 									{formatDate(user.createdAt)}
-								</TableBodyCell>
-								<TableBodyCell class="text-right">
-									{#if user.role !== 'admin' || users.filter(u => u.role === 'admin').length > 1}
-										<Button
-											size="xs"
-											color="red"
-											outline
-											onclick={() => handleRemoveUser(user._id)}
-											title={$t('settings.team.removeUser')}
-										>
-											<TrashBinOutline class="w-4 h-4" />
-										</Button>
-									{/if}
 								</TableBodyCell>
 							</TableBodyRow>
 						{/each}

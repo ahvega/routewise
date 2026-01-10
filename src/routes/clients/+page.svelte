@@ -19,12 +19,24 @@
 		CloseCircleOutline,
 		BuildingOutline,
 		UserOutline,
-		RefreshOutline
+		RefreshOutline,
+		FilterOutline
 	} from 'flowbite-svelte-icons';
 	import { useQuery, useConvexClient } from 'convex-svelte';
 	import { api } from '$convex/_generated/api';
 	import { tenantStore } from '$lib/stores';
-	import { StatusBadge, DataTable, type Column } from '$lib/components/ui';
+	import {
+		StatusBadge,
+		DataTable,
+		ActionMenu,
+		createEditAction,
+		createDeleteAction,
+		createCallAction,
+		createEmailAction,
+		filterActions,
+		type Column,
+		type ActionItem
+	} from '$lib/components/ui';
 	import type { Id } from '$convex/_generated/dataModel';
 	import { t } from '$lib/i18n';
 
@@ -164,13 +176,25 @@
 			sortable: true,
 			filterOptions: ['active', 'inactive'],
 			filterPlaceholder: $t('clients.filters.statusPlaceholder')
-		},
-		{
-			key: 'actions',
-			label: $t('common.actions'),
-			sortable: false
 		}
 	]);
+
+	// Build actions for a client row
+	function getClientActions(clientData: typeof clients[0]): ActionItem[] {
+		return filterActions([
+			// Edit action
+			createEditAction(() => openEditModal(clientData), $t('common.edit')),
+
+			// Call/Email actions (with divider)
+			clientData.phone
+				? { ...createCallAction(clientData.phone, $t('common.call'))!, dividerBefore: true }
+				: null,
+			createEmailAction(clientData.email, $t('common.email')),
+
+			// Delete action
+			createDeleteAction(() => handleDelete(clientData._id), false, $t('common.delete'))
+		]);
+	}
 
 	function openCreateModal() {
 		isEditing = false;
@@ -312,14 +336,45 @@
 
 	const clients = $derived(clientsQuery.data || []);
 	const isLoading = $derived(clientsQuery.isLoading);
+
+	// Status filter state
+	let statusFilter = $state('');
+
+	// Stats
+	const stats = $derived({
+		total: clients.length,
+		active: clients.filter((c) => c.status === 'active').length,
+		inactive: clients.filter((c) => c.status === 'inactive').length,
+		companies: clients.filter((c) => c.type === 'company').length,
+		individuals: clients.filter((c) => c.type === 'individual').length
+	});
+
+	// Filter functions
+	function filterByStatus(status: string) {
+		statusFilter = status;
+	}
+
+	function clearFilters() {
+		statusFilter = '';
+	}
+
+	// Active filter indicator
+	const activeFilter = $derived(statusFilter);
+
+	// Pre-filtered clients for DataTable
+	const filteredClients = $derived(
+		statusFilter
+			? clients.filter((c) => c.status === statusFilter)
+			: clients
+	);
 </script>
 
 <div class="space-y-6">
-	<div class="flex justify-between items-center">
+	<div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
 		<div>
 			<h1 class="text-3xl font-bold text-gray-900 dark:text-white">{$t('clients.title')}</h1>
 			<p class="text-gray-600 dark:text-gray-400 mt-1">
-				{$t('clients.subtitle', { values: { count: clients.length } })}
+				{$t('clients.subtitle', { values: { count: stats.total } })}
 			</p>
 		</div>
 		<Button onclick={openCreateModal}>
@@ -327,6 +382,68 @@
 			{$t('clients.addClient')}
 		</Button>
 	</div>
+
+	{#if !isLoading}
+		<!-- Stats Cards -->
+		<div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+			<Card class="max-w-none p-4! {activeFilter === '' ? 'ring-2 ring-primary-500' : ''}">
+				<div class="flex items-start justify-between">
+					<div>
+						<p class="text-sm font-medium text-gray-500 dark:text-gray-400">{$t('common.all')}</p>
+						<p class="text-2xl font-bold text-gray-900 dark:text-white">{stats.total}</p>
+					</div>
+					<button
+						onclick={() => clearFilters()}
+						class="p-1.5 rounded-lg transition-colors {activeFilter === '' ? 'bg-primary-100 text-primary-600 dark:bg-primary-900 dark:text-primary-400' : 'text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-300'}"
+						title={$t('common.clearFilters')}
+					>
+						<FilterOutline class="w-4 h-4" />
+					</button>
+				</div>
+			</Card>
+			<Card class="max-w-none p-4! {activeFilter === 'active' ? 'ring-2 ring-emerald-500' : ''}">
+				<div class="flex items-start justify-between">
+					<div>
+						<p class="text-sm font-medium text-gray-500 dark:text-gray-400">{$t('statuses.active')}</p>
+						<p class="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{stats.active}</p>
+					</div>
+					<button
+						onclick={() => filterByStatus('active')}
+						class="p-1.5 rounded-lg transition-colors {activeFilter === 'active' ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900 dark:text-emerald-400' : 'text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-300'}"
+						title={$t('common.filter')}
+					>
+						<FilterOutline class="w-4 h-4" />
+					</button>
+				</div>
+			</Card>
+			<Card class="max-w-none p-4! {activeFilter === 'inactive' ? 'ring-2 ring-gray-500' : ''}">
+				<div class="flex items-start justify-between">
+					<div>
+						<p class="text-sm font-medium text-gray-500 dark:text-gray-400">{$t('statuses.inactive')}</p>
+						<p class="text-2xl font-bold text-gray-600 dark:text-gray-300">{stats.inactive}</p>
+					</div>
+					<button
+						onclick={() => filterByStatus('inactive')}
+						class="p-1.5 rounded-lg transition-colors {activeFilter === 'inactive' ? 'bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-300' : 'text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-300'}"
+						title={$t('common.filter')}
+					>
+						<FilterOutline class="w-4 h-4" />
+					</button>
+				</div>
+			</Card>
+			<Card class="max-w-none p-4!">
+				<div class="flex items-start justify-between">
+					<div>
+						<p class="text-sm font-medium text-gray-500 dark:text-gray-400">{$t('clients.fields.company')}</p>
+						<p class="text-2xl font-bold text-blue-600 dark:text-blue-400">{stats.companies}</p>
+					</div>
+					<div class="p-1.5">
+						<BuildingOutline class="w-4 h-4 text-gray-400" />
+					</div>
+				</div>
+			</Card>
+		</div>
+	{/if}
 
 	<Card class="max-w-none !p-6">
 		{#if isLoading}
@@ -343,26 +460,46 @@
 					{$t('clients.addClient')}
 				</Button>
 			</div>
+		{:else if filteredClients.length === 0}
+			<div class="text-center py-12">
+				<p class="text-gray-500 dark:text-gray-400 mb-4">
+					{$t('common.noResults')}
+				</p>
+				<Button color="alternative" onclick={() => clearFilters()}>
+					{$t('common.clearFilters')}
+				</Button>
+			</div>
 		{:else}
-			<DataTable data={clients} {columns}>
+			<DataTable data={filteredClients} {columns}>
 				{#snippet row(clientData)}
 					<TableBodyCell>
-						<div class="flex items-center gap-3">
-							<div class="p-2 rounded-full bg-gray-100 dark:bg-gray-700">
-								{#if clientData.type === 'company'}
-									<BuildingOutline class="w-5 h-5 text-gray-500 dark:text-gray-400" />
-								{:else}
-									<UserOutline class="w-5 h-5 text-gray-500 dark:text-gray-400" />
-								{/if}
-							</div>
-							<div>
-								<div class="font-medium text-gray-900 dark:text-white">
-									{getClientName(clientData)}
+						<span class="font-mono text-sm text-gray-600 dark:text-gray-400">
+							{clientData.clientCode || '-'}
+						</span>
+					</TableBodyCell>
+					<TableBodyCell>
+						<div class="flex items-center justify-between gap-2">
+							<div class="flex items-center gap-3">
+								<div class="p-2 rounded-full bg-gray-100 dark:bg-gray-700">
+									{#if clientData.type === 'company'}
+										<BuildingOutline class="w-5 h-5 text-gray-500 dark:text-gray-400" />
+									{:else}
+										<UserOutline class="w-5 h-5 text-gray-500 dark:text-gray-400" />
+									{/if}
 								</div>
-								<div class="text-sm text-gray-500 dark:text-gray-400">
-									{clientData.city || clientData.country}
+								<div>
+									<div class="font-medium text-gray-900 dark:text-white">
+										{getClientName(clientData)}
+									</div>
+									<div class="text-sm text-gray-500 dark:text-gray-400">
+										{clientData.city || clientData.country}
+									</div>
 								</div>
 							</div>
+							<ActionMenu
+								triggerId="actions-{clientData._id}"
+								actions={getClientActions(clientData)}
+							/>
 						</div>
 					</TableBodyCell>
 					<TableBodyCell>
@@ -398,16 +535,6 @@
 					</TableBodyCell>
 					<TableBodyCell>
 						<StatusBadge status={clientData.status} />
-					</TableBodyCell>
-					<TableBodyCell>
-						<div class="flex gap-2">
-							<Button size="xs" color="light" onclick={() => openEditModal(clientData)}>
-								<PenOutline class="w-4 h-4" />
-							</Button>
-							<Button size="xs" color="red" outline onclick={() => handleDelete(clientData._id)}>
-								<TrashBinOutline class="w-4 h-4" />
-							</Button>
-						</div>
 					</TableBodyCell>
 				{/snippet}
 			</DataTable>

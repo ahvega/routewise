@@ -536,7 +536,7 @@
 		<Tabs>
 			<TabItem open title={$t('settings.tabs.costParameters')}>
 				<!-- Currency Configuration -->
-				<Card class="max-w-none mt-4 !p-6">
+				<Card class="max-w-none mt-4 p-6">
 					<h5 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Configuración de Moneda</h5>
 
 					<div class="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -591,7 +591,7 @@
 				</Card>
 
 				<!-- Operating Costs -->
-				<Card class="max-w-none mt-4 !p-6">
+				<Card class="max-w-none mt-4 p-6!">
 					<div class="flex items-center gap-2 mb-4">
 						<CogOutline class="w-5 h-5 text-gray-500 dark:text-gray-400" />
 						<h5 class="text-lg font-semibold text-gray-900 dark:text-white">{$t('settings.operatingCosts')}</h5>
@@ -669,7 +669,7 @@
 				</Card>
 
 				<!-- Rounding & Terms -->
-				<Card class="max-w-none mt-4 !p-6">
+				<Card class="max-w-none mt-4 p-6!">
 					<h5 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Redondeo y Términos</h5>
 
 					<div class="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -694,7 +694,7 @@
 				</Card>
 
 				<!-- Pricing Levels -->
-				<Card class="max-w-none mt-4 !p-6">
+				<Card class="max-w-none mt-4 p-6!">
 					<h5 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Niveles de Precios para Clientes</h5>
 					<Helper class="mb-4">Define los niveles de precios y sus descuentos asociados para clientes</Helper>
 
@@ -782,7 +782,7 @@
 				</Card>
 
 				<!-- License Categories -->
-				<Card class="max-w-none mt-4 !p-6">
+				<Card class="max-w-none mt-4 p-6!">
 					<h5 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Categorías de Licencia de Conducir</h5>
 					<Helper class="mb-4">Define las categorías de licencia disponibles para los conductores</Helper>
 
@@ -850,7 +850,7 @@
 				</Card>
 
 				<!-- Units -->
-				<Card class="max-w-none mt-4 !p-6">
+				<Card class="max-w-none mt-4 p-6!">
 					<h5 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Unidades y Preferencias</h5>
 
 					<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -885,7 +885,7 @@
 
 			<TabItem title={$t('settings.tabs.organization')}>
 				<!-- Company Logo Upload -->
-				<Card class="max-w-none mt-4 !p-6">
+				<Card class="max-w-none mt-4 p-6!">
 					<h5 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Logo de la Empresa</h5>
 					<p class="text-sm text-gray-500 dark:text-gray-400 mb-4">
 						Este logo se mostrará en cotizaciones, facturas y documentos PDF.
@@ -894,7 +894,7 @@
 					{#if tenant}
 						<div class="flex items-start gap-6">
 							<!-- Logo Preview -->
-							<div class="flex-shrink-0">
+							<div class="shrink-0">
 								<div class="w-32 h-32 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg flex items-center justify-center overflow-hidden bg-gray-50 dark:bg-gray-800">
 									{#if tenant.logoUrl}
 										<img
@@ -934,7 +934,7 @@
 								</div>
 
 								{#if logoError}
-									<Alert color="red" class="!p-3">
+									<Alert color="red" class="p-3!">
 										<span class="text-sm">{logoError}</span>
 									</Alert>
 								{/if}
@@ -970,7 +970,7 @@
 				</Card>
 
 				<!-- Organization Info -->
-				<Card class="max-w-none mt-4 !p-6">
+				<Card class="max-w-none mt-4 p-6!">
 					<h5 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">{$t('settings.organization.title')}</h5>
 
 					{#if tenant}
@@ -1053,7 +1053,7 @@
 			</TabItem>
 
 			<TabItem title={$t('settings.tabs.about')}>
-				<Card class="max-w-none mt-4 !p-6">
+				<Card class="max-w-none mt-4 p-6!">
 					<h5 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">{$t('settings.about.title')}</h5>
 
 					<div class="space-y-4">

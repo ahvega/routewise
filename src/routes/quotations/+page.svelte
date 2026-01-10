@@ -1,27 +1,25 @@
 <script lang="ts">
-	import {
-		Button,
-		Card,
-		TableBodyCell,
-		Dropdown,
-		DropdownItem,
-		Spinner,
-		Toast
-	} from 'flowbite-svelte';
-	import {
-		PlusOutline,
-		DotsHorizontalOutline,
-		EyeOutline,
-		PenOutline,
-		TrashBinOutline,
-		PaperPlaneOutline,
-		CheckCircleOutline,
-		CloseCircleOutline
-	} from 'flowbite-svelte-icons';
+	import { Button, Card, TableBodyCell, Spinner, Toast } from 'flowbite-svelte';
+	import { PlusOutline, CheckCircleOutline, CloseCircleOutline, FilterOutline } from 'flowbite-svelte-icons';
 	import { useQuery, useConvexClient } from 'convex-svelte';
 	import { api } from '$convex/_generated/api';
 	import { tenantStore } from '$lib/stores';
-	import { StatusBadge, DataTable, type Column } from '$lib/components/ui';
+	import {
+		StatusBadge,
+		DataTable,
+		ActionMenu,
+		type Column,
+		createViewAction,
+		createCallAction,
+		createEmailAction,
+		createDeleteAction,
+		filterActions,
+		type ActionItem
+	} from '$lib/components/ui';
+	import {
+		PaperPlaneOutline,
+		FilePdfOutline
+	} from 'flowbite-svelte-icons';
 	import type { Id } from '$convex/_generated/dataModel';
 	import { t } from '$lib/i18n';
 
@@ -48,7 +46,11 @@
 	const clients = $derived(clientsQuery.data || []);
 	const isLoading = $derived(quotationsQuery.isLoading);
 
+	// Status filter state
+	let statusFilter = $state('');
+
 	// Table columns configuration (reactive for i18n)
+	// Note: Actions column removed - kebab menu is now in first column
 	const columns = $derived<Column<any>[]>([
 		{
 			key: 'quotationNumber',
@@ -86,11 +88,6 @@
 			label: $t('quotations.columns.date'),
 			sortable: true,
 			sortFn: (a, b, dir) => dir === 'asc' ? a.createdAt - b.createdAt : b.createdAt - a.createdAt
-		},
-		{
-			key: 'actions',
-			label: $t('common.actions'),
-			sortable: false
 		}
 	]);
 
@@ -102,6 +99,58 @@
 			return clientData.companyName || 'Unnamed Company';
 		}
 		return [clientData.firstName, clientData.lastName].filter(Boolean).join(' ') || 'Unnamed';
+	}
+
+	// Get client contact info for Call/Email actions
+	function getClientContact(clientId: Id<'clients'> | undefined): { phone?: string; email?: string } {
+		if (!clientId) return {};
+		const clientData = clients.find((c) => c._id === clientId);
+		if (!clientData) return {};
+		return {
+			phone: clientData.phone || undefined,
+			email: clientData.email || undefined
+		};
+	}
+
+	// Build actions for a quotation row
+	function getQuotationActions(quote: typeof quotations[0]): ActionItem[] {
+		const contact = getClientContact(quote.clientId);
+
+		return filterActions([
+			// View action
+			createViewAction(`/quotations/${quote._id}`, $t('quotations.viewQuotation')),
+
+			// Contact actions (with divider)
+			contact.phone ? { ...createCallAction(contact.phone, $t('common.callClient'))!, dividerBefore: true } : null,
+			createEmailAction(contact.email, $t('common.emailClient')),
+
+			// Status actions (with divider)
+			quote.status === 'draft' ? {
+				id: 'send',
+				label: $t('common.sent'),
+				icon: PaperPlaneOutline,
+				onClick: () => updateStatus(quote._id, 'sent'),
+				dividerBefore: true
+			} : null,
+			quote.status === 'sent' ? {
+				id: 'approve',
+				label: $t('common.accepted'),
+				icon: CheckCircleOutline,
+				onClick: () => updateStatus(quote._id, 'approved'),
+				color: 'success' as const,
+				dividerBefore: true
+			} : null,
+			quote.status === 'sent' ? {
+				id: 'reject',
+				label: $t('common.rejected'),
+				icon: CloseCircleOutline,
+				onClick: () => updateStatus(quote._id, 'rejected'),
+				color: 'warning' as const
+			} : null,
+
+			// Delete action (always last, with divider)
+			createDeleteAction(() => handleDelete(quote._id), false, $t('common.delete'))
+		]);
 	}
 
 	function formatCurrency(value: number): string {
@@ -156,6 +205,25 @@
 		sent: quotations.filter((q) => q.status === 'sent').length,
 		approved: quotations.filter((q) => q.status === 'approved').length
 	});
+
+	// Filter by card click
+	function filterByStatus(status: string) {
+		statusFilter = status;
+	}
+
+	function clearFilters() {
+		statusFilter = '';
+	}
+
+	// Active filter indicator
+	const activeFilter = $derived(statusFilter);
+
+	// Pre-filtered quotations for DataTable
+	const filteredQuotations = $derived(
+		statusFilter
+			? quotations.filter((q) => q.status === statusFilter)
+			: quotations
+	);
 </script>
 
 <div class="space-y-6">
@@ -163,7 +231,7 @@
 		<div>
 			<h1 class="text-3xl font-bold text-gray-900 dark:text-white">{$t('quotations.title')}</h1>
 			<p class="text-gray-600 dark:text-gray-400 mt-1">
-				{stats.total} total, {stats.draft} {$t('dashboard.drafts')}, {stats.approved} {$t('dashboard.approved')}
+				{$t('quotations.subtitle', { count: stats.total })}
 			</p>
 		</div>
 		<Button href="/quotations/new">
@@ -172,30 +240,112 @@
 		</Button>
 	</div>
 
-	<Card class="max-w-none !p-6">
-		{#if isLoading}
-			<div class="flex justify-center py-12">
-				<Spinner size="8" />
-			</div>
-		{:else if quotations.length === 0}
-			<div class="text-center py-12">
-				<p class="text-gray-500 dark:text-gray-400 mb-4">
-					{$t('quotations.noQuotations')}
-				</p>
-				<Button href="/quotations/new">
-					<PlusOutline class="w-4 h-4 mr-2" />
-					{$t('quotations.newQuotation')}
-				</Button>
-			</div>
-		{:else}
-			<DataTable data={quotations} {columns}>
+	{#if isLoading}
+		<div class="flex justify-center py-12">
+			<Spinner size="8" />
+		</div>
+	{:else}
+		<!-- Stats Cards -->
+		<div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+			<Card class="max-w-none p-4! {activeFilter === '' ? 'ring-2 ring-primary-500' : ''}">
+				<div class="flex items-start justify-between">
+					<div>
+						<p class="text-sm font-medium text-gray-500 dark:text-gray-400">{$t('common.all')}</p>
+						<p class="text-2xl font-bold text-gray-900 dark:text-white">{stats.total}</p>
+					</div>
+					<button
+						onclick={() => clearFilters()}
+						class="p-1.5 rounded-lg transition-colors {activeFilter === '' ? 'bg-primary-100 text-primary-600 dark:bg-primary-900 dark:text-primary-400' : 'text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-300'}"
+						title={$t('common.clearFilters')}
+					>
+						<FilterOutline class="w-4 h-4" />
+					</button>
+				</div>
+			</Card>
+			<Card class="max-w-none p-4! {activeFilter === 'draft' ? 'ring-2 ring-gray-500' : ''}">
+				<div class="flex items-start justify-between">
+					<div>
+						<p class="text-sm font-medium text-gray-500 dark:text-gray-400">{$t('statuses.draft')}</p>
+						<p class="text-2xl font-bold text-gray-600 dark:text-gray-300">{stats.draft}</p>
+					</div>
+					<button
+						onclick={() => filterByStatus('draft')}
+						class="p-1.5 rounded-lg transition-colors {activeFilter === 'draft' ? 'bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-300' : 'text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-300'}"
+						title={$t('common.filter')}
+					>
+						<FilterOutline class="w-4 h-4" />
+					</button>
+				</div>
+			</Card>
+			<Card class="max-w-none p-4! {activeFilter === 'sent' ? 'ring-2 ring-blue-500' : ''}">
+				<div class="flex items-start justify-between">
+					<div>
+						<p class="text-sm font-medium text-gray-500 dark:text-gray-400">{$t('statuses.sent')}</p>
+						<p class="text-2xl font-bold text-blue-600 dark:text-blue-400">{stats.sent}</p>
+					</div>
+					<button
+						onclick={() => filterByStatus('sent')}
+						class="p-1.5 rounded-lg transition-colors {activeFilter === 'sent' ? 'bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-400' : 'text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-300'}"
+						title={$t('common.filter')}
+					>
+						<FilterOutline class="w-4 h-4" />
+					</button>
+				</div>
+			</Card>
+			<Card class="max-w-none p-4! {activeFilter === 'approved' ? 'ring-2 ring-emerald-500' : ''}">
+				<div class="flex items-start justify-between">
+					<div>
+						<p class="text-sm font-medium text-gray-500 dark:text-gray-400">{$t('statuses.approved')}</p>
+						<p class="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{stats.approved}</p>
+					</div>
+					<button
+						onclick={() => filterByStatus('approved')}
+						class="p-1.5 rounded-lg transition-colors {activeFilter === 'approved' ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900 dark:text-emerald-400' : 'text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-300'}"
+						title={$t('common.filter')}
+					>
+						<FilterOutline class="w-4 h-4" />
+					</button>
+				</div>
+			</Card>
+		</div>
+
+		<Card class="max-w-none !p-6">
+			{#if quotations.length === 0}
+				<div class="text-center py-12">
+					<p class="text-gray-500 dark:text-gray-400 mb-4">
+						{$t('quotations.noQuotations')}
+					</p>
+					<Button href="/quotations/new">
+						<PlusOutline class="w-4 h-4 mr-2" />
+						{$t('quotations.newQuotation')}
+					</Button>
+				</div>
+			{:else if filteredQuotations.length === 0}
+				<div class="text-center py-12">
+					<p class="text-gray-500 dark:text-gray-400 mb-4">
+						{$t('common.noResults')}
+					</p>
+					<Button color="alternative" onclick={() => clearFilters()}>
+						{$t('common.clearFilters')}
+					</Button>
+				</div>
+			{:else}
+				<DataTable data={filteredQuotations} {columns}>
 				{#snippet row(quote)}
 					<TableBodyCell>
-						<div class="font-mono font-medium text-gray-900 dark:text-white">
-							{quote.quotationNumber}
-						</div>
-						<div class="text-xs text-gray-500 dark:text-gray-400">
-							{getClientName(quote.clientId)}
+						<div class="flex items-center justify-between gap-2">
+							<div>
+								<div class="font-mono font-medium text-gray-900 dark:text-white">
+									{quote.quotationNumber}
+								</div>
+								<div class="text-xs text-gray-500 dark:text-gray-400">
+									{getClientName(quote.clientId)}
+								</div>
+							</div>
+							<ActionMenu
+								triggerId="actions-{quote._id}"
+								actions={getQuotationActions(quote)}
+							/>
 						</div>
 					</TableBodyCell>
 					<TableBodyCell>
@@ -225,41 +375,11 @@
 					<TableBodyCell class="text-sm text-gray-500 dark:text-gray-400">
 						{formatDate(quote.createdAt)}
 					</TableBodyCell>
-					<TableBodyCell>
-						<Button size="xs" color="light" id="actions-{quote._id}">
-							<DotsHorizontalOutline class="w-4 h-4" />
-						</Button>
-						<Dropdown triggeredBy="#actions-{quote._id}" class="dark:bg-gray-800 dark:border-gray-700">
-							<DropdownItem href="/quotations/{quote._id}" class="dark:text-gray-200 dark:hover:bg-gray-700">
-								<EyeOutline class="w-4 h-4 mr-2 inline" />
-								{$t('quotations.viewQuotation')}
-							</DropdownItem>
-							{#if quote.status === 'draft'}
-								<DropdownItem onclick={() => updateStatus(quote._id, 'sent')} class="dark:text-gray-200 dark:hover:bg-gray-700">
-									<PaperPlaneOutline class="w-4 h-4 mr-2 inline" />
-									{$t('common.sent')}
-								</DropdownItem>
-							{/if}
-							{#if quote.status === 'sent'}
-								<DropdownItem onclick={() => updateStatus(quote._id, 'approved')} class="dark:text-gray-200 dark:hover:bg-gray-700">
-									<CheckCircleOutline class="w-4 h-4 mr-2 inline" />
-									{$t('common.accepted')}
-								</DropdownItem>
-								<DropdownItem onclick={() => updateStatus(quote._id, 'rejected')} class="dark:text-gray-200 dark:hover:bg-gray-700">
-									<CloseCircleOutline class="w-4 h-4 mr-2 inline" />
-									{$t('common.rejected')}
-								</DropdownItem>
-							{/if}
-							<DropdownItem class="text-red-600 dark:text-red-400 dark:hover:bg-gray-700" onclick={() => handleDelete(quote._id)}>
-								<TrashBinOutline class="w-4 h-4 mr-2 inline" />
-								{$t('common.delete')}
-							</DropdownItem>
-						</Dropdown>
-					</TableBodyCell>
 				{/snippet}
 			</DataTable>
 		{/if}
-	</Card>
+		</Card>
+	{/if}
 </div>
 
 <!-- Toast notifications -->

@@ -20,12 +20,24 @@
 		CloseCircleOutline,
 		ExclamationCircleOutline,
 		UserOutline,
-		InfoCircleSolid
+		InfoCircleSolid,
+		FilterOutline
 	} from 'flowbite-svelte-icons';
 	import { useQuery, useConvexClient } from 'convex-svelte';
 	import { api } from '$convex/_generated/api';
 	import { tenantStore } from '$lib/stores';
-	import { StatusBadge, DataTable, type Column } from '$lib/components/ui';
+	import {
+		StatusBadge,
+		DataTable,
+		ActionMenu,
+		createEditAction,
+		createDeleteAction,
+		createCallAction,
+		createEmailAction,
+		filterActions,
+		type Column,
+		type ActionItem
+	} from '$lib/components/ui';
 	import type { Id } from '$convex/_generated/dataModel';
 	import { t } from '$lib/i18n';
 
@@ -139,13 +151,30 @@
 			sortable: true,
 			filterOptions: ['active', 'inactive', 'on_leave'],
 			filterPlaceholder: $t('drivers.filters.statusPlaceholder')
-		},
-		{
-			key: 'actions',
-			label: $t('common.actions'),
-			sortable: false
 		}
 	]);
+
+	// Build actions for a driver row
+	function getDriverActions(driver: typeof drivers[0]): ActionItem[] {
+		return filterActions([
+			// Edit action
+			createEditAction(() => openEditModal(driver), $t('common.edit')),
+
+			// Call actions (with divider)
+			driver.phone
+				? { ...createCallAction(driver.phone, $t('common.call'))!, dividerBefore: true }
+				: null,
+			driver.emergencyContactPhone
+				? createCallAction(driver.emergencyContactPhone, $t('drivers.callEmergencyContact'))
+				: null,
+
+			// Email action
+			createEmailAction(driver.email, $t('common.email')),
+
+			// Delete action
+			createDeleteAction(() => handleDelete(driver._id), false, $t('common.delete'))
+		]);
+	}
 
 	function openCreateModal() {
 		isEditing = false;
@@ -272,16 +301,46 @@
 
 	const drivers = $derived(driversQuery.data || []);
 	const isLoading = $derived(driversQuery.isLoading);
+
+	// Status filter state
+	let statusFilter = $state('');
+
+	// Stats
+	const stats = $derived({
+		total: drivers.length,
+		active: drivers.filter((d) => d.status === 'active').length,
+		inactive: drivers.filter((d) => d.status === 'inactive').length,
+		on_leave: drivers.filter((d) => d.status === 'on_leave').length
+	});
+
+	// Filter functions
+	function filterByStatus(status: string) {
+		statusFilter = status;
+	}
+
+	function clearFilters() {
+		statusFilter = '';
+	}
+
+	// Active filter indicator
+	const activeFilter = $derived(statusFilter);
+
+	// Pre-filtered drivers for DataTable
+	const filteredDrivers = $derived(
+		statusFilter
+			? drivers.filter((d) => d.status === statusFilter)
+			: drivers
+	);
 </script>
 
 <div class="space-y-6">
-	<div class="flex justify-between items-center">
+	<div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
 		<div>
 			<h1 class="text-3xl font-bold text-gray-900 dark:text-white">{$t('drivers.title')}</h1>
 			<p class="text-gray-600 dark:text-gray-400 mt-1">
-				{$t('drivers.subtitle', { values: { count: drivers.length } })}
+				{$t('drivers.subtitle', { values: { count: stats.total } })}
 				{#if tenant && tenant.maxDrivers !== -1}
-					<span class="text-sm">({drivers.length} / {tenant.maxDrivers})</span>
+					<span class="text-sm">({stats.total} / {tenant.maxDrivers})</span>
 				{/if}
 			</p>
 		</div>
@@ -304,6 +363,72 @@
 		</Alert>
 	{/if}
 
+	{#if !isLoading}
+		<!-- Stats Cards -->
+		<div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+			<Card class="max-w-none p-4! {activeFilter === '' ? 'ring-2 ring-primary-500' : ''}">
+				<div class="flex items-start justify-between">
+					<div>
+						<p class="text-sm font-medium text-gray-500 dark:text-gray-400">{$t('common.all')}</p>
+						<p class="text-2xl font-bold text-gray-900 dark:text-white">{stats.total}</p>
+					</div>
+					<button
+						onclick={() => clearFilters()}
+						class="p-1.5 rounded-lg transition-colors {activeFilter === '' ? 'bg-primary-100 text-primary-600 dark:bg-primary-900 dark:text-primary-400' : 'text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-300'}"
+						title={$t('common.clearFilters')}
+					>
+						<FilterOutline class="w-4 h-4" />
+					</button>
+				</div>
+			</Card>
+			<Card class="max-w-none p-4! {activeFilter === 'active' ? 'ring-2 ring-emerald-500' : ''}">
+				<div class="flex items-start justify-between">
+					<div>
+						<p class="text-sm font-medium text-gray-500 dark:text-gray-400">{$t('statuses.active')}</p>
+						<p class="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{stats.active}</p>
+					</div>
+					<button
+						onclick={() => filterByStatus('active')}
+						class="p-1.5 rounded-lg transition-colors {activeFilter === 'active' ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900 dark:text-emerald-400' : 'text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-300'}"
+						title={$t('common.filter')}
+					>
+						<FilterOutline class="w-4 h-4" />
+					</button>
+				</div>
+			</Card>
+			<Card class="max-w-none p-4! {activeFilter === 'on_leave' ? 'ring-2 ring-yellow-500' : ''}">
+				<div class="flex items-start justify-between">
+					<div>
+						<p class="text-sm font-medium text-gray-500 dark:text-gray-400">{$t('statuses.on_leave')}</p>
+						<p class="text-2xl font-bold text-yellow-600 dark:text-yellow-400">{stats.on_leave}</p>
+					</div>
+					<button
+						onclick={() => filterByStatus('on_leave')}
+						class="p-1.5 rounded-lg transition-colors {activeFilter === 'on_leave' ? 'bg-yellow-100 text-yellow-600 dark:bg-yellow-900 dark:text-yellow-400' : 'text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-300'}"
+						title={$t('common.filter')}
+					>
+						<FilterOutline class="w-4 h-4" />
+					</button>
+				</div>
+			</Card>
+			<Card class="max-w-none p-4! {activeFilter === 'inactive' ? 'ring-2 ring-gray-500' : ''}">
+				<div class="flex items-start justify-between">
+					<div>
+						<p class="text-sm font-medium text-gray-500 dark:text-gray-400">{$t('statuses.inactive')}</p>
+						<p class="text-2xl font-bold text-gray-600 dark:text-gray-300">{stats.inactive}</p>
+					</div>
+					<button
+						onclick={() => filterByStatus('inactive')}
+						class="p-1.5 rounded-lg transition-colors {activeFilter === 'inactive' ? 'bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-300' : 'text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-300'}"
+						title={$t('common.filter')}
+					>
+						<FilterOutline class="w-4 h-4" />
+					</button>
+				</div>
+			</Card>
+		</div>
+	{/if}
+
 	<Card class="max-w-none !p-6">
 		{#if isLoading}
 			<div class="flex justify-center py-12">
@@ -319,19 +444,36 @@
 					{$t('drivers.addDriver')}
 				</Button>
 			</div>
+		{:else if filteredDrivers.length === 0}
+			<div class="text-center py-12">
+				<p class="text-gray-500 dark:text-gray-400 mb-4">
+					{$t('common.noResults')}
+				</p>
+				<Button color="alternative" onclick={() => clearFilters()}>
+					{$t('common.clearFilters')}
+				</Button>
+			</div>
 		{:else}
-			<DataTable data={drivers} {columns}>
+			<DataTable data={filteredDrivers} {columns}>
 				{#snippet row(driver)}
 					{@const expiryStatus = getLicenseExpiryStatus(driver.licenseExpiry)}
 					<TableBodyCell>
-						<div class="font-medium text-gray-900 dark:text-white">
-							{driver.firstName} {driver.lastName}
-						</div>
-						{#if driver.hireDate}
-							<div class="text-sm text-gray-500 dark:text-gray-400">
-								Since {formatDate(driver.hireDate)}
+						<div class="flex items-center justify-between gap-2">
+							<div>
+								<div class="font-medium text-gray-900 dark:text-white">
+									{driver.firstName} {driver.lastName}
+								</div>
+								{#if driver.hireDate}
+									<div class="text-sm text-gray-500 dark:text-gray-400">
+										Since {formatDate(driver.hireDate)}
+									</div>
+								{/if}
 							</div>
-						{/if}
+							<ActionMenu
+								triggerId="actions-{driver._id}"
+								actions={getDriverActions(driver)}
+							/>
+						</div>
 					</TableBodyCell>
 					<TableBodyCell>
 						<div class="text-sm">
@@ -361,16 +503,6 @@
 					</TableBodyCell>
 					<TableBodyCell>
 						<StatusBadge status={driver.status} />
-					</TableBodyCell>
-					<TableBodyCell>
-						<div class="flex gap-2">
-							<Button size="xs" color="light" onclick={() => openEditModal(driver)}>
-								<PenOutline class="w-4 h-4" />
-							</Button>
-							<Button size="xs" color="red" outline onclick={() => handleDelete(driver._id)}>
-								<TrashBinOutline class="w-4 h-4" />
-							</Button>
-						</div>
 					</TableBodyCell>
 				{/snippet}
 			</DataTable>

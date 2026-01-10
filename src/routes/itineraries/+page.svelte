@@ -1,28 +1,30 @@
 <script lang="ts">
-	import {
-		Button,
-		Card,
-		TableBodyCell,
-		Dropdown,
-		DropdownItem,
-		Spinner,
-		Toast
-	} from 'flowbite-svelte';
+	import { Button, Card, TableBodyCell, Spinner, Toast } from 'flowbite-svelte';
 	import {
 		PlusOutline,
-		DotsHorizontalOutline,
-		EyeOutline,
-		TrashBinOutline,
 		CheckCircleOutline,
 		CloseCircleOutline,
 		TruckOutline,
 		UserOutline,
-		CalendarMonthOutline
+		CalendarMonthOutline,
+		PlayOutline,
+		FilterOutline
 	} from 'flowbite-svelte-icons';
 	import { useQuery, useConvexClient } from 'convex-svelte';
 	import { api } from '$convex/_generated/api';
 	import { tenantStore } from '$lib/stores';
-	import { StatusBadge, DataTable, type Column } from '$lib/components/ui';
+	import {
+		StatusBadge,
+		DataTable,
+		ActionMenu,
+		type Column,
+		createViewAction,
+		createCallAction,
+		createEmailAction,
+		createDeleteAction,
+		filterActions,
+		type ActionItem
+	} from '$lib/components/ui';
 	import type { Id } from '$convex/_generated/dataModel';
 	import { t } from '$lib/i18n';
 
@@ -61,7 +63,11 @@
 	const vehicles = $derived(vehiclesQuery.data || []);
 	const isLoading = $derived(itinerariesQuery.isLoading);
 
+	// Status filter state
+	let statusFilter = $state('');
+
 	// Table columns configuration (reactive for i18n)
+	// Note: Actions column removed - kebab menu is now in first column
 	const columns = $derived<Column<any>[]>([
 		{
 			key: 'itineraryNumber',
@@ -99,11 +105,6 @@
 			sortable: true,
 			filterOptions: ['scheduled', 'in_progress', 'completed', 'cancelled'],
 			filterPlaceholder: $t('itineraries.filters.statusPlaceholder')
-		},
-		{
-			key: 'actions',
-			label: $t('common.actions'),
-			sortable: false
 		}
 	]);
 
@@ -129,6 +130,58 @@
 		const vehicle = vehicles.find((v) => v._id === vehicleId);
 		if (!vehicle) return 'Unknown';
 		return vehicle.name;
+	}
+
+	// Get driver contact info for Call/Email actions
+	function getDriverContact(driverId: Id<'drivers'> | undefined): { phone?: string; email?: string } {
+		if (!driverId) return {};
+		const driver = drivers.find((d) => d._id === driverId);
+		if (!driver) return {};
+		return {
+			phone: driver.phone || undefined,
+			email: driver.email || undefined
+		};
+	}
+
+	// Build actions for an itinerary row
+	function getItineraryActions(itinerary: typeof itineraries[0]): ActionItem[] {
+		const driverContact = getDriverContact(itinerary.driverId);
+
+		return filterActions([
+			// View action
+			createViewAction(`/itineraries/${itinerary._id}`, $t('itineraries.viewItinerary')),
+
+			// Contact actions (with divider)
+			itinerary.tripLeaderPhone ? {
+				...createCallAction(itinerary.tripLeaderPhone, $t('itineraries.callTripLeader'))!,
+				dividerBefore: true
+			} : null,
+			driverContact.phone ? createCallAction(driverContact.phone, $t('common.callDriver')) : null,
+			itinerary.tripLeaderEmail ? createEmailAction(itinerary.tripLeaderEmail, $t('itineraries.emailTripLeader')) : null,
+
+			// Status actions (with divider)
+			itinerary.status === 'scheduled' ? {
+				id: 'start',
+				label: $t('itineraries.startTrip'),
+				icon: PlayOutline,
+				onClick: () => updateStatus(itinerary._id, 'in_progress'),
+				color: 'success' as const,
+				dividerBefore: true
+			} : null,
+			itinerary.status === 'in_progress' ? {
+				id: 'complete',
+				label: $t('itineraries.completeTrip'),
+				icon: CheckCircleOutline,
+				onClick: () => updateStatus(itinerary._id, 'completed'),
+				color: 'success' as const,
+				dividerBefore: true
+			} : null,
+
+			// Delete action (only for scheduled, with divider)
+			itinerary.status === 'scheduled' ?
+				createDeleteAction(() => handleDelete(itinerary._id), false, $t('common.delete'))
+				: null
+		]);
 	}
 
 	function formatCurrency(value: number): string {
@@ -183,6 +236,25 @@
 		inProgress: itineraries.filter((i) => i.status === 'in_progress').length,
 		completed: itineraries.filter((i) => i.status === 'completed').length
 	});
+
+	// Filter by card click
+	function filterByStatus(status: string) {
+		statusFilter = status;
+	}
+
+	function clearFilters() {
+		statusFilter = '';
+	}
+
+	// Active filter indicator
+	const activeFilter = $derived(statusFilter);
+
+	// Pre-filtered itineraries for DataTable
+	const filteredItineraries = $derived(
+		statusFilter
+			? itineraries.filter((i) => i.status === statusFilter)
+			: itineraries
+	);
 </script>
 
 <div class="space-y-6">
@@ -190,7 +262,7 @@
 		<div>
 			<h1 class="text-3xl font-bold text-gray-900 dark:text-white">{$t('itineraries.title')}</h1>
 			<p class="text-gray-600 dark:text-gray-400 mt-1">
-				{stats.total} total, {stats.scheduled} {$t('itineraries.status.scheduled')}, {stats.inProgress} {$t('itineraries.status.in_progress')}
+				{$t('itineraries.subtitle', { count: stats.total })}
 			</p>
 		</div>
 		<Button href="/itineraries/new">
@@ -199,30 +271,112 @@
 		</Button>
 	</div>
 
-	<Card class="max-w-none !p-6">
-		{#if isLoading}
-			<div class="flex justify-center py-12">
-				<Spinner size="8" />
-			</div>
-		{:else if itineraries.length === 0}
-			<div class="text-center py-12">
-				<p class="text-gray-500 dark:text-gray-400 mb-4">
-					{$t('itineraries.noItineraries')}
-				</p>
-				<Button href="/itineraries/new">
-					<PlusOutline class="w-4 h-4 mr-2" />
-					{$t('itineraries.newItinerary')}
-				</Button>
-			</div>
-		{:else}
-			<DataTable data={itineraries} {columns}>
+	{#if isLoading}
+		<div class="flex justify-center py-12">
+			<Spinner size="8" />
+		</div>
+	{:else}
+		<!-- Stats Cards -->
+		<div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+			<Card class="max-w-none p-4! {activeFilter === '' ? 'ring-2 ring-primary-500' : ''}">
+				<div class="flex items-start justify-between">
+					<div>
+						<p class="text-sm font-medium text-gray-500 dark:text-gray-400">{$t('common.all')}</p>
+						<p class="text-2xl font-bold text-gray-900 dark:text-white">{stats.total}</p>
+					</div>
+					<button
+						onclick={() => clearFilters()}
+						class="p-1.5 rounded-lg transition-colors {activeFilter === '' ? 'bg-primary-100 text-primary-600 dark:bg-primary-900 dark:text-primary-400' : 'text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-300'}"
+						title={$t('common.clearFilters')}
+					>
+						<FilterOutline class="w-4 h-4" />
+					</button>
+				</div>
+			</Card>
+			<Card class="max-w-none p-4! {activeFilter === 'scheduled' ? 'ring-2 ring-blue-500' : ''}">
+				<div class="flex items-start justify-between">
+					<div>
+						<p class="text-sm font-medium text-gray-500 dark:text-gray-400">{$t('itineraries.status.scheduled')}</p>
+						<p class="text-2xl font-bold text-blue-600 dark:text-blue-400">{stats.scheduled}</p>
+					</div>
+					<button
+						onclick={() => filterByStatus('scheduled')}
+						class="p-1.5 rounded-lg transition-colors {activeFilter === 'scheduled' ? 'bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-400' : 'text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-300'}"
+						title={$t('common.filter')}
+					>
+						<FilterOutline class="w-4 h-4" />
+					</button>
+				</div>
+			</Card>
+			<Card class="max-w-none p-4! {activeFilter === 'in_progress' ? 'ring-2 ring-amber-500' : ''}">
+				<div class="flex items-start justify-between">
+					<div>
+						<p class="text-sm font-medium text-gray-500 dark:text-gray-400">{$t('itineraries.status.in_progress')}</p>
+						<p class="text-2xl font-bold text-amber-600 dark:text-amber-400">{stats.inProgress}</p>
+					</div>
+					<button
+						onclick={() => filterByStatus('in_progress')}
+						class="p-1.5 rounded-lg transition-colors {activeFilter === 'in_progress' ? 'bg-amber-100 text-amber-600 dark:bg-amber-900 dark:text-amber-400' : 'text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-300'}"
+						title={$t('common.filter')}
+					>
+						<FilterOutline class="w-4 h-4" />
+					</button>
+				</div>
+			</Card>
+			<Card class="max-w-none p-4! {activeFilter === 'completed' ? 'ring-2 ring-emerald-500' : ''}">
+				<div class="flex items-start justify-between">
+					<div>
+						<p class="text-sm font-medium text-gray-500 dark:text-gray-400">{$t('itineraries.status.completed')}</p>
+						<p class="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{stats.completed}</p>
+					</div>
+					<button
+						onclick={() => filterByStatus('completed')}
+						class="p-1.5 rounded-lg transition-colors {activeFilter === 'completed' ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900 dark:text-emerald-400' : 'text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-300'}"
+						title={$t('common.filter')}
+					>
+						<FilterOutline class="w-4 h-4" />
+					</button>
+				</div>
+			</Card>
+		</div>
+
+		<Card class="max-w-none !p-6">
+			{#if itineraries.length === 0}
+				<div class="text-center py-12">
+					<p class="text-gray-500 dark:text-gray-400 mb-4">
+						{$t('itineraries.noItineraries')}
+					</p>
+					<Button href="/itineraries/new">
+						<PlusOutline class="w-4 h-4 mr-2" />
+						{$t('itineraries.newItinerary')}
+					</Button>
+				</div>
+			{:else if filteredItineraries.length === 0}
+				<div class="text-center py-12">
+					<p class="text-gray-500 dark:text-gray-400 mb-4">
+						{$t('common.noResults')}
+					</p>
+					<Button color="alternative" onclick={() => clearFilters()}>
+						{$t('common.clearFilters')}
+					</Button>
+				</div>
+			{:else}
+				<DataTable data={filteredItineraries} {columns}>
 				{#snippet row(itinerary)}
 					<TableBodyCell>
-						<div class="font-mono font-medium text-gray-900 dark:text-white">
-							{itinerary.itineraryDisplayName || itinerary.itineraryNumber}
-						</div>
-						<div class="text-xs text-gray-500 dark:text-gray-400">
-							{getClientName(itinerary.clientId)}
+						<div class="flex items-center justify-between gap-2">
+							<div>
+								<div class="font-mono font-medium text-gray-900 dark:text-white">
+									{itinerary.itineraryDisplayName || itinerary.itineraryNumber}
+								</div>
+								<div class="text-xs text-gray-500 dark:text-gray-400">
+									{getClientName(itinerary.clientId)}
+								</div>
+							</div>
+							<ActionMenu
+								triggerId="actions-{itinerary._id}"
+								actions={getItineraryActions(itinerary)}
+							/>
 						</div>
 					</TableBodyCell>
 					<TableBodyCell>
@@ -231,7 +385,7 @@
 								{itinerary.origin}
 							</div>
 							<div class="text-gray-500 dark:text-gray-400 truncate max-w-[200px]">
-								{itinerary.destination}
+								→ {itinerary.destination}
 							</div>
 						</div>
 					</TableBodyCell>
@@ -269,39 +423,11 @@
 					<TableBodyCell>
 						<StatusBadge status={itinerary.status} variant="itinerary" />
 					</TableBodyCell>
-					<TableBodyCell>
-						<Button size="xs" color="light" id="actions-{itinerary._id}">
-							<DotsHorizontalOutline class="w-4 h-4" />
-						</Button>
-						<Dropdown triggeredBy="#actions-{itinerary._id}" class="w-48">
-							<DropdownItem href="/itineraries/{itinerary._id}" class="text-gray-700 dark:text-gray-200">
-								<EyeOutline class="w-4 h-4 mr-2 inline" />
-								{$t('itineraries.viewItinerary')}
-							</DropdownItem>
-							{#if itinerary.status === 'scheduled'}
-								<DropdownItem onclick={() => updateStatus(itinerary._id, 'in_progress')} class="text-gray-700 dark:text-gray-200">
-									<CheckCircleOutline class="w-4 h-4 mr-2 inline" />
-									{$t('itineraries.startTrip')}
-								</DropdownItem>
-							{/if}
-							{#if itinerary.status === 'in_progress'}
-								<DropdownItem onclick={() => updateStatus(itinerary._id, 'completed')} class="text-gray-700 dark:text-gray-200">
-									<CheckCircleOutline class="w-4 h-4 mr-2 inline" />
-									{$t('itineraries.completeTrip')}
-								</DropdownItem>
-							{/if}
-							{#if itinerary.status === 'scheduled'}
-								<DropdownItem class="text-red-600 dark:text-red-400" onclick={() => handleDelete(itinerary._id)}>
-									<TrashBinOutline class="w-4 h-4 mr-2 inline" />
-									{$t('common.delete')}
-								</DropdownItem>
-							{/if}
-						</Dropdown>
-					</TableBodyCell>
 				{/snippet}
 			</DataTable>
 		{/if}
-	</Card>
+		</Card>
+	{/if}
 </div>
 
 <!-- Toast notifications -->
