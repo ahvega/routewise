@@ -18,7 +18,7 @@ import type {
 	ICostCalculationService
 } from '$lib/types';
 import { DEFAULT_SYSTEM_PARAMETERS, TOLL_COSTS, ErrorType } from '$lib/types';
-import { convertDistance, convertFuelEfficiency } from '$lib/utils';
+import { convertDistance, convertFuelEfficiency, normalizeFuelPrice, type FuelPriceUnit } from '$lib/utils';
 
 /**
  * Fuel calculation utilities
@@ -26,12 +26,20 @@ import { convertDistance, convertFuelEfficiency } from '$lib/utils';
 export class FuelCalculator {
 	/**
 	 * Calculate fuel costs based on distance and vehicle specifications
+	 * @param distance - Distance in km
+	 * @param vehicle - Vehicle with fuel efficiency specs
+	 * @param fuelPrice - Price per unit of fuel
+	 * @param fuelPriceUnit - Unit of fuel price ('gallon' | 'liter'). Defaults to 'gallon'.
 	 */
 	calculateFuelCosts(
 		distance: number,
 		vehicle: Vehicle,
-		fuelPrice: number
+		fuelPrice: number,
+		fuelPriceUnit: FuelPriceUnit = 'gallon'
 	): FuelCosts {
+		// Normalize fuel price to per-gallon (internal calculation unit)
+		const fuelPricePerGallon = normalizeFuelPrice(fuelPrice, fuelPriceUnit, 'gallon');
+
 		// Convert distance to vehicle's preferred unit
 		const distanceInVehicleUnit = convertDistance(
 			distance,
@@ -51,24 +59,32 @@ export class FuelCalculator {
 		// Calculate fuel consumption in gallons
 		const consumption = distanceInVehicleUnit / efficiencyInVehicleUnit;
 
-		// Calculate total fuel cost
-		const cost = consumption * fuelPrice;
+		// Calculate total fuel cost (using normalized price per gallon)
+		const cost = consumption * fuelPricePerGallon;
 
 		return {
 			consumption: Math.round(consumption * 100) / 100,
 			cost: Math.round(cost * 100) / 100,
-			pricePerUnit: fuelPrice
+			pricePerUnit: fuelPricePerGallon // Return the normalized price per gallon
 		};
 	}
 
 	/**
 	 * Calculate refueling costs for long-distance trips
+	 * @param distance - Distance in km
+	 * @param vehicle - Vehicle with fuel capacity specs
+	 * @param fuelPrice - Price per unit of fuel
+	 * @param fuelPriceUnit - Unit of fuel price ('gallon' | 'liter'). Defaults to 'gallon'.
 	 */
 	calculateRefuelingCosts(
 		distance: number,
 		vehicle: Vehicle,
-		fuelPrice: number
+		fuelPrice: number,
+		fuelPriceUnit: FuelPriceUnit = 'gallon'
 	): RefuelingCosts {
+		// Normalize fuel price to per-gallon (internal calculation unit)
+		const fuelPricePerGallon = normalizeFuelPrice(fuelPrice, fuelPriceUnit, 'gallon');
+
 		// Convert distance to vehicle's preferred unit
 		const distanceInVehicleUnit = convertDistance(
 			distance,
@@ -89,8 +105,8 @@ export class FuelCalculator {
 		// Calculate number of refueling stops needed
 		const stops = Math.max(0, Math.floor(distanceInVehicleUnit / autonomy) - 1);
 
-		// Cost per refueling stop (full tank)
-		const costPerStop = vehicle.fuelCapacity * fuelPrice;
+		// Cost per refueling stop (full tank) - using normalized price per gallon
+		const costPerStop = vehicle.fuelCapacity * fuelPricePerGallon;
 
 		const total = stops * costPerStop;
 
@@ -303,14 +319,18 @@ export class CostCalculationService implements ICostCalculationService {
 			estimatedDays ||
 			this.driverExpenseCalculator.calculateDaysFromDuration(route.totalTime);
 
+		// Get fuel price unit (default to 'gallon' for backward compatibility)
+		const fuelPriceUnit = (params.fuelPriceUnit as FuelPriceUnit) || 'gallon';
+
 		// Calculate all cost components
-		const fuel = this.calculateFuelCosts(totalDistance, vehicle, params.fuelPrice);
+		const fuel = this.calculateFuelCosts(totalDistance, vehicle, params.fuelPrice, fuelPriceUnit);
 		const driver = this.calculateDriverExpenses(days, params, includeDriverIncentive);
 		const vehicleCosts = this.calculateVehicleCosts(totalDistance, days, vehicle);
 		const refueling = this.fuelCalculator.calculateRefuelingCosts(
 			totalDistance,
 			vehicle,
-			params.fuelPrice
+			params.fuelPrice,
+			fuelPriceUnit
 		);
 		const tolls = this.tollCalculator.calculateTollCosts(
 			route.segments[0]?.origin || '',
@@ -339,14 +359,19 @@ export class CostCalculationService implements ICostCalculationService {
 
 	/**
 	 * Calculate fuel costs
+	 * @param distance - Distance in km
+	 * @param vehicle - Vehicle with fuel efficiency specs
+	 * @param fuelPrice - Price per unit of fuel
+	 * @param fuelPriceUnit - Unit of fuel price ('gallon' | 'liter'). Defaults to 'gallon'.
 	 */
 	calculateFuelCosts(
 		distance: number,
 		vehicle: Vehicle,
-		fuelPrice?: number
+		fuelPrice?: number,
+		fuelPriceUnit: FuelPriceUnit = 'gallon'
 	): FuelCosts {
 		const price = fuelPrice || DEFAULT_SYSTEM_PARAMETERS.fuelPrice;
-		return this.fuelCalculator.calculateFuelCosts(distance, vehicle, price);
+		return this.fuelCalculator.calculateFuelCosts(distance, vehicle, price, fuelPriceUnit);
 	}
 
 	/**

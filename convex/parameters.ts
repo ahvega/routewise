@@ -56,6 +56,7 @@ export const create = mutation({
     // Operating costs
     fuelPrice: v.number(),
     fuelPriceCurrency: v.optional(v.string()),
+    fuelPriceUnit: v.optional(v.string()), // 'gallon' | 'liter'
     mealCostPerDay: v.number(),
     mealCostCurrency: v.optional(v.string()),
     hotelCostPerNight: v.number(),
@@ -131,6 +132,7 @@ export const create = mutation({
       pricingLevels,
       licenseCategories,
       fuelPriceCurrency: args.fuelPriceCurrency || localCurrency,
+      fuelPriceUnit: args.fuelPriceUnit || 'gallon', // Default to gallon for backward compatibility
       mealCostCurrency: args.mealCostCurrency || localCurrency,
       hotelCostCurrency: args.hotelCostCurrency || localCurrency,
       driverIncentiveCurrency: args.driverIncentiveCurrency || localCurrency,
@@ -154,6 +156,7 @@ export const update = mutation({
     // Operating costs
     fuelPrice: v.optional(v.number()),
     fuelPriceCurrency: v.optional(v.string()),
+    fuelPriceUnit: v.optional(v.string()), // 'gallon' | 'liter'
     mealCostPerDay: v.optional(v.number()),
     mealCostCurrency: v.optional(v.string()),
     hotelCostPerNight: v.optional(v.number()),

@@ -1542,7 +1542,17 @@ export interface ExpenseAdvancePdfData {
   company: {
     name: string;
     logo?: string;
+    address?: string;
+    city?: string;
+    phone?: string;
+    email?: string;
+    websiteUrl?: string;
   };
+
+  // Additional parameters
+  fuelPriceUnit?: string;
+  fuelPrice?: number;
+  hotelCostPerNight?: number;
 }
 
 // Expense advance specific styles
@@ -1562,15 +1572,15 @@ const expenseAdvanceStyles = `
   .container {
     max-width: 800px;
     margin: 0 auto;
-    padding: 15px 20px;
+    padding: 10px 15px;
   }
   /* Header */
   .advance-header {
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
-    margin-bottom: 15px;
-    padding-bottom: 10px;
+    margin-bottom: 8px;
+    padding-bottom: 6px;
     border-bottom: 2px solid #333;
   }
   .logo-area {
@@ -1579,6 +1589,24 @@ const expenseAdvanceStyles = `
   .logo-area img {
     max-height: 45px;
     max-width: 90px;
+  }
+  .company-info {
+    flex: 1;
+    padding-left: 15px;
+  }
+  .company-name {
+    font-size: 14px;
+    font-weight: bold;
+    color: #333;
+    margin-bottom: 3px;
+  }
+  .company-details {
+    font-size: 9px;
+    color: #666;
+    line-height: 1.4;
+  }
+  .company-details span {
+    display: block;
   }
   .exchange-rate {
     font-size: 11px;
@@ -1614,8 +1642,8 @@ const expenseAdvanceStyles = `
     font-size: 14px;
     font-weight: bold;
     text-align: center;
-    padding: 8px 15px;
-    margin-bottom: 10px;
+    padding: 5px 10px;
+    margin-bottom: 6px;
   }
   .document-title .currency-label {
     font-weight: normal;
@@ -1631,11 +1659,11 @@ const expenseAdvanceStyles = `
     grid-template-columns: 1fr 1fr 1fr;
     gap: 0;
     border: 1px solid #333;
-    margin-bottom: 10px;
+    margin-bottom: 6px;
     font-size: 10px;
   }
   .info-cell {
-    padding: 6px 10px;
+    padding: 4px 8px;
     border-right: 1px solid #333;
   }
   .info-cell:last-child {
@@ -1662,8 +1690,8 @@ const expenseAdvanceStyles = `
     font-size: 11px;
     font-weight: bold;
     text-align: center;
-    padding: 5px 10px;
-    margin: 10px 0 0 0;
+    padding: 3px 8px;
+    margin: 6px 0 0 0;
     border: 1px solid #fcd34d;
   }
   /* Tables */
@@ -1675,14 +1703,14 @@ const expenseAdvanceStyles = `
   .data-table th {
     background: #fef3c7;
     color: #333;
-    padding: 5px 6px;
+    padding: 3px 4px;
     text-align: center;
     font-weight: 600;
     border: 1px solid #e5e7eb;
     font-size: 9px;
   }
   .data-table td {
-    padding: 4px 6px;
+    padding: 2px 4px;
     border: 1px solid #e5e7eb;
     vertical-align: middle;
   }
@@ -1804,7 +1832,7 @@ function formatAdvanceDate(dateInput: string | number): string {
 // Generate viáticos table HTML
 function generateViaticosTableHtml(viaticos: ExpenseAdvanceViatico[], currency: 'HNL' | 'USD'): string {
   const currencySymbol = currency === 'USD' ? '$' : 'L';
-  const lodgingLabel = currency === 'USD' ? 'Hotel' : 'Bus';
+  const lodgingLabel = 'Hotel'; // Always show "Hotel" regardless of currency
 
   // Calculate totals
   const totals = viaticos.reduce((acc, v) => ({
@@ -1835,24 +1863,24 @@ function generateViaticosTableHtml(viaticos: ExpenseAdvanceViatico[], currency: 
     </tr>
   `).join('');
 
-  // Add empty rows to fill space (up to 7 rows)
-  const emptyRowsCount = Math.max(0, 7 - viaticos.length);
+  // Add empty rows to fill space (blank for hand-filling)
+  const emptyRowsCount = Math.max(0, 5 - viaticos.length);
   const emptyRows = Array(emptyRowsCount).fill(`
     <tr>
       <td class="date-col"></td>
       <td></td>
-      <td class="currency-symbol">${currencySymbol}</td>
-      <td class="number empty">-</td>
-      <td class="currency-symbol">${currencySymbol}</td>
-      <td class="number empty">-</td>
-      <td class="currency-symbol">${currencySymbol}</td>
-      <td class="number empty">-</td>
-      <td class="currency-symbol">${currencySymbol}</td>
-      <td class="number empty">-</td>
-      <td class="currency-symbol">${currencySymbol}</td>
-      <td class="number empty">-</td>
-      <td class="currency-symbol">${currencySymbol}</td>
-      <td class="number empty">-</td>
+      <td class="currency-symbol"></td>
+      <td class="number"></td>
+      <td class="currency-symbol"></td>
+      <td class="number"></td>
+      <td class="currency-symbol"></td>
+      <td class="number"></td>
+      <td class="currency-symbol"></td>
+      <td class="number"></td>
+      <td class="currency-symbol"></td>
+      <td class="number"></td>
+      <td class="currency-symbol"></td>
+      <td class="number"></td>
     </tr>
   `).join('');
 
@@ -1903,18 +1931,18 @@ function generateGastosTableHtml(gastos: ExpenseAdvanceGasto[], currency: 'HNL' 
     </tr>
   `).join('');
 
-  // Add empty rows
-  const emptyRowsCount = Math.max(0, 5 - gastos.length);
+  // Add empty rows (blank for hand-filling)
+  const emptyRowsCount = Math.max(0, 4 - gastos.length);
   const emptyRows = Array(emptyRowsCount).fill(`
     <tr>
       <td class="date-col"></td>
       <td></td>
       <td></td>
-      <td class="number empty">-</td>
-      <td class="currency-symbol">${currencySymbol}</td>
-      <td class="number empty">-</td>
-      <td class="currency-symbol">${currencySymbol}</td>
-      <td class="number empty">-</td>
+      <td class="number"></td>
+      <td class="currency-symbol"></td>
+      <td class="number"></td>
+      <td class="currency-symbol"></td>
+      <td class="number"></td>
     </tr>
   `).join('');
 
@@ -1962,8 +1990,8 @@ function generateLiquidacionTableHtml(liquidacion: ExpenseAdvanceLiquidacion[], 
     </tr>
   `).join('');
 
-  // Add empty rows for settlement
-  const emptyRowsCount = Math.max(0, 8 - liquidacion.length);
+  // Add empty rows for settlement (blank for hand-filling)
+  const emptyRowsCount = Math.max(0, 6 - liquidacion.length);
   const emptyRows = Array(emptyRowsCount).fill(`
     <tr>
       <td class="date-col"></td>
@@ -1972,8 +2000,8 @@ function generateLiquidacionTableHtml(liquidacion: ExpenseAdvanceLiquidacion[], 
       <td class="number"></td>
       <td class="currency-symbol"></td>
       <td class="number"></td>
-      <td class="currency-symbol">${currencySymbol}</td>
-      <td class="number empty">-</td>
+      <td class="currency-symbol"></td>
+      <td class="number"></td>
     </tr>
   `).join('');
 
@@ -2021,6 +2049,15 @@ export function generateExpenseAdvanceHtml(data: ExpenseAdvancePdfData): string 
     <div class="advance-header">
       <div class="logo-area">
         ${data.company.logo ? `<img src="${data.company.logo}" alt="Logo" />` : ''}
+      </div>
+      <div class="company-info">
+        <div class="company-name">${data.company.name}</div>
+        <div class="company-details">
+          ${data.company.address ? `<span>${data.company.address}${data.company.city ? `, ${data.company.city}` : ''}</span>` : ''}
+          ${data.company.phone ? `<span>Tel: ${data.company.phone}</span>` : ''}
+          ${data.company.email ? `<span>${data.company.email}</span>` : ''}
+          ${data.company.websiteUrl ? `<span>${data.company.websiteUrl}</span>` : ''}
+        </div>
       </div>
       ${data.exchangeRate ? `
       <div class="exchange-rate">

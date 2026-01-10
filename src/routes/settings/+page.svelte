@@ -72,6 +72,7 @@
 		// Operating costs
 		fuelPrice: 110,
 		fuelPriceCurrency: 'HNL',
+		fuelPriceUnit: 'gallon' as 'gallon' | 'liter',
 		mealCostPerDay: 250,
 		mealCostCurrency: 'HNL',
 		hotelCostPerNight: 800,
@@ -151,6 +152,7 @@
 				preferredCurrency: params.preferredCurrency,
 				fuelPrice: params.fuelPrice,
 				fuelPriceCurrency: params.fuelPriceCurrency || localCurr,
+				fuelPriceUnit: (params.fuelPriceUnit as 'gallon' | 'liter') || 'gallon',
 				mealCostPerDay: params.mealCostPerDay,
 				mealCostCurrency: params.mealCostCurrency || localCurr,
 				hotelCostPerNight: params.hotelCostPerNight,
@@ -225,6 +227,7 @@
 					preferredCurrency: formData.preferredCurrency,
 					fuelPrice: formData.fuelPrice,
 					fuelPriceCurrency: formData.fuelPriceCurrency,
+					fuelPriceUnit: formData.fuelPriceUnit,
 					mealCostPerDay: formData.mealCostPerDay,
 					mealCostCurrency: formData.mealCostCurrency,
 					hotelCostPerNight: formData.hotelCostPerNight,
@@ -248,6 +251,7 @@
 					preferredCurrency: formData.preferredCurrency,
 					fuelPrice: formData.fuelPrice,
 					fuelPriceCurrency: formData.fuelPriceCurrency,
+					fuelPriceUnit: formData.fuelPriceUnit,
 					mealCostPerDay: formData.mealCostPerDay,
 					mealCostCurrency: formData.mealCostCurrency,
 					hotelCostPerNight: formData.hotelCostPerNight,
@@ -599,14 +603,18 @@
 							<Label for="fuelPrice">Precio Combustible ({formData.fuelPriceCurrency})</Label>
 							<div class="flex gap-2">
 								<Input id="fuelPrice" type="number" bind:value={formData.fuelPrice} step="0.01" min="0" class="flex-1" />
-								<Select value={formData.fuelPriceCurrency} onchange={handleFuelCurrencyChange} class="w-28">
+								<Select value={formData.fuelPriceCurrency} onchange={handleFuelCurrencyChange} class="w-24">
 									{#each currencyOptions as opt}
 										<option value={opt.value}>{opt.value}</option>
 									{/each}
 								</Select>
+								<Select bind:value={formData.fuelPriceUnit} class="w-24">
+									<option value="gallon">Galón</option>
+									<option value="liter">Litro</option>
+								</Select>
 							</div>
 							<Helper class="mt-1">
-								{formatCurrency(fuelConverted.local, formData.localCurrency)} / ${fuelConverted.usd.toFixed(2)} USD por galón
+								{formatCurrency(fuelConverted.local, formData.localCurrency)} / ${fuelConverted.usd.toFixed(2)} USD por {formData.fuelPriceUnit === 'gallon' ? 'galón' : 'litro'}
 							</Helper>
 						</div>
 

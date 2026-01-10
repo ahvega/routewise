@@ -196,7 +196,7 @@
 	{/if}
 
 	<!-- Filters -->
-	<Card class="!p-4">
+	<Card class="max-w-none !p-4">
 		<div class="flex flex-col md:flex-row gap-4">
 			<div class="flex-1">
 				<Input
@@ -217,7 +217,7 @@
 	</Card>
 
 	<!-- Advances Table -->
-	<Card class="!p-0 overflow-hidden">
+	<Card class="max-w-none !p-0 overflow-hidden">
 		{#if advancesQuery.isLoading}
 			<div class="flex items-center justify-center p-8">
 				<Spinner size="8" />

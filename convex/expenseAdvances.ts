@@ -118,6 +118,12 @@ export const createFromItinerary = mutation({
     estimatedLodging: v.optional(v.number()),
     estimatedTolls: v.optional(v.number()),
     estimatedOther: v.optional(v.number()),
+    // Detailed breakdown fields
+    estimatedFuelGallons: v.optional(v.number()), // Fuel quantity in gallons
+    fuelPriceUsed: v.optional(v.number()), // Fuel price at time of creation
+    fuelPriceUnit: v.optional(v.string()), // 'gallon' | 'liter' - Unit used for fuel price
+    tripDays: v.optional(v.number()), // Number of trip days
+    tripNights: v.optional(v.number()), // Number of nights for lodging
     purpose: v.optional(v.string()),
     notes: v.optional(v.string()),
     saveAsDraft: v.optional(v.boolean()), // If true, saves as draft instead of pending
@@ -176,6 +182,12 @@ export const createFromItinerary = mutation({
       estimatedLodging,
       estimatedTolls,
       estimatedOther,
+      // Detailed breakdown fields
+      estimatedFuelGallons: args.estimatedFuelGallons,
+      fuelPriceUsed: args.fuelPriceUsed,
+      fuelPriceUnit: args.fuelPriceUnit,
+      tripDays: args.tripDays,
+      tripNights: args.tripNights,
       status,
       notes: args.notes,
       createdAt: now,
@@ -204,6 +216,12 @@ export const create = mutation({
     estimatedLodging: v.optional(v.number()),
     estimatedTolls: v.optional(v.number()),
     estimatedOther: v.optional(v.number()),
+    // Detailed breakdown fields
+    estimatedFuelGallons: v.optional(v.number()), // Fuel quantity in gallons
+    fuelPriceUsed: v.optional(v.number()), // Fuel price at time of creation
+    fuelPriceUnit: v.optional(v.string()), // 'gallon' | 'liter' - Unit used for fuel price
+    tripDays: v.optional(v.number()), // Number of trip days
+    tripNights: v.optional(v.number()), // Number of nights for lodging
     notes: v.optional(v.string()),
     saveAsDraft: v.optional(v.boolean()), // If true, saves as draft instead of pending
   },
@@ -235,6 +253,12 @@ export const create = mutation({
       estimatedLodging: args.estimatedLodging,
       estimatedTolls: args.estimatedTolls,
       estimatedOther: args.estimatedOther,
+      // Detailed breakdown fields
+      estimatedFuelGallons: args.estimatedFuelGallons,
+      fuelPriceUsed: args.fuelPriceUsed,
+      fuelPriceUnit: args.fuelPriceUnit,
+      tripDays: args.tripDays,
+      tripNights: args.tripNights,
       notes: args.notes,
       status,
       createdAt: now,
@@ -257,6 +281,12 @@ export const update = mutation({
     estimatedLodging: v.optional(v.number()),
     estimatedTolls: v.optional(v.number()),
     estimatedOther: v.optional(v.number()),
+    // Detailed breakdown fields
+    estimatedFuelGallons: v.optional(v.number()),
+    fuelPriceUsed: v.optional(v.number()),
+    fuelPriceUnit: v.optional(v.string()),
+    tripDays: v.optional(v.number()),
+    tripNights: v.optional(v.number()),
     notes: v.optional(v.string()),
     internalNotes: v.optional(v.string()),
   },
@@ -534,6 +564,7 @@ export const calculateSuggestedAdvance = query({
 
     // Get active parameters for fuel price
     let fuelPrice = 0;
+    let fuelPriceUnit: 'gallon' | 'liter' = 'gallon'; // Default to gallon for backward compatibility
     const parameters = await ctx.db
       .query("parameters")
       .withIndex("by_tenant", (q) => q.eq("tenantId", itinerary.tenantId))
@@ -541,7 +572,15 @@ export const calculateSuggestedAdvance = query({
       .first();
     if (parameters) {
       fuelPrice = parameters.fuelPrice;
+      fuelPriceUnit = (parameters.fuelPriceUnit as 'gallon' | 'liter') || 'gallon';
     }
+
+    // Normalize fuel price to per-gallon for calculations (extraGallons is in gallons)
+    // 1 gallon = 3.78541 liters
+    const LITERS_PER_GALLON = 3.78541;
+    const fuelPricePerGallon = fuelPriceUnit === 'liter'
+      ? fuelPrice * LITERS_PER_GALLON
+      : fuelPrice;
 
     // Try to get quotation for cost breakdown (use local currency values)
     let totalFuelCost = 0;
@@ -605,8 +644,8 @@ export const calculateSuggestedAdvance = query({
         const extraDistance = tripDistance - safeRange;
         // Calculate extra fuel needed (in gallons)
         const extraGallons = extraDistance / fuelEfficiencyKmPerGallon;
-        // Calculate cost of extra fuel
-        fuelAdvance = extraGallons * fuelPrice;
+        // Calculate cost of extra fuel (using normalized price per gallon)
+        fuelAdvance = extraGallons * fuelPricePerGallon;
         extraFuelNeeded = extraGallons;
       }
       // If trip is within safe range, no fuel advance needed (starts with full tank)
@@ -617,6 +656,10 @@ export const calculateSuggestedAdvance = query({
 
     const totalSuggested = fuelAdvance + mealsCost + lodgingCost + tollCost;
 
+    // Calculate trip days and nights from itinerary
+    const tripDays = itinerary.estimatedDays || Math.ceil((itinerary.totalTime || 0) / (8 * 60));
+    const tripNights = tripDays > 1 ? tripDays - 1 : 0;
+
     return {
       // Fuel breakdown
       estimatedFuel: Math.round(fuelAdvance),
@@ -626,6 +669,13 @@ export const calculateSuggestedAdvance = query({
       extraFuelNeeded: Math.round(extraFuelNeeded * 100) / 100, // Gallons with 2 decimals
       tripDistance: itinerary.totalDistance,
       fuelAdvanceNeeded: fuelAdvance > 0, // Flag to indicate if fuel advance is needed
+      // Fuel price details (for detailed breakdown)
+      fuelPriceUsed: fuelPrice, // Original fuel price from parameters
+      fuelPriceUnit, // 'gallon' | 'liter' - Unit of fuel price
+      fuelPricePerGallon, // Normalized price per gallon used in calculation
+      // Trip duration (for detailed breakdown)
+      tripDays, // Number of trip days
+      tripNights, // Number of nights for lodging
       // Other costs
       estimatedMeals: mealsCost,
       estimatedLodging: lodgingCost,

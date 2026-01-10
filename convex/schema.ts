@@ -120,6 +120,7 @@ export default defineSchema({
     // Operating costs (stored in local currency)
     fuelPrice: v.number(),
     fuelPriceCurrency: v.optional(v.string()), // Currency of fuelPrice
+    fuelPriceUnit: v.optional(v.string()), // 'gallon' | 'liter' - Unit for fuel price (default: gallon)
     mealCostPerDay: v.number(),
     mealCostCurrency: v.optional(v.string()),
     hotelCostPerNight: v.number(),
@@ -575,6 +576,12 @@ export default defineSchema({
     estimatedLodging: v.optional(v.number()),
     estimatedTolls: v.optional(v.number()),
     estimatedOther: v.optional(v.number()),
+    // Detailed breakdown for PDF and UI
+    estimatedFuelGallons: v.optional(v.number()), // Fuel quantity in gallons
+    fuelPriceUsed: v.optional(v.number()), // Fuel price at time of creation
+    fuelPriceUnit: v.optional(v.string()), // 'gallon' | 'liter' - Unit used for fuel price
+    tripDays: v.optional(v.number()), // Number of trip days for meal/lodging calculation
+    tripNights: v.optional(v.number()), // Number of nights for lodging
     // Status workflow: draft → pending → approved → disbursed → settled
     status: v.string(), // 'draft' | 'pending' | 'approved' | 'disbursed' | 'settled' | 'cancelled'
     approvedBy: v.optional(v.id("users")),

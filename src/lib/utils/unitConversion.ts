@@ -122,3 +122,60 @@ export function calculateFuelConsumption(
 	// Return gallons needed
 	return distanceKm / kpg;
 }
+
+// Conversion constant: 1 gallon = 3.78541 liters
+export const LITERS_PER_GALLON = 3.78541;
+export const GALLONS_PER_LITER = 1 / LITERS_PER_GALLON;
+
+export type FuelPriceUnit = 'gallon' | 'liter';
+
+/**
+ * Normalize fuel price between gallon and liter units
+ * Used to convert fuel prices stored in different units to a consistent unit for calculations
+ */
+export function normalizeFuelPrice(
+	price: number,
+	fromUnit: FuelPriceUnit,
+	toUnit: FuelPriceUnit
+): number {
+	if (fromUnit === toUnit) return price;
+
+	if (fromUnit === 'liter' && toUnit === 'gallon') {
+		// Price per liter to price per gallon: multiply by liters per gallon
+		return price * LITERS_PER_GALLON;
+	}
+
+	// Price per gallon to price per liter: divide by liters per gallon
+	return price / LITERS_PER_GALLON;
+}
+
+/**
+ * Get display label for fuel price unit
+ */
+export function getFuelPriceUnitLabel(unit: FuelPriceUnit): string {
+	return unit === 'gallon' ? 'per Gallon' : 'per Liter';
+}
+
+/**
+ * Get short label for fuel price unit
+ */
+export function getFuelPriceUnitShort(unit: FuelPriceUnit): string {
+	return unit === 'gallon' ? '/gal' : '/L';
+}
+
+/**
+ * Convert fuel volume between gallons and liters
+ */
+export function convertFuelVolume(
+	value: number,
+	fromUnit: FuelPriceUnit,
+	toUnit: FuelPriceUnit
+): number {
+	if (fromUnit === toUnit) return value;
+
+	if (fromUnit === 'gallon' && toUnit === 'liter') {
+		return value * LITERS_PER_GALLON;
+	}
+
+	return value * GALLONS_PER_LITER;
+}

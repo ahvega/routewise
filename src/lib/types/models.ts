@@ -40,12 +40,16 @@ export interface LegacyVehicle {
 	actualizado: string;
 }
 
+// Fuel price unit type
+export type FuelPriceUnitType = 'gallon' | 'liter';
+
 // System Parameters Model - Enhanced for SaaS multi-tenancy
 export interface SystemParameters {
 	id?: string;
 	tenantId?: string;
 	year: number;
 	fuelPrice: number;
+	fuelPriceUnit?: FuelPriceUnitType; // 'gallon' | 'liter' - Unit for fuel price
 	mealCostPerDay: number;
 	hotelCostPerNight: number;
 	driverIncentivePerDay: number;

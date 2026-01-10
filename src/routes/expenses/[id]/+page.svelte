@@ -4,6 +4,7 @@
 	import { useQuery, useConvexClient } from 'convex-svelte';
 	import { api } from '$convex/_generated/api';
 	import type { Id } from '$convex/_generated/dataModel';
+	import { tenantStore } from '$lib/stores';
 	import {
 		Card,
 		Button,
@@ -13,7 +14,15 @@
 		Textarea,
 		Select,
 		Spinner,
-		Toast
+		Toast,
+		Accordion,
+		AccordionItem,
+		Table,
+		TableHead,
+		TableHeadCell,
+		TableBody,
+		TableBodyRow,
+		TableBodyCell
 	} from 'flowbite-svelte';
 	import {
 		ArrowLeftOutline,
@@ -29,7 +38,11 @@
 		PaperPlaneOutline,
 		TrashBinOutline,
 		FilePdfOutline,
-		DownloadOutline
+		DownloadOutline,
+		FireOutline,
+		BuildingOutline,
+		MapPinAltOutline,
+		DotsHorizontalOutline
 	} from 'flowbite-svelte-icons';
 	import { t } from '$lib/i18n';
 	import StatusBadge from '$lib/components/ui/StatusBadge.svelte';
@@ -53,6 +66,21 @@
 	const itinerary = $derived(itineraryQuery.data);
 	const driver = $derived(driverQuery.data);
 
+	// Query tenant for company info (PDF header)
+	const tenantQuery = useQuery(
+		api.tenants.get,
+		() => (tenantStore.tenantId ? { id: tenantStore.tenantId as Id<'tenants'> } : 'skip')
+	);
+
+	// Query parameters for fuel price unit and settings
+	const parametersQuery = useQuery(
+		api.parameters.getActive,
+		() => (tenantStore.tenantId ? { tenantId: tenantStore.tenantId as Id<'tenants'> } : 'skip')
+	);
+
+	const tenant = $derived(tenantQuery.data);
+	const parameters = $derived(parametersQuery.data);
+
 	// Modal states
 	let showApproveModal = $state(false);
 	let showDisburseModal = $state(false);
@@ -72,6 +100,109 @@
 	let settlementNotes = $state('');
 
 	let cancelReason = $state('');
+
+	// Editable expense lines (for draft/pending status)
+	interface ExpenseLine {
+		id: string;
+		description: string;
+		amount: number;
+	}
+
+	let tollLines = $state<ExpenseLine[]>([]);
+	let otherLines = $state<ExpenseLine[]>([]);
+	let isEditMode = $state(false);
+	let isSaving = $state(false);
+
+	// Check if advance is editable (draft or pending)
+	const isEditable = $derived(
+		advance?.status === 'draft' || advance?.status === 'pending'
+	);
+
+	// Initialize editable lines from advance data
+	$effect(() => {
+		if (advance && isEditable && tollLines.length === 0 && otherLines.length === 0) {
+			// Initialize toll lines
+			if (advance.estimatedTolls && advance.estimatedTolls > 0) {
+				tollLines = [{
+					id: crypto.randomUUID(),
+					description: itinerary ? `${itinerary.origin} → ${itinerary.destination}` : 'Peajes de ruta',
+					amount: advance.estimatedTolls
+				}];
+			}
+			// Initialize other lines
+			if (advance.estimatedOther && advance.estimatedOther > 0) {
+				otherLines = [{
+					id: crypto.randomUUID(),
+					description: 'Imprevistos y contingencias',
+					amount: advance.estimatedOther
+				}];
+			}
+		}
+	});
+
+	// Calculate totals from editable lines
+	const editableTollsTotal = $derived(tollLines.reduce((sum, line) => sum + line.amount, 0));
+	const editableOtherTotal = $derived(otherLines.reduce((sum, line) => sum + line.amount, 0));
+
+	// Editable grand total
+	const editableGrandTotal = $derived(
+		(advance?.estimatedFuel ?? 0) +
+		(advance?.estimatedMeals ?? 0) +
+		(advance?.estimatedLodging ?? 0) +
+		editableTollsTotal +
+		editableOtherTotal
+	);
+
+	function addTollLine() {
+		tollLines = [...tollLines, {
+			id: crypto.randomUUID(),
+			description: '',
+			amount: 0
+		}];
+	}
+
+	function removeTollLine(id: string) {
+		tollLines = tollLines.filter(line => line.id !== id);
+	}
+
+	function addOtherLine() {
+		otherLines = [...otherLines, {
+			id: crypto.randomUUID(),
+			description: '',
+			amount: 0
+		}];
+	}
+
+	function removeOtherLine(id: string) {
+		otherLines = otherLines.filter(line => line.id !== id);
+	}
+
+	async function saveExpenseChanges() {
+		if (!advance) return;
+		isSaving = true;
+		try {
+			// Calculate the new total amount
+			const newTotal =
+				(advance.estimatedFuel ?? 0) +
+				(advance.estimatedMeals ?? 0) +
+				(advance.estimatedLodging ?? 0) +
+				editableTollsTotal +
+				editableOtherTotal;
+
+			await client.mutation(api.expenseAdvances.update, {
+				id: advance._id,
+				estimatedTolls: editableTollsTotal,
+				estimatedOther: editableOtherTotal,
+				amountHnl: newTotal // Update the advance total amount
+			});
+			isEditMode = false;
+			showSuccessToast('Cambios guardados');
+		} catch (error) {
+			showErrorToast('Error al guardar cambios');
+		} finally {
+			isSaving = false;
+		}
+	}
 
 	// Toast
 	let showToast = $state(false);
@@ -101,6 +232,54 @@
 			minimumFractionDigits: 2
 		}).format(amount);
 	}
+
+	function formatUsd(amount: number): string {
+		return new Intl.NumberFormat('en-US', {
+			style: 'currency',
+			currency: 'USD',
+			minimumFractionDigits: 2
+		}).format(amount);
+	}
+
+	// Convert HNL to USD using exchange rate from parameters
+	function toUsd(hnlAmount: number): number {
+		const rate = parameters?.exchangeRate || 25;
+		return hnlAmount / rate;
+	}
+
+	// Get fuel quantity and unit label
+	const fuelQuantity = $derived((advance as Record<string, unknown>)?.estimatedFuelGallons as number | undefined);
+	const fuelUnit = $derived(parameters?.fuelPriceUnit || 'gallon');
+	const fuelUnitLabel = $derived(fuelUnit === 'gallon' ? 'gal' : 'L');
+	const fuelUnitPrice = $derived(parameters?.fuelPrice ?? 0);
+
+	// Trip days for per-day breakdown
+	const tripDays = $derived(itinerary?.estimatedDays || 1);
+	const mealsPerDay = $derived((advance?.estimatedMeals ?? 0) / tripDays);
+	const lodgingPerNight = $derived((advance?.estimatedLodging ?? 0) / Math.max(1, tripDays - 1));
+
+	// Meal breakdown (approximate thirds for breakfast/lunch/dinner)
+	const breakfastPerDay = $derived(mealsPerDay * 0.25); // 25% for breakfast
+	const lunchPerDay = $derived(mealsPerDay * 0.375); // 37.5% for lunch
+	const dinnerPerDay = $derived(mealsPerDay * 0.375); // 37.5% for dinner
+
+	// Total for summary - uses editable values when available
+	const estimatedTotal = $derived(
+		(advance?.estimatedFuel ?? 0) +
+		(advance?.estimatedMeals ?? 0) +
+		(advance?.estimatedLodging ?? 0) +
+		(isEditable && (tollLines.length > 0 || otherLines.length > 0)
+			? editableTollsTotal + editableOtherTotal
+			: (advance?.estimatedTolls ?? 0) + (advance?.estimatedOther ?? 0))
+	);
+
+	// Display values for tolls and other (use editable when available)
+	const displayTolls = $derived(
+		isEditable && tollLines.length > 0 ? editableTollsTotal : (advance?.estimatedTolls ?? 0)
+	);
+	const displayOther = $derived(
+		isEditable && otherLines.length > 0 ? editableOtherTotal : (advance?.estimatedOther ?? 0)
+	);
 
 	function formatDate(timestamp: number): string {
 		return new Date(timestamp).toLocaleDateString('es-HN', {
@@ -266,7 +445,7 @@
 			const pdfData = {
 				advanceNumber: advance.advanceNumber,
 				clientName: itinerary.clientId ? 'Cliente' : 'Walk-in', // We'll get this from the client query
-				itineraryCode: itinerary.itineraryNumber || itinerary.itineraryLongName || '',
+				itineraryCode: itinerary.itineraryLongName || itinerary.itineraryNumber || '',
 				route: `${itinerary.origin} - ${itinerary.destination}`,
 				driverName: driver ? `${driver.firstName} ${driver.lastName}` : 'Sin asignar',
 				currency: 'HNL' as const,
@@ -281,9 +460,21 @@
 				balanceCompanyFavor: advance.balanceAmount && advance.balanceAmount > 0 ? advance.balanceAmount : 0,
 				balanceEmployeeFavor: advance.balanceAmount && advance.balanceAmount < 0 ? Math.abs(advance.balanceAmount) : 0,
 				documentDate: formatDate(advance.createdAt),
+				// Company info from tenant (with fallback for backward compatibility)
 				company: {
-					name: 'LAT Tours & Travel'
-				}
+					name: tenant?.companyName || 'la Empresa',
+					logo: tenant?.logoUrl,
+					address: tenant?.address,
+					city: tenant?.city,
+					phone: tenant?.primaryContactPhone,
+					email: tenant?.primaryContactEmail,
+					websiteUrl: tenant?.websiteUrl
+				},
+				// Parameters for detailed calculations
+				fuelPriceUnit: parameters?.fuelPriceUnit || 'gallon',
+				fuelPrice: parameters?.fuelPrice,
+				hotelCostPerNight: parameters?.hotelCostPerNight,
+				exchangeRate: parameters?.exchangeRate
 			};
 
 			const response = await fetch('/api/pdf/expense-advance', {
@@ -351,12 +542,20 @@
 		const dateStr = itinerary ? formatAdvanceDate(itinerary.startDate) : '';
 
 		if (advance.estimatedFuel && advance.estimatedFuel > 0) {
+			// Use fuel quantity from advance if available, otherwise calculate
+			const fuelQuantity = (advance as Record<string, unknown>).estimatedFuelGallons as number | undefined;
+			const fuelUnit = parameters?.fuelPriceUnit || 'gallon';
+			const fuelUnitLabel = fuelUnit === 'gallon' ? 'gal' : 'L';
+			const fuelUnitPrice = parameters?.fuelPrice ?? 0;
+
 			gastos.push({
 				date: dateStr,
 				location: itinerary?.origin || '',
-				concept: 'Combustible',
-				quantity: 1,
-				unitPrice: advance.estimatedFuel,
+				concept: fuelQuantity
+					? `Combustible (${fuelQuantity.toFixed(1)} ${fuelUnitLabel})`
+					: 'Combustible',
+				quantity: fuelQuantity ?? 1,
+				unitPrice: fuelQuantity && fuelUnitPrice ? fuelUnitPrice : advance.estimatedFuel,
 				total: advance.estimatedFuel
 			});
 		}
@@ -465,7 +664,7 @@
 			<!-- Main Content -->
 			<div class="lg:col-span-2 space-y-6">
 				<!-- Advance Header -->
-				<Card class="!p-6">
+				<Card class="max-w-none !p-6">
 					<div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
 						<div>
 							<h1 class="text-2xl font-bold text-gray-900 dark:text-white">
@@ -481,9 +680,13 @@
 						<div class="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
 							<p class="text-sm text-gray-500 dark:text-gray-400">{$t('expenses.amount')}</p>
 							<p class="text-2xl font-bold text-gray-900 dark:text-white mt-1">
-								{formatCurrency(advance.amountHnl)}
+								{formatCurrency(isEditable ? estimatedTotal : advance.amountHnl)}
 							</p>
-							{#if advance.amountUsd}
+							{#if isEditable}
+								<p class="text-sm text-gray-500 dark:text-gray-400">
+									≈ {formatUsd(toUsd(estimatedTotal))}
+								</p>
+							{:else if advance.amountUsd}
 								<p class="text-sm text-gray-500 dark:text-gray-400">
 									≈ ${advance.amountUsd.toFixed(2)} USD
 								</p>
@@ -507,55 +710,371 @@
 					</div>
 				</Card>
 
-				<!-- Estimated Breakdown -->
+				<!-- Estimated Breakdown with Accordion -->
 				{#if advance.status !== 'settled'}
-					<Card class="!p-6">
-						<h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-							{$t('expenses.estimatedBreakdown')}
-						</h3>
-						<div class="space-y-3">
-							<div class="flex justify-between">
-								<span class="text-gray-600 dark:text-gray-400">{$t('expenses.breakdown.fuel')}</span>
-								<span class="font-medium text-gray-900 dark:text-white">
-									{formatCurrency(advance.estimatedFuel ?? 0)}
-								</span>
+					<Card class="max-w-none !p-6">
+						<div class="flex items-center justify-between mb-4">
+							<h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+								{$t('expenses.estimatedBreakdown')}
+							</h3>
+							<div class="text-right">
+								<p class="text-xl font-bold text-gray-900 dark:text-white">{formatCurrency(estimatedTotal)}</p>
+								<p class="text-sm text-gray-500 dark:text-gray-400">≈ {formatUsd(toUsd(estimatedTotal))}</p>
 							</div>
-							<div class="flex justify-between">
-								<span class="text-gray-600 dark:text-gray-400">{$t('expenses.breakdown.meals')}</span>
-								<span class="font-medium text-gray-900 dark:text-white">
-									{formatCurrency(advance.estimatedMeals ?? 0)}
-								</span>
+						</div>
+
+						<Accordion class="divide-y divide-gray-200 dark:divide-gray-700">
+							<!-- Fuel -->
+							<AccordionItem>
+								{#snippet header()}
+									<div class="flex items-center justify-between w-full pr-4">
+										<div class="flex items-center gap-2">
+											<FireOutline class="w-4 h-4 text-orange-500" />
+											<span>{$t('expenses.breakdown.fuel')}</span>
+										</div>
+										<div class="text-right">
+											<span class="font-semibold">{formatCurrency(advance.estimatedFuel ?? 0)}</span>
+											<span class="text-xs text-gray-500 ml-2">({formatUsd(toUsd(advance.estimatedFuel ?? 0))})</span>
+										</div>
+									</div>
+								{/snippet}
+								<div class="space-y-2 text-sm">
+									{#if fuelQuantity}
+										<div class="flex justify-between">
+											<span class="text-gray-600 dark:text-gray-400">Cantidad estimada:</span>
+											<span class="font-medium">{fuelQuantity.toFixed(1)} {fuelUnitLabel}</span>
+										</div>
+										<div class="flex justify-between">
+											<span class="text-gray-600 dark:text-gray-400">Precio por {fuelUnitLabel === 'gal' ? 'galón' : 'litro'}:</span>
+											<span class="font-medium">{formatCurrency(fuelUnitPrice)}</span>
+										</div>
+									{:else}
+										<div class="flex justify-between">
+											<span class="text-gray-600 dark:text-gray-400">Combustible estimado:</span>
+											<span class="font-medium">{formatCurrency(advance.estimatedFuel ?? 0)}</span>
+										</div>
+									{/if}
+									<div class="flex justify-between border-t border-gray-200 dark:border-gray-700 pt-2">
+										<span class="font-medium text-gray-900 dark:text-white">Total combustible:</span>
+										<span class="font-bold">{formatCurrency(advance.estimatedFuel ?? 0)}</span>
+									</div>
+								</div>
+							</AccordionItem>
+
+							<!-- Meals -->
+							<AccordionItem>
+								{#snippet header()}
+									<div class="flex items-center justify-between w-full pr-4">
+										<div class="flex items-center gap-2">
+											<svg class="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+												<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+											</svg>
+											<span>{$t('expenses.breakdown.meals')}</span>
+										</div>
+										<div class="text-right">
+											<span class="font-semibold">{formatCurrency(advance.estimatedMeals ?? 0)}</span>
+											<span class="text-xs text-gray-500 ml-2">({formatUsd(toUsd(advance.estimatedMeals ?? 0))})</span>
+										</div>
+									</div>
+								{/snippet}
+								<div class="space-y-3">
+									<Table striped={true} class="text-sm">
+										<TableHead>
+											<TableHeadCell class="!py-2">Día</TableHeadCell>
+											<TableHeadCell class="!py-2 text-right">Desayuno</TableHeadCell>
+											<TableHeadCell class="!py-2 text-right">Almuerzo</TableHeadCell>
+											<TableHeadCell class="!py-2 text-right">Cena</TableHeadCell>
+											<TableHeadCell class="!py-2 text-right">Total</TableHeadCell>
+										</TableHead>
+										<TableBody>
+											{#each Array(tripDays) as _, i}
+												<TableBodyRow>
+													<TableBodyCell class="!py-1">Día {i + 1}</TableBodyCell>
+													<TableBodyCell class="!py-1 text-right">{formatCurrency(breakfastPerDay)}</TableBodyCell>
+													<TableBodyCell class="!py-1 text-right">{formatCurrency(lunchPerDay)}</TableBodyCell>
+													<TableBodyCell class="!py-1 text-right">{formatCurrency(dinnerPerDay)}</TableBodyCell>
+													<TableBodyCell class="!py-1 text-right font-medium">{formatCurrency(mealsPerDay)}</TableBodyCell>
+												</TableBodyRow>
+											{/each}
+											<TableBodyRow class="font-bold bg-gray-50 dark:bg-gray-700">
+												<TableBodyCell class="!py-1">Total</TableBodyCell>
+												<TableBodyCell class="!py-1 text-right">{formatCurrency(breakfastPerDay * tripDays)}</TableBodyCell>
+												<TableBodyCell class="!py-1 text-right">{formatCurrency(lunchPerDay * tripDays)}</TableBodyCell>
+												<TableBodyCell class="!py-1 text-right">{formatCurrency(dinnerPerDay * tripDays)}</TableBodyCell>
+												<TableBodyCell class="!py-1 text-right">{formatCurrency(advance.estimatedMeals ?? 0)}</TableBodyCell>
+											</TableBodyRow>
+										</TableBody>
+									</Table>
+								</div>
+							</AccordionItem>
+
+							<!-- Lodging -->
+							<AccordionItem>
+								{#snippet header()}
+									<div class="flex items-center justify-between w-full pr-4">
+										<div class="flex items-center gap-2">
+											<BuildingOutline class="w-4 h-4 text-blue-500" />
+											<span>{$t('expenses.breakdown.lodging')}</span>
+										</div>
+										<div class="text-right">
+											<span class="font-semibold">{formatCurrency(advance.estimatedLodging ?? 0)}</span>
+											<span class="text-xs text-gray-500 ml-2">({formatUsd(toUsd(advance.estimatedLodging ?? 0))})</span>
+										</div>
+									</div>
+								{/snippet}
+								<div class="space-y-3">
+									{#if tripDays > 1}
+										<Table striped={true} class="text-sm">
+											<TableHead>
+												<TableHeadCell class="!py-2">Noche</TableHeadCell>
+												<TableHeadCell class="!py-2">Ubicación</TableHeadCell>
+												<TableHeadCell class="!py-2 text-right">Costo</TableHeadCell>
+											</TableHead>
+											<TableBody>
+												{#each Array(Math.max(0, tripDays - 1)) as _, i}
+													<TableBodyRow>
+														<TableBodyCell class="!py-1">Noche {i + 1}</TableBodyCell>
+														<TableBodyCell class="!py-1 text-gray-500">{itinerary?.destination || '-'}</TableBodyCell>
+														<TableBodyCell class="!py-1 text-right">{formatCurrency(lodgingPerNight)}</TableBodyCell>
+													</TableBodyRow>
+												{/each}
+												<TableBodyRow class="font-bold bg-gray-50 dark:bg-gray-700">
+													<TableBodyCell class="!py-1" colspan={2}>Total ({tripDays - 1} noches)</TableBodyCell>
+													<TableBodyCell class="!py-1 text-right">{formatCurrency(advance.estimatedLodging ?? 0)}</TableBodyCell>
+												</TableBodyRow>
+											</TableBody>
+										</Table>
+									{:else}
+										<p class="text-sm text-gray-500 dark:text-gray-400">Viaje de un solo día - sin hospedaje</p>
+									{/if}
+								</div>
+							</AccordionItem>
+
+							<!-- Tolls (Editable) -->
+							<AccordionItem>
+								{#snippet header()}
+									<div class="flex items-center justify-between w-full pr-4">
+										<div class="flex items-center gap-2">
+											<MapPinAltOutline class="w-4 h-4 text-purple-500" />
+											<span>{$t('expenses.breakdown.tolls')}</span>
+											{#if isEditable}
+												<span class="text-xs bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-300 px-2 py-0.5 rounded">Editable</span>
+											{/if}
+										</div>
+										<div class="text-right">
+											<span class="font-semibold">{formatCurrency(displayTolls)}</span>
+											<span class="text-xs text-gray-500 ml-2">({formatUsd(toUsd(displayTolls))})</span>
+										</div>
+									</div>
+								{/snippet}
+								<div class="space-y-3">
+									{#if isEditable}
+										<!-- Editable toll lines with table layout -->
+										<div class="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+											<div class="grid grid-cols-12 gap-0 bg-gray-100 dark:bg-gray-700 text-xs font-semibold text-gray-700 dark:text-gray-300">
+												<div class="col-span-1 p-2 text-center">#</div>
+												<div class="col-span-7 p-2">Concepto</div>
+												<div class="col-span-3 p-2 text-right">Monto (L.)</div>
+												<div class="col-span-1 p-2"></div>
+											</div>
+											{#each tollLines as line, index (line.id)}
+												<div class="grid grid-cols-12 gap-0 border-t border-gray-200 dark:border-gray-700 items-center">
+													<div class="col-span-1 p-2 text-center text-sm text-gray-500">{index + 1}</div>
+													<div class="col-span-7 p-1">
+														<Input
+															type="text"
+															placeholder="Ej: Peaje Villa Nueva"
+															bind:value={line.description}
+															size="sm"
+															class="w-full"
+														/>
+													</div>
+													<div class="col-span-3 p-1">
+														<Input
+															type="text"
+															inputmode="decimal"
+															placeholder="0.00"
+															value={line.amount.toFixed(2)}
+															onchange={(e) => { line.amount = parseFloat((e.target as HTMLInputElement).value) || 0; }}
+															onblur={(e) => { (e.target as HTMLInputElement).value = line.amount.toFixed(2); }}
+															size="sm"
+															class="w-full text-right"
+														/>
+													</div>
+													<div class="col-span-1 p-1 text-center">
+														<Button
+															color="red"
+															outline
+															size="xs"
+															class="!p-1"
+															onclick={() => removeTollLine(line.id)}
+														>
+															<TrashBinOutline class="w-3 h-3" />
+														</Button>
+													</div>
+												</div>
+											{/each}
+											{#if tollLines.length === 0}
+												<div class="p-4 text-center text-sm text-gray-500 dark:text-gray-400 italic">
+													No hay peajes agregados. Haga clic en "Agregar peaje" para añadir uno.
+												</div>
+											{/if}
+										</div>
+										<Button
+											color="light"
+											size="xs"
+											class="w-full"
+											onclick={addTollLine}
+										>
+											<svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+												<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+											</svg>
+											Agregar peaje
+										</Button>
+										<div class="flex justify-between border-t border-gray-200 dark:border-gray-700 pt-2 font-medium">
+											<span>Total peajes ({tollLines.length} items):</span>
+											<span class="font-bold">{formatCurrency(editableTollsTotal)}</span>
+										</div>
+									{:else}
+										<!-- Read-only view -->
+										<div class="flex justify-between text-sm">
+											<span class="text-gray-600 dark:text-gray-400">Ruta:</span>
+											<span class="font-medium">{itinerary?.origin} → {itinerary?.destination}</span>
+										</div>
+										<div class="flex justify-between border-t border-gray-200 dark:border-gray-700 pt-2">
+											<span class="font-medium text-gray-900 dark:text-white">Total peajes:</span>
+											<span class="font-bold">{formatCurrency(advance.estimatedTolls ?? 0)}</span>
+										</div>
+									{/if}
+								</div>
+							</AccordionItem>
+
+							<!-- Other (Editable) -->
+							<AccordionItem>
+								{#snippet header()}
+									<div class="flex items-center justify-between w-full pr-4">
+										<div class="flex items-center gap-2">
+											<DotsHorizontalOutline class="w-4 h-4 text-gray-500" />
+											<span>{$t('expenses.breakdown.other')}</span>
+											{#if isEditable}
+												<span class="text-xs bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-2 py-0.5 rounded">Editable</span>
+											{/if}
+										</div>
+										<div class="text-right">
+											<span class="font-semibold">{formatCurrency(displayOther)}</span>
+											<span class="text-xs text-gray-500 ml-2">({formatUsd(toUsd(displayOther))})</span>
+										</div>
+									</div>
+								{/snippet}
+								<div class="space-y-3">
+									{#if isEditable}
+										<!-- Editable other expense lines with table layout -->
+										<div class="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+											<div class="grid grid-cols-12 gap-0 bg-gray-100 dark:bg-gray-700 text-xs font-semibold text-gray-700 dark:text-gray-300">
+												<div class="col-span-1 p-2 text-center">#</div>
+												<div class="col-span-7 p-2">Concepto</div>
+												<div class="col-span-3 p-2 text-right">Monto (L.)</div>
+												<div class="col-span-1 p-2"></div>
+											</div>
+											{#each otherLines as line, index (line.id)}
+												<div class="grid grid-cols-12 gap-0 border-t border-gray-200 dark:border-gray-700 items-center">
+													<div class="col-span-1 p-2 text-center text-sm text-gray-500">{index + 1}</div>
+													<div class="col-span-7 p-1">
+														<Input
+															type="text"
+															placeholder="Ej: Lavado de bus"
+															bind:value={line.description}
+															size="sm"
+															class="w-full"
+														/>
+													</div>
+													<div class="col-span-3 p-1">
+														<Input
+															type="text"
+															inputmode="decimal"
+															placeholder="0.00"
+															value={line.amount.toFixed(2)}
+															onchange={(e) => { line.amount = parseFloat((e.target as HTMLInputElement).value) || 0; }}
+															onblur={(e) => { (e.target as HTMLInputElement).value = line.amount.toFixed(2); }}
+															size="sm"
+															class="w-full text-right"
+														/>
+													</div>
+													<div class="col-span-1 p-1 text-center">
+														<Button
+															color="red"
+															outline
+															size="xs"
+															class="!p-1"
+															onclick={() => removeOtherLine(line.id)}
+														>
+															<TrashBinOutline class="w-3 h-3" />
+														</Button>
+													</div>
+												</div>
+											{/each}
+											{#if otherLines.length === 0}
+												<div class="p-4 text-center text-sm text-gray-500 dark:text-gray-400 italic">
+													No hay gastos agregados. Haga clic en "Agregar gasto" para añadir uno.
+												</div>
+											{/if}
+										</div>
+										<Button
+											color="light"
+											size="xs"
+											class="w-full"
+											onclick={addOtherLine}
+										>
+											<svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+												<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+											</svg>
+											Agregar gasto
+										</Button>
+										<div class="flex justify-between border-t border-gray-200 dark:border-gray-700 pt-2 font-medium">
+											<span>Total otros ({otherLines.length} items):</span>
+											<span class="font-bold">{formatCurrency(editableOtherTotal)}</span>
+										</div>
+									{:else}
+										<!-- Read-only view -->
+										<div class="flex justify-between text-sm">
+											<span class="text-gray-600 dark:text-gray-400">Imprevistos y contingencias:</span>
+											<span class="font-medium">{formatCurrency(advance.estimatedOther ?? 0)}</span>
+										</div>
+										<p class="text-xs text-gray-500 dark:text-gray-400 italic">
+											Incluye gastos menores, emergencias y otros gastos no previstos.
+										</p>
+									{/if}
+								</div>
+							</AccordionItem>
+						</Accordion>
+
+						<!-- Summary with multi-currency and save button -->
+						<div class="mt-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+							<div class="flex justify-between items-center">
+								<div>
+									<span class="font-semibold text-gray-900 dark:text-white">{$t('common.total')}</span>
+									<span class="text-sm text-gray-500 dark:text-gray-400 ml-2">({tripDays} días)</span>
+								</div>
+								<div class="text-right">
+									<p class="text-xl font-bold text-gray-900 dark:text-white">{formatCurrency(estimatedTotal)}</p>
+									<p class="text-sm text-gray-500 dark:text-gray-400">≈ {formatUsd(toUsd(estimatedTotal))}</p>
+								</div>
 							</div>
-							<div class="flex justify-between">
-								<span class="text-gray-600 dark:text-gray-400">{$t('expenses.breakdown.lodging')}</span>
-								<span class="font-medium text-gray-900 dark:text-white">
-									{formatCurrency(advance.estimatedLodging ?? 0)}
-								</span>
-							</div>
-							<div class="flex justify-between">
-								<span class="text-gray-600 dark:text-gray-400">{$t('expenses.breakdown.tolls')}</span>
-								<span class="font-medium text-gray-900 dark:text-white">
-									{formatCurrency(advance.estimatedTolls ?? 0)}
-								</span>
-							</div>
-							<div class="flex justify-between">
-								<span class="text-gray-600 dark:text-gray-400">{$t('expenses.breakdown.other')}</span>
-								<span class="font-medium text-gray-900 dark:text-white">
-									{formatCurrency(advance.estimatedOther ?? 0)}
-								</span>
-							</div>
-							<div class="border-t border-gray-200 dark:border-gray-700 pt-3 flex justify-between">
-								<span class="font-semibold text-gray-900 dark:text-white">{$t('common.total')}</span>
-								<span class="font-bold text-gray-900 dark:text-white">
-									{formatCurrency(
-										(advance.estimatedFuel ?? 0) +
-										(advance.estimatedMeals ?? 0) +
-										(advance.estimatedLodging ?? 0) +
-										(advance.estimatedTolls ?? 0) +
-										(advance.estimatedOther ?? 0)
-									)}
-								</span>
-							</div>
+							{#if isEditable && (tollLines.length > 0 || otherLines.length > 0)}
+								<div class="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+									<Button
+										color="primary"
+										class="w-full"
+										onclick={saveExpenseChanges}
+										disabled={isSaving}
+									>
+										{#if isSaving}
+											<Spinner size="4" class="mr-2" />
+										{/if}
+										Guardar cambios
+									</Button>
+								</div>
+							{/if}
 						</div>
 					</Card>
 				{/if}
@@ -638,7 +1157,7 @@
 				{/if}
 
 				<!-- Timeline -->
-				<Card class="!p-6">
+				<Card class="max-w-none !p-6">
 					<h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">
 						{$t('expenses.sections.timeline')}
 					</h3>
