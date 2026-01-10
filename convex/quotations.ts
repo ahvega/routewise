@@ -383,24 +383,27 @@ export const create = mutation({
 
     const now = Date.now();
 
-    // Get client code if client is specified
+    // Get client data if client is specified (used for code and name fallback)
     let clientCode: string | null = null;
+    let clientFullName: string | null = null;
     if (args.clientId) {
       const client = await ctx.db.get(args.clientId);
       if (client) {
+        // Get client full name (used for document naming fallback)
+        if (client.type === 'company') {
+          clientFullName = client.companyName || null;
+        } else {
+          clientFullName = `${client.firstName || ''} ${client.lastName || ''}`.trim() || null;
+        }
+
         // Use existing client code or generate one
         if (client.clientCode) {
           clientCode = client.clientCode;
-        } else {
+        } else if (clientFullName) {
           // Generate code from client name
-          const clientName = client.type === 'company'
-            ? client.companyName || ''
-            : `${client.firstName || ''} ${client.lastName || ''}`.trim();
-          if (clientName) {
-            clientCode = generateClientCode(clientName);
-            // Save generated code to client
-            await ctx.db.patch(args.clientId, { clientCode });
-          }
+          clientCode = generateClientCode(clientFullName);
+          // Save generated code to client
+          await ctx.db.patch(args.clientId, { clientCode });
         }
       }
     }
@@ -415,6 +418,11 @@ export const create = mutation({
       }
     }
 
+    // Determine leader name for document naming:
+    // 1. Use groupLeaderName if provided
+    // 2. Otherwise, use client full name as fallback
+    const leaderNameForDocument = args.groupLeaderName || clientFullName;
+
     // Generate quotation number with new format
     const {
       quotationNumber,
@@ -426,7 +434,7 @@ export const create = mutation({
       ctx,
       args.tenantId,
       clientCode,
-      args.groupLeaderName || null,
+      leaderNameForDocument,
       args.groupSize
     );
 
