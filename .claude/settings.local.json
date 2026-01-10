@@ -26,5 +26,11 @@
       "Bash(find:*)"
     ],
     "deny": []
-  }
+  },
+  "enabledMcpjsonServers": [
+    "svelte",
+    "flowbite-svelte",
+    "convex"
+  ],
+  "enableAllProjectMcpServers": true
 }
