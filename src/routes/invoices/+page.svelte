@@ -54,6 +54,13 @@
 		return client.type === 'company' ? client.companyName || '-' : `${client.firstName} ${client.lastName}`;
 	}
 
+	// Get client code
+	function getClientCode(clientId: Id<'clients'> | undefined): string {
+		if (!clientId) return '';
+		const client = clients.find((c) => c._id === clientId);
+		return client?.clientCode || '';
+	}
+
 	// Format currency
 	function formatCurrency(value: number): string {
 		return new Intl.NumberFormat('es-HN', {
@@ -85,10 +92,14 @@
 			if (searchTerm) {
 				const term = searchTerm.toLowerCase();
 				const clientName = getClientName(inv.clientId).toLowerCase();
+				const clientCode = getClientCode(inv.clientId).toLowerCase();
 				if (
 					!inv.invoiceNumber.toLowerCase().includes(term) &&
+					!(inv.invoiceLongName && inv.invoiceLongName.toLowerCase().includes(term)) &&
 					!clientName.includes(term) &&
-					!inv.description.toLowerCase().includes(term)
+					!clientCode.includes(term) &&
+					!inv.description.toLowerCase().includes(term) &&
+					!(inv.serviceDescription && inv.serviceDescription.toLowerCase().includes(term))
 				) {
 					return false;
 				}
@@ -112,7 +123,7 @@
 
 	// Status options
 	const statusOptions = [
-		{ value: '', name: $t('common.all') },
+		{ value: '', name: $t('invoices.filterByStatus') },
 		{ value: 'draft', name: $t('invoices.statuses.draft') },
 		{ value: 'sent', name: $t('invoices.statuses.sent') },
 		{ value: 'paid', name: $t('invoices.statuses.paid') },
@@ -120,7 +131,7 @@
 	];
 
 	const paymentStatusOptions = [
-		{ value: '', name: $t('common.all') },
+		{ value: '', name: $t('invoices.filterByPayment') },
 		{ value: 'unpaid', name: $t('invoices.paymentStatuses.unpaid') },
 		{ value: 'partial', name: $t('invoices.paymentStatuses.partial') },
 		{ value: 'paid', name: $t('invoices.paymentStatuses.paid') },
@@ -237,27 +248,18 @@
 			},
 			contact.email ? {
 				id: 'sendEmail',
-				label: $t('invoices.sendViaEmail'),
+				label: $t('invoices.actions.sendViaEmail'),
 				icon: EnvelopeOutline as any,
 				onClick: () => console.log('Send email to:', contact.email)
 			} : null,
 
-			// Status actions (with divider)
-			invoice.status === 'draft' ? {
-				id: 'send',
-				label: $t('invoices.markAsSent'),
-				icon: EnvelopeOutline as any,
-				onClick: () => updateStatus(invoice._id, 'sent'),
-				dividerBefore: true
-			} : null,
-
-			['unpaid', 'partial'].includes(invoice.paymentStatus) && invoice.status !== 'cancelled' ? {
-				id: 'markPaid',
-				label: $t('invoices.markAsPaid'),
+			!['cancelled', 'void'].includes(invoice.status) ? {
+				id: 'recordPayment',
+				label: $t('invoices.actions.recordPayment'),
 				icon: CashOutline as any,
-				onClick: () => markAsPaid(invoice._id),
-				color: 'success' as const,
-				dividerBefore: invoice.status !== 'draft'
+				href: invoice.paymentStatus !== 'paid' ? `/invoices/${invoice._id}?action=recordPayment` : undefined,
+				disabled: invoice.paymentStatus === 'paid',
+				dividerBefore: true
 			} : null,
 
 			// Delete action (only for draft)

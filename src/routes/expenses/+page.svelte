@@ -69,11 +69,16 @@
 		api.drivers.list,
 		() => (tenantStore.tenantId ? { tenantId: tenantStore.tenantId } : 'skip')
 	);
+	const clientsQuery = useQuery(
+		api.clients.list,
+		() => (tenantStore.tenantId ? { tenantId: tenantStore.tenantId } : 'skip')
+	);
 
 	const advances = $derived(advancesQuery.data ?? []);
 	const stats = $derived(statsQuery.data);
 	const itineraries = $derived(itinerariesQuery.data ?? []);
 	const drivers = $derived(driversQuery.data ?? []);
+	const clients = $derived(clientsQuery.data ?? []);
 
 	// Create lookup maps
 	const itineraryMap = $derived(
@@ -81,6 +86,9 @@
 	);
 	const driverMap = $derived(
 		new Map(drivers.map((d) => [d._id, d]))
+	);
+	const clientMap = $derived(
+		new Map(clients.map((c) => [c._id, c]))
 	);
 
 	// Filter advances by search
@@ -90,18 +98,22 @@
 			const query = searchQuery.toLowerCase();
 			const itinerary = itineraryMap.get(advance.itineraryId);
 			const driver = advance.driverId ? driverMap.get(advance.driverId) : null;
+			const client = itinerary?.clientId ? clientMap.get(itinerary.clientId) : null;
+
 			return (
 				advance.advanceNumber.toLowerCase().includes(query) ||
 				advance.purpose.toLowerCase().includes(query) ||
 				(itinerary && (
 					itinerary.itineraryNumber.toLowerCase().includes(query) ||
+					(itinerary.itineraryDisplayName && itinerary.itineraryDisplayName.toLowerCase().includes(query)) ||
 					itinerary.origin.toLowerCase().includes(query) ||
 					itinerary.destination.toLowerCase().includes(query)
 				)) ||
 				(driver && (
 					driver.firstName.toLowerCase().includes(query) ||
 					driver.lastName.toLowerCase().includes(query)
-				))
+				)) ||
+				(client && client.clientCode && client.clientCode.toLowerCase().includes(query))
 			);
 		})
 	);
@@ -135,7 +147,7 @@
 	}
 
 	const statusOptions = [
-		{ value: '', name: $t('common.all') },
+		{ value: '', name: $t('expenses.filterByStatus') },
 		{ value: 'draft', name: $t('expenses.status.draft') },
 		{ value: 'pending', name: $t('expenses.status.pending') },
 		{ value: 'approved', name: $t('expenses.status.approved') },
@@ -383,7 +395,7 @@
 			<div class="flex-1">
 				<Input
 					type="text"
-					placeholder={$t('common.search')}
+					placeholder={$t('expenses.searchPlaceholder')}
 					bind:value={searchQuery}
 					class="ps-10"
 				>

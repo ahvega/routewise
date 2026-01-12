@@ -103,7 +103,12 @@
 			key: 'status',
 			label: $t('itineraries.columns.status'),
 			sortable: true,
-			filterOptions: ['scheduled', 'in_progress', 'completed', 'cancelled'],
+			filterOptions: [
+				{ label: $t('statuses.scheduled'), value: 'scheduled' },
+				{ label: $t('statuses.in_progress'), value: 'in_progress' },
+				{ label: $t('statuses.completed'), value: 'completed' },
+				{ label: $t('statuses.cancelled'), value: 'cancelled' }
+			],
 			filterPlaceholder: $t('itineraries.filters.statusPlaceholder')
 		}
 	]);
@@ -340,8 +345,8 @@
 			</Card>
 		</div>
 
-		<Card class="max-w-none !p-6">
-			{#if itineraries.length === 0}
+		{#if itineraries.length === 0}
+			<Card class="max-w-none !p-6">
 				<div class="text-center py-12">
 					<p class="text-gray-500 dark:text-gray-400 mb-4">
 						{$t('itineraries.noItineraries')}
@@ -351,17 +356,13 @@
 						{$t('itineraries.newItinerary')}
 					</Button>
 				</div>
-			{:else if filteredItineraries.length === 0}
-				<div class="text-center py-12">
-					<p class="text-gray-500 dark:text-gray-400 mb-4">
-						{$t('common.noResults')}
-					</p>
-					<Button color="alternative" onclick={() => clearFilters()}>
-						{$t('common.clearFilters')}
-					</Button>
-				</div>
-			{:else}
-				<DataTable data={filteredItineraries} {columns}>
+			</Card>
+		{:else}
+			<DataTable 
+				data={filteredItineraries} 
+				{columns}
+				additionalSearchKeys={['itineraryDisplayName', 'destination', 'tripLeaderName']}
+			>
 				{#snippet row(itinerary)}
 					<TableBodyCell>
 						<div class="flex items-center justify-between gap-2">
@@ -426,7 +427,6 @@
 				{/snippet}
 			</DataTable>
 		{/if}
-		</Card>
 	{/if}
 </div>
 

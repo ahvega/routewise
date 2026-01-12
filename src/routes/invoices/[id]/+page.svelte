@@ -62,6 +62,17 @@
 	const tenant = $derived(tenantQuery.data);
 	const isLoading = $derived(invoiceQuery.isLoading);
 
+	// Handle action query param
+	$effect(() => {
+		if (invoice && $page.url.searchParams.get('action') === 'recordPayment' && !showPaymentModal) {
+			openPaymentModal();
+			// Clear action param
+			const newUrl = new URL($page.url);
+			newUrl.searchParams.delete('action');
+			goto(newUrl.toString(), { replaceState: true, keepFocus: true });
+		}
+	});
+
 	// Get related data
 	const clientData = $derived(invoice?.clientId ? clients.find((c) => c._id === invoice.clientId) : null);
 	const itinerary = $derived(invoice?.itineraryId ? itineraries.find((i) => i._id === invoice.itineraryId) : null);
@@ -347,8 +358,19 @@
 			if (!pdfResponse.ok) throw new Error('Failed to generate PDF');
 
 			const pdfBlob = await pdfResponse.blob();
-			const pdfArrayBuffer = await pdfBlob.arrayBuffer();
-			const pdfBase64 = btoa(String.fromCharCode(...new Uint8Array(pdfArrayBuffer)));
+			
+			// Convert Blob to Base64 using FileReader to avoid stack overflow with large files
+			const pdfBase64 = await new Promise<string>((resolve, reject) => {
+				const reader = new FileReader();
+				reader.onloadend = () => {
+					const result = reader.result as string;
+					// Remove data URL prefix
+					const base64 = result.split(',')[1];
+					resolve(base64);
+				};
+				reader.onerror = reject;
+				reader.readAsDataURL(pdfBlob);
+			});
 
 			// Send the email
 			const emailResponse = await fetch('/api/email/send', {
@@ -677,7 +699,7 @@
 {/if}
 
 <!-- Record Payment Modal -->
-<Modal bind:open={showPaymentModal} size="md" title={$t('invoices.recordPayment')}>
+<Modal bind:open={showPaymentModal} size="md" title={$t('invoices.actions.recordPayment')}>
 	<div class="grid grid-cols-2 gap-4">
 		<div>
 			<Label for="paymentAmount">{$t('invoices.paymentAmount')}</Label>

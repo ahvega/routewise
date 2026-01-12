@@ -5,7 +5,7 @@
 		label: string;
 		sortable?: boolean;
 		filterable?: boolean;
-		filterOptions?: string[]; // For dropdown filters
+		filterOptions?: (string | { label: string; value: string })[]; // For dropdown filters
 		filterPlaceholder?: string;
 		sortFn?: (a: T, b: T, direction: 'asc' | 'desc') => number;
 		getValue?: (item: T) => any; // Custom value getter for sorting/filtering
@@ -38,10 +38,13 @@
 		TableHeadCell,
 		TableBody,
 		TableBodyRow,
-		Input
+		Input,
+		Card,
+		Select
 	} from 'flowbite-svelte';
-	import { ChevronUpOutline, ChevronDownOutline, ChevronSortOutline } from 'flowbite-svelte-icons';
+	import { ChevronUpOutline, ChevronDownOutline, ChevronSortOutline, SearchOutline } from 'flowbite-svelte-icons';
 	import type { Snippet } from 'svelte';
+	import { t } from '$lib/i18n';
 
 	interface Props {
 		data: T[];
@@ -51,6 +54,7 @@
 		class?: string;
 		row: Snippet<[T, number]>;
 		emptyState?: Snippet;
+		additionalSearchKeys?: string[];
 	}
 
 	let {
@@ -60,7 +64,8 @@
 		hoverable = true,
 		class: className = '',
 		row,
-		emptyState
+		emptyState,
+		additionalSearchKeys
 	}: Props = $props();
 
 	// Sorting state
@@ -69,12 +74,13 @@
 
 	// Filter state
 	let filters = $state<Record<string, string>>({});
+	let globalSearch = $state('');
 
 	// Initialize filters
 	$effect(() => {
 		const initialFilters: Record<string, string> = {};
 		columns.forEach((col) => {
-			if (col.filterable || col.filterOptions) {
+			if (col.filterOptions) {
 				initialFilters[col.key as string] = '';
 			}
 		});
@@ -102,7 +108,7 @@
 	const processedData = $derived.by(() => {
 		let result = [...data];
 
-		// Apply filters
+		// Apply dropdown filters
 		Object.entries(filters).forEach(([key, value]) => {
 			if (!value) return;
 
@@ -112,16 +118,34 @@
 			result = result.filter((item) => {
 				const itemValue = getValue(item, column);
 				if (itemValue === null || itemValue === undefined) return false;
-
-				// For dropdown filters, exact match
-				if (column.filterOptions) {
-					return String(itemValue).toLowerCase() === value.toLowerCase();
-				}
-
-				// For text filters, partial match
-				return String(itemValue).toLowerCase().includes(value.toLowerCase());
+				return String(itemValue).toLowerCase() === value.toLowerCase();
 			});
 		});
+
+		// Apply global search filter
+		if (globalSearch) {
+			const term = globalSearch.toLowerCase();
+			result = result.filter((item) => {
+				// Check visible columns
+				const foundInColumns = columns.some((column) => {
+					if (!column.filterable || column.filterOptions) return false;
+					const itemValue = getValue(item, column);
+					if (itemValue === null || itemValue === undefined) return false;
+					return String(itemValue).toLowerCase().includes(term);
+				});
+				if (foundInColumns) return true;
+
+				// Check additional keys
+				if (additionalSearchKeys) {
+					return additionalSearchKeys.some((key) => {
+						const val = item[key];
+						if (val === null || val === undefined) return false;
+						return String(val).toLowerCase().includes(term);
+					});
+				}
+				return false;
+			});
+		}
 
 		// Apply sorting
 		if (sortKey) {
@@ -158,109 +182,126 @@
 
 	// Check if any filters are active
 	const hasFilters = $derived(columns.some((c) => c.filterable || c.filterOptions));
+	const hasSearch = $derived(columns.some((c) => c.filterable && !c.filterOptions));
+	const searchPlaceholder = $derived(columns.find(c => c.filterable && !c.filterOptions && c.filterPlaceholder)?.filterPlaceholder || $t('common.search'));
 </script>
 
 <div class="space-y-4">
 	<!-- Filters Row -->
 	{#if hasFilters}
-		<div class="flex flex-wrap gap-3 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
-			{#each columns as column}
-				{#if column.filterOptions}
-					<div class="w-40">
-						<select
-							bind:value={filters[column.key as string]}
-							class="block w-full text-xs bg-gray-50 border border-gray-300 text-gray-900 rounded-lg focus:ring-primary-500 focus:border-primary-500 p-2 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:focus:ring-primary-500 dark:focus:border-primary-500"
-						>
-							<option value="">{column.filterPlaceholder || `All ${column.label}`}</option>
-							{#each column.filterOptions as option}
-								<option value={option}>{option.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}</option>
-							{/each}
-						</select>
-					</div>
-				{:else if column.filterable}
-					<div class="w-40">
+		<Card class="max-w-none p-4!">
+			<div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4 items-center">
+				{#if hasSearch}
+					<div class="md:col-span-2 lg:col-span-1">
 						<Input
-							size="sm"
 							type="text"
-							placeholder={column.filterPlaceholder || `Filter ${column.label}...`}
-							bind:value={filters[column.key as string]}
-							class="text-xs"
-						/>
+							placeholder={searchPlaceholder}
+							bind:value={globalSearch}
+							class="pl-10"
+						>
+							{#snippet left()}
+								<SearchOutline class="w-5 h-5 text-gray-500" />
+							{/snippet}
+						</Input>
 					</div>
 				{/if}
-			{/each}
 
-			{#if Object.values(filters).some(v => v)}
-				<button
-					type="button"
-					onclick={() => {
-						const cleared: Record<string, string> = {};
-						Object.keys(filters).forEach(k => cleared[k] = '');
-						filters = cleared;
-					}}
-					class="text-xs text-primary-600 dark:text-primary-400 hover:underline self-center"
-				>
-					Clear filters
-				</button>
-			{/if}
-		</div>
+				{#each columns as column}
+					{#if column.filterOptions}
+						<div>
+							<Select
+								bind:value={filters[column.key as string]}
+								placeholder={column.filterPlaceholder || $t('common.all')}
+							>
+								{#each column.filterOptions as option}
+									{#if typeof option === 'string'}
+										<option value={option}>{option.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}</option>
+									{:else}
+										<option value={option.value}>{option.label}</option>
+									{/if}
+								{/each}
+							</Select>
+						</div>
+					{/if}
+				{/each}
+
+				{#if globalSearch || Object.values(filters).some(v => v)}
+					<div class="flex justify-end md:justify-start">
+						<button
+							type="button"
+							onclick={() => {
+								globalSearch = '';
+								const cleared: Record<string, string> = {};
+								Object.keys(filters).forEach(k => cleared[k] = '');
+								filters = cleared;
+							}}
+							class="text-sm text-primary-600 dark:text-primary-400 hover:underline"
+						>
+							{$t('common.clearFilters')}
+						</button>
+					</div>
+				{/if}
+			</div>
+		</Card>
 	{/if}
 
 	<!-- Results count -->
 	{#if data.length !== processedData.length}
-		<p class="text-sm text-gray-500 dark:text-gray-400">
-			Showing {processedData.length} of {data.length} results
+		<p class="text-sm text-gray-500 dark:text-gray-400 px-1">
+			{$t('common.showing', { values: { count: processedData.length, total: data.length } })}
 		</p>
 	{/if}
 
 	<!-- Table -->
-	<Table {striped} {hoverable} class={className}>
-		<TableHead>
-			{#each columns as column}
-				<TableHeadCell class={column.headerClass || ''}>
-					{#if column.sortable}
-						<button
-							type="button"
-							onclick={() => handleSort(column.key as string)}
-							class="flex items-center gap-1 hover:text-primary-600 dark:hover:text-primary-400 transition-colors group"
-						>
-							<span>{column.label}</span>
-							<span class="text-gray-400 group-hover:text-primary-500">
-								{#if sortKey === column.key}
-									{#if sortDirection === 'asc'}
-										<ChevronUpOutline class="w-3 h-3" />
+	<Card class="max-w-none p-0! overflow-hidden">
+		<Table {striped} {hoverable} class={className}>
+			<TableHead>
+				{#each columns as column}
+					<TableHeadCell class={column.headerClass || ''}>
+						{#if column.sortable}
+							<button
+								type="button"
+								onclick={() => handleSort(column.key as string)}
+								class="flex items-center gap-1 hover:text-primary-600 dark:hover:text-primary-400 transition-colors group"
+							>
+								<span>{column.label}</span>
+								<span class="text-gray-400 group-hover:text-primary-500">
+									{#if sortKey === column.key}
+										{#if sortDirection === 'asc'}
+											<ChevronUpOutline class="w-3 h-3" />
+										{:else}
+											<ChevronDownOutline class="w-3 h-3" />
+										{/if}
 									{:else}
-										<ChevronDownOutline class="w-3 h-3" />
+										<ChevronSortOutline class="w-3 h-3 opacity-50 group-hover:opacity-100" />
 									{/if}
-								{:else}
-									<ChevronSortOutline class="w-3 h-3 opacity-50 group-hover:opacity-100" />
-								{/if}
-							</span>
-						</button>
-					{:else}
-						{column.label}
-					{/if}
-				</TableHeadCell>
-			{/each}
-		</TableHead>
-		<TableBody>
-			{#if processedData.length === 0}
-				<tr>
-					<td colspan={columns.length} class="text-center py-8">
-						{#if emptyState}
-							{@render emptyState()}
+								</span>
+							</button>
 						{:else}
-							<p class="text-gray-500 dark:text-gray-400">No data found</p>
+							{column.label}
 						{/if}
-					</td>
-				</tr>
-			{:else}
-				{#each processedData as item, index}
-					<TableBodyRow>
-						{@render row(item, index)}
-					</TableBodyRow>
+					</TableHeadCell>
 				{/each}
-			{/if}
-		</TableBody>
-	</Table>
+			</TableHead>
+			<TableBody>
+				{#if processedData.length === 0}
+					<tr>
+						<td colspan={columns.length} class="text-center py-8">
+							{#if emptyState}
+								{@render emptyState()}
+							{:else}
+								<p class="text-gray-500 dark:text-gray-400">{$t('common.noResults')}</p>
+							{/if}
+						</td>
+					</tr>
+				{:else}
+					{#each processedData as item, index}
+						<TableBodyRow>
+							{@render row(item, index)}
+						</TableBodyRow>
+					{/each}
+				{/if}
+			</TableBody>
+		</Table>
+	</Card>
 </div>

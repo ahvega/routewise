@@ -32,10 +32,12 @@
 		StatusBadge,
 		DataTable,
 		ActionMenu,
+		ContactActions,
 		createEditAction,
 		createDeleteAction,
 		createCallAction,
 		createEmailAction,
+		createWhatsAppAction,
 		filterActions,
 		type Column,
 		type ActionItem
@@ -139,7 +141,8 @@
 			key: 'licenseCategory',
 			label: $t('drivers.columns.category') || 'Category',
 			sortable: true,
-			filterOptions: licenseCategories.map(c => c.name)
+			filterOptions: licenseCategories.map(c => c.name),
+			filterPlaceholder: $t('drivers.filters.categoryPlaceholder')
 		},
 		{
 			key: 'licenseExpiry',
@@ -151,7 +154,11 @@
 			key: 'status',
 			label: $t('drivers.columns.status'),
 			sortable: true,
-			filterOptions: ['active', 'inactive', 'on_leave'],
+			filterOptions: [
+				{ label: $t('statuses.active'), value: 'active' },
+				{ label: $t('statuses.inactive'), value: 'inactive' },
+				{ label: $t('statuses.on_leave'), value: 'on_leave' }
+			],
 			filterPlaceholder: $t('drivers.filters.statusPlaceholder')
 		}
 	]);
@@ -162,10 +169,11 @@
 			// Edit action
 			createEditAction(() => openEditModal(driver), $t('common.edit')),
 
-			// Call actions (with divider)
+			// Call/WhatsApp actions (with divider)
 			driver.phone
 				? { ...createCallAction(driver.phone, $t('common.call'))!, dividerBefore: true }
 				: null,
+			createWhatsAppAction(driver.phone),
 			driver.emergencyContactPhone
 				? createCallAction(driver.emergencyContactPhone, $t('drivers.callEmergencyContact'))
 				: null,
@@ -444,12 +452,14 @@
 		</div>
 	{/if}
 
-	<Card class="max-w-none !p-6">
-		{#if isLoading}
+	{#if isLoading}
+		<Card class="max-w-none !p-6">
 			<div class="flex justify-center py-12">
 				<Spinner size="8" />
 			</div>
-		{:else if drivers.length === 0}
+		</Card>
+	{:else if drivers.length === 0}
+		<Card class="max-w-none !p-6">
 			<div class="text-center py-12">
 				<p class="text-gray-500 dark:text-gray-400 mb-4">
 					{$t('drivers.noDrivers')}
@@ -459,70 +469,64 @@
 					{$t('drivers.addDriver')}
 				</Button>
 			</div>
-		{:else if filteredDrivers.length === 0}
-			<div class="text-center py-12">
-				<p class="text-gray-500 dark:text-gray-400 mb-4">
-					{$t('common.noResults')}
-				</p>
-				<Button color="alternative" onclick={() => clearFilters()}>
-					{$t('common.clearFilters')}
-				</Button>
-			</div>
-		{:else}
-			<DataTable data={filteredDrivers} {columns}>
-				{#snippet row(driver)}
-					{@const expiryStatus = getLicenseExpiryStatus(driver.licenseExpiry)}
-					<TableBodyCell>
-						<div class="flex items-center justify-between gap-2">
-							<div>
-								<div class="font-medium text-gray-900 dark:text-white">
-									{driver.firstName} {driver.lastName}
-								</div>
-								{#if driver.hireDate}
-									<div class="text-sm text-gray-500 dark:text-gray-400">
-										Since {formatDate(driver.hireDate)}
-									</div>
-								{/if}
+		</Card>
+	{:else}
+		<DataTable data={filteredDrivers} {columns}>
+			{#snippet row(driver)}
+				{@const expiryStatus = getLicenseExpiryStatus(driver.licenseExpiry)}
+				<TableBodyCell>
+					<div class="flex items-center justify-between gap-2">
+						<div>
+							<div class="font-medium text-gray-900 dark:text-white">
+								{driver.firstName} {driver.lastName}
 							</div>
-							<ActionMenu
-								triggerId="actions-{driver._id}"
-								actions={getDriverActions(driver)}
-							/>
-						</div>
-					</TableBodyCell>
-					<TableBodyCell>
-						<div class="text-sm">
-							<div class="text-gray-900 dark:text-white">{driver.phone}</div>
-							{#if driver.email}
-								<div class="text-gray-500 dark:text-gray-400">{driver.email}</div>
+							{#if driver.hireDate}
+								<div class="text-sm text-gray-500 dark:text-gray-400">
+									Since {formatDate(driver.hireDate)}
+								</div>
 							{/if}
 						</div>
-					</TableBodyCell>
-					<TableBodyCell>
-						<div class="font-mono text-sm text-gray-900 dark:text-white">{driver.licenseNumber}</div>
-					</TableBodyCell>
-					<TableBodyCell>
-						{#if driver.licenseCategory}
-							<StatusBadge status={driver.licenseCategory} />
-						{:else}
-							<span class="text-gray-400">-</span>
+						<ActionMenu
+							triggerId="actions-{driver._id}"
+							actions={getDriverActions(driver)}
+						/>
+					</div>
+				</TableBodyCell>
+				<TableBodyCell>
+					<div class="text-sm">
+						<div class="flex items-center gap-2">
+							<span class="text-gray-900 dark:text-white">{driver.phone}</span>
+							<ContactActions phone={driver.phone} email={driver.email} size="xs" />
+						</div>
+						{#if driver.email}
+							<div class="text-gray-500 dark:text-gray-400">{driver.email}</div>
 						{/if}
-					</TableBodyCell>
-					<TableBodyCell>
-						<StatusBadge status={expiryStatus.status}>
-							{#if expiryStatus.status === 'error'}
-								<ExclamationCircleOutline class="w-3 h-3 mr-1 inline" />
-							{/if}
-							{expiryStatus.text}
-						</StatusBadge>
-					</TableBodyCell>
-					<TableBodyCell>
-						<StatusBadge status={driver.status} />
-					</TableBodyCell>
-				{/snippet}
-			</DataTable>
-		{/if}
-	</Card>
+					</div>
+				</TableBodyCell>
+				<TableBodyCell>
+					<div class="font-mono text-sm text-gray-900 dark:text-white">{driver.licenseNumber}</div>
+				</TableBodyCell>
+				<TableBodyCell>
+					{#if driver.licenseCategory}
+						<StatusBadge status={driver.licenseCategory} />
+					{:else}
+						<span class="text-gray-400">-</span>
+					{/if}
+				</TableBodyCell>
+				<TableBodyCell>
+					<StatusBadge status={expiryStatus.status}>
+						{#if expiryStatus.status === 'error'}
+							<ExclamationCircleOutline class="w-3 h-3 mr-1 inline" />
+						{/if}
+						{expiryStatus.text}
+					</StatusBadge>
+				</TableBodyCell>
+				<TableBodyCell>
+					<StatusBadge status={driver.status} />
+				</TableBodyCell>
+			{/snippet}
+		</DataTable>
+	{/if}
 </div>
 
 <!-- Create/Edit Modal -->

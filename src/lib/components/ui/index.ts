@@ -6,6 +6,7 @@ export { default as ComboboxInput } from './ComboboxInput.svelte';
 export { default as PlacesAutocomplete } from './PlacesAutocomplete.svelte';
 export { default as ActionMenu } from './ActionMenu.svelte';
 export { default as ActionMenuCard } from './ActionMenuCard.svelte';
+export { default as ContactActions } from './ContactActions.svelte';
 
 // Re-export types
 export type { Column } from './DataTable.svelte';
@@ -20,6 +21,8 @@ export {
 	createDuplicateAction,
 	createCallAction,
 	createEmailAction,
+	createWhatsAppAction,
+	formatPhoneForWhatsApp,
 	createPdfAction,
 	createSendEmailAction,
 	createApproveAction,

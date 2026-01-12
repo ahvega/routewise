@@ -277,14 +277,21 @@
 			key: 'ownership',
 			label: $t('vehicles.columns.ownership'),
 			sortable: true,
-			filterOptions: ['owned', 'rented'],
+			filterOptions: [
+				{ label: $t('statuses.owned'), value: 'owned' },
+				{ label: $t('statuses.rented'), value: 'rented' }
+			],
 			filterPlaceholder: $t('vehicles.filters.ownershipPlaceholder')
 		},
 		{
 			key: 'status',
 			label: $t('vehicles.columns.status'),
 			sortable: true,
-			filterOptions: ['active', 'inactive', 'maintenance'],
+			filterOptions: [
+				{ label: $t('statuses.active'), value: 'active' },
+				{ label: $t('statuses.inactive'), value: 'inactive' },
+				{ label: $t('statuses.maintenance'), value: 'maintenance' }
+			],
 			filterPlaceholder: $t('vehicles.filters.statusPlaceholder')
 		}
 	]);
@@ -597,12 +604,14 @@
 		</div>
 	{/if}
 
-	<Card class="max-w-none !p-6">
-		{#if isLoading}
+	{#if isLoading}
+		<Card class="max-w-none !p-6">
 			<div class="flex justify-center py-12">
 				<Spinner size="8" />
 			</div>
-		{:else if vehicles.length === 0}
+		</Card>
+	{:else if vehicles.length === 0}
+		<Card class="max-w-none !p-6">
 			<div class="text-center py-12">
 				<p class="text-gray-500 dark:text-gray-400 mb-4">
 					{$t('vehicles.noVehicles')}
@@ -612,58 +621,49 @@
 					{$t('vehicles.addVehicle')}
 				</Button>
 			</div>
-		{:else if filteredVehicles.length === 0}
-			<div class="text-center py-12">
-				<p class="text-gray-500 dark:text-gray-400 mb-4">
-					{$t('common.noResults')}
-				</p>
-				<Button color="alternative" onclick={() => clearFilters()}>
-					{$t('common.clearFilters')}
-				</Button>
-			</div>
-		{:else}
-			<DataTable data={filteredVehicles} {columns}>
-				{#snippet row(vehicle)}
-					<TableBodyCell>
-						<div class="flex items-center justify-between gap-2">
-							<div>
-								<div class="font-medium text-gray-900 dark:text-white">
-									{vehicle.name}
-								</div>
-								{#if vehicle.make || vehicle.model}
-									<div class="text-sm text-gray-500 dark:text-gray-400">
-										{[vehicle.make, vehicle.model, vehicle.year].filter(Boolean).join(' ')}
-									</div>
-								{/if}
+		</Card>
+	{:else}
+		<DataTable data={filteredVehicles} {columns}>
+			{#snippet row(vehicle)}
+				<TableBodyCell>
+					<div class="flex items-center justify-between gap-2">
+						<div>
+							<div class="font-medium text-gray-900 dark:text-white">
+								{vehicle.name}
 							</div>
-							<ActionMenu
-								triggerId="actions-{vehicle._id}"
-								actions={getVehicleActions(vehicle)}
-							/>
+							{#if vehicle.make || vehicle.model}
+								<div class="text-sm text-gray-500 dark:text-gray-400">
+									{[vehicle.make, vehicle.model, vehicle.year].filter(Boolean).join(' ')}
+								</div>
+							{/if}
 						</div>
-					</TableBodyCell>
-					<TableBodyCell>
-						{vehicle.passengerCapacity} {$t('vehicles.fields.passengers')}
-					</TableBodyCell>
-					<TableBodyCell>
-						{vehicle.fuelEfficiency} {vehicle.fuelEfficiencyUnit === 'kpl' ? 'km/L' : vehicle.fuelEfficiencyUnit}
-					</TableBodyCell>
-					<TableBodyCell>
-						{formatCurrency(vehicle.costPerDay)}
-					</TableBodyCell>
-					<TableBodyCell>
-						{formatCurrency(vehicle.costPerDistance)}/{vehicle.distanceUnit}
-					</TableBodyCell>
-					<TableBodyCell>
-						<StatusBadge status={vehicle.ownership} />
-					</TableBodyCell>
-					<TableBodyCell>
-						<StatusBadge status={vehicle.status} />
-					</TableBodyCell>
-				{/snippet}
-			</DataTable>
-		{/if}
-	</Card>
+						<ActionMenu
+							triggerId="actions-{vehicle._id}"
+							actions={getVehicleActions(vehicle)}
+						/>
+					</div>
+				</TableBodyCell>
+				<TableBodyCell>
+					{vehicle.passengerCapacity} {$t('vehicles.fields.passengers')}
+				</TableBodyCell>
+				<TableBodyCell>
+					{vehicle.fuelEfficiency} {vehicle.fuelEfficiencyUnit === 'kpl' ? 'km/L' : vehicle.fuelEfficiencyUnit}
+				</TableBodyCell>
+				<TableBodyCell>
+					{formatCurrency(vehicle.costPerDay)}
+				</TableBodyCell>
+				<TableBodyCell>
+					{formatCurrency(vehicle.costPerDistance)}/{vehicle.distanceUnit}
+				</TableBodyCell>
+				<TableBodyCell>
+					<StatusBadge status={vehicle.ownership} />
+				</TableBodyCell>
+				<TableBodyCell>
+					<StatusBadge status={vehicle.status} />
+				</TableBodyCell>
+			{/snippet}
+		</DataTable>
+	{/if}
 </div>
 
 <!-- Create/Edit Modal -->

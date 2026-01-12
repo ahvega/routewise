@@ -242,6 +242,9 @@ export const createFromQuotation = mutation({
     dropoffTime: v.optional(v.string()),
     dropoffNotes: v.optional(v.string()),
     notes: v.optional(v.string()),
+    // Trip leader contact info (from GroupLeaderModal)
+    tripLeaderPhone: v.optional(v.string()),
+    tripLeaderEmail: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     // Get the quotation
@@ -312,8 +315,10 @@ export const createFromQuotation = mutation({
       startDate: args.startDate,
       endDate: args.endDate,
       estimatedDays: quotation.estimatedDays,
-      // Trip Leader (copied from quotation's group leader)
+      // Trip Leader (copied from quotation's group leader, with optional contact info)
       tripLeaderName: quotation.groupLeaderName,
+      tripLeaderPhone: args.tripLeaderPhone,
+      tripLeaderEmail: args.tripLeaderEmail,
       // Pickup/Dropoff
       pickupLocation: args.pickupLocation || quotation.origin,
       pickupTime: args.pickupTime,

@@ -31,10 +31,12 @@
 		StatusBadge,
 		DataTable,
 		ActionMenu,
+		ContactActions,
 		createEditAction,
 		createDeleteAction,
 		createCallAction,
 		createEmailAction,
+		createWhatsAppAction,
 		filterActions,
 		type Column,
 		type ActionItem
@@ -135,8 +137,6 @@
 			key: 'clientCode',
 			label: 'Código',
 			sortable: true,
-			filterable: true,
-			filterPlaceholder: 'Código...',
 			getValue: (c) => c.clientCode || '-'
 		},
 		{
@@ -158,14 +158,22 @@
 			key: 'type',
 			label: $t('clients.columns.type'),
 			sortable: true,
-			filterOptions: ['company', 'individual'],
+			filterOptions: [
+				{ label: $t('clients.fields.company'), value: 'company' },
+				{ label: $t('clients.fields.individual'), value: 'individual' }
+			],
 			filterPlaceholder: $t('clients.filters.typePlaceholder')
 		},
 		{
 			key: 'pricingLevel',
 			label: $t('clients.columns.pricing') || 'Pricing',
 			sortable: true,
-			filterOptions: ['standard', 'preferred', 'vip']
+			filterOptions: [
+				{ label: $t('statuses.standard'), value: 'standard' },
+				{ label: $t('statuses.preferred'), value: 'preferred' },
+				{ label: $t('statuses.vip'), value: 'vip' }
+			],
+			filterPlaceholder: $t('clients.filters.pricingPlaceholder')
 		},
 		{
 			key: 'creditLimit',
@@ -176,7 +184,10 @@
 			key: 'status',
 			label: $t('clients.columns.status'),
 			sortable: true,
-			filterOptions: ['active', 'inactive'],
+			filterOptions: [
+				{ label: $t('statuses.active'), value: 'active' },
+				{ label: $t('statuses.inactive'), value: 'inactive' }
+			],
 			filterPlaceholder: $t('clients.filters.statusPlaceholder')
 		}
 	]);
@@ -187,10 +198,11 @@
 			// Edit action
 			createEditAction(() => openEditModal(clientData), $t('common.edit')),
 
-			// Call/Email actions (with divider)
+			// Call/WhatsApp/Email actions (with divider)
 			clientData.phone
 				? { ...createCallAction(clientData.phone, $t('common.call'))!, dividerBefore: true }
 				: null,
+			createWhatsAppAction(clientData.phone),
 			createEmailAction(clientData.email, $t('common.email')),
 
 			// Delete action
@@ -460,12 +472,14 @@
 		</div>
 	{/if}
 
-	<Card class="max-w-none !p-6">
-		{#if isLoading}
+	{#if isLoading}
+		<Card class="max-w-none !p-6">
 			<div class="flex justify-center py-12">
 				<Spinner size="8" />
 			</div>
-		{:else if clients.length === 0}
+		</Card>
+	{:else if clients.length === 0}
+		<Card class="max-w-none !p-6">
 			<div class="text-center py-12">
 				<p class="text-gray-500 dark:text-gray-400 mb-4">
 					{$t('clients.noClients')}
@@ -475,86 +489,82 @@
 					{$t('clients.addClient')}
 				</Button>
 			</div>
-		{:else if filteredClients.length === 0}
-			<div class="text-center py-12">
-				<p class="text-gray-500 dark:text-gray-400 mb-4">
-					{$t('common.noResults')}
-				</p>
-				<Button color="alternative" onclick={() => clearFilters()}>
-					{$t('common.clearFilters')}
-				</Button>
-			</div>
-		{:else}
-			<DataTable data={filteredClients} {columns}>
-				{#snippet row(clientData)}
-					<TableBodyCell>
-						<span class="font-mono text-sm text-gray-600 dark:text-gray-400">
-							{clientData.clientCode || '-'}
-						</span>
-					</TableBodyCell>
-					<TableBodyCell>
-						<div class="flex items-center justify-between gap-2">
-							<div class="flex items-center gap-3">
-								<div class="p-2 rounded-full bg-gray-100 dark:bg-gray-700">
-									{#if clientData.type === 'company'}
-										<BuildingOutline class="w-5 h-5 text-gray-500 dark:text-gray-400" />
-									{:else}
-										<UserOutline class="w-5 h-5 text-gray-500 dark:text-gray-400" />
-									{/if}
+		</Card>
+	{:else}
+		<DataTable data={filteredClients} {columns}>
+			{#snippet row(clientData)}
+				<TableBodyCell>
+					<span class="font-mono text-sm text-gray-600 dark:text-gray-400">
+						{clientData.clientCode || '-'}
+					</span>
+				</TableBodyCell>
+				<TableBodyCell>
+					<div class="flex items-center justify-between gap-2">
+						<div class="flex items-center gap-3">
+							<div class="p-2 rounded-full bg-gray-100 dark:bg-gray-700">
+								{#if clientData.type === 'company'}
+									<BuildingOutline class="w-5 h-5 text-gray-500 dark:text-gray-400" />
+								{:else}
+									<UserOutline class="w-5 h-5 text-gray-500 dark:text-gray-400" />
+								{/if}
+							</div>
+							<div>
+								<div class="font-medium text-gray-900 dark:text-white">
+									{getClientName(clientData)}
 								</div>
-								<div>
-									<div class="font-medium text-gray-900 dark:text-white">
-										{getClientName(clientData)}
-									</div>
-									<div class="text-sm text-gray-500 dark:text-gray-400">
-										{clientData.city || clientData.country}
-									</div>
+								<div class="text-sm text-gray-500 dark:text-gray-400">
+									{clientData.city || clientData.country}
 								</div>
 							</div>
-							<ActionMenu
-								triggerId="actions-{clientData._id}"
-								actions={getClientActions(clientData)}
-							/>
 						</div>
-					</TableBodyCell>
-					<TableBodyCell>
-						<div class="text-sm">
-							{#if clientData.email}
-								<div class="text-gray-900 dark:text-white">{clientData.email}</div>
-							{/if}
-							{#if clientData.phone}
-								<div class="text-gray-500 dark:text-gray-400">{clientData.phone}</div>
-							{/if}
-						</div>
-					</TableBodyCell>
-					<TableBodyCell>
-						<StatusBadge status={clientData.type} />
-					</TableBodyCell>
-					<TableBodyCell>
-						<div class="text-sm font-medium text-gray-900 dark:text-white">
-							{getPricingLevelName(clientData.pricingLevel)}
-						</div>
-						<div class="text-xs text-gray-500 dark:text-gray-400">
-							{clientData.discountPercentage}% {$t('clients.columns.discount').toLowerCase()}
-						</div>
-					</TableBodyCell>
-					<TableBodyCell>
-						<div class="text-sm">
-							<div class="text-gray-900 dark:text-white">
-								L {clientData.creditLimit.toLocaleString()}
+						<ActionMenu
+							triggerId="actions-{clientData._id}"
+							actions={getClientActions(clientData)}
+						/>
+					</div>
+				</TableBodyCell>
+				<TableBodyCell>
+					<div class="text-sm">
+						{#if clientData.email}
+							<div class="text-gray-900 dark:text-white">{clientData.email}</div>
+						{/if}
+						{#if clientData.phone}
+							<div class="flex items-center gap-2">
+								<span class="text-gray-500 dark:text-gray-400">{clientData.phone}</span>
+								<ContactActions phone={clientData.phone} email={clientData.email} size="xs" />
 							</div>
-							<div class="text-gray-500 dark:text-gray-400">
-								{clientData.paymentTerms > 0 ? $t('clients.fields.paymentTermsDays', { values: { days: clientData.paymentTerms } }) : $t('clients.fields.immediate')}
-							</div>
+						{:else if clientData.email}
+							<ContactActions email={clientData.email} size="xs" class="mt-1" />
+						{/if}
+					</div>
+				</TableBodyCell>
+				<TableBodyCell>
+					<StatusBadge status={clientData.type} />
+				</TableBodyCell>
+				<TableBodyCell>
+					<div class="text-sm font-medium text-gray-900 dark:text-white">
+						{getPricingLevelName(clientData.pricingLevel)}
+					</div>
+					<div class="text-xs text-gray-500 dark:text-gray-400">
+						{clientData.discountPercentage}% {$t('clients.columns.discount').toLowerCase()}
+					</div>
+				</TableBodyCell>
+				<TableBodyCell>
+					<div class="text-sm">
+						<div class="text-gray-900 dark:text-white">
+							L {clientData.creditLimit.toLocaleString()}
 						</div>
-					</TableBodyCell>
-					<TableBodyCell>
-						<StatusBadge status={clientData.status} />
-					</TableBodyCell>
-				{/snippet}
-			</DataTable>
-		{/if}
-	</Card>
+						<div class="text-gray-500 dark:text-gray-400">
+							{clientData.paymentTerms > 0 ? $t('clients.fields.paymentTermsDays', { values: { days: clientData.paymentTerms } }) : $t('clients.fields.immediate')}
+						</div>
+					</div>
+				</TableBodyCell>
+				<TableBodyCell>
+					<StatusBadge status={clientData.status} />
+				</TableBodyCell>
+			{/snippet}
+		</DataTable>
+	{/if}
 </div>
 
 <!-- Create/Edit Modal -->

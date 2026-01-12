@@ -149,3 +149,96 @@ a[href][class*="rounded-lg"][class*="hover:bg"],
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
+
+/* ==============================================
+   ApexCharts Styles - Dark Mode Override
+   Using html.dark for higher specificity to override
+   the component's bundled CSS
+   ============================================== */
+
+/* Tooltips */
+html.dark .apexcharts-canvas .apexcharts-tooltip {
+  background-color: #374151 !important;
+  color: #f3f4f6 !important;
+  border-color: transparent !important;
+}
+html.dark .apexcharts-canvas .apexcharts-tooltip .apexcharts-tooltip-title {
+  background-color: #4b5563 !important;
+  border-color: #6b7280 !important;
+  color: #e5e7eb !important;
+}
+html.dark .apexcharts-canvas .apexcharts-tooltip .apexcharts-tooltip-text-y-label {
+  color: #e5e7eb !important;
+}
+html.dark .apexcharts-canvas .apexcharts-tooltip .apexcharts-tooltip-text-y-value {
+  color: white !important;
+}
+html.dark .apexcharts-canvas .apexcharts-tooltip-series-group.apexcharts-active {
+  background-color: #374151 !important;
+  color: #f3f4f6 !important;
+}
+
+/* X-Axis Tooltip */
+html.dark .apexcharts-canvas .apexcharts-xaxistooltip {
+  color: #f3f4f6 !important;
+  background-color: #374151 !important;
+}
+html.dark .apexcharts-canvas .apexcharts-xaxistooltip:after,
+html.dark .apexcharts-canvas .apexcharts-xaxistooltip:before {
+  border-bottom-color: #374151 !important;
+}
+
+/* Legend - CRITICAL for dark mode visibility */
+html.dark .apexcharts-canvas .apexcharts-legend-text {
+  color: #f3f4f6 !important;
+}
+html.dark .apexcharts-canvas .apexcharts-legend-text:not(.apexcharts-inactive-legend):hover {
+  color: white !important;
+}
+
+/* Data Labels (donut center labels) - CRITICAL for dark mode */
+html.dark .apexcharts-canvas .apexcharts-datalabels-group .apexcharts-text.apexcharts-datalabel-value {
+  fill: white !important;
+}
+html.dark .apexcharts-canvas .apexcharts-datalabels-group .apexcharts-text.apexcharts-datalabel-label {
+  fill: #e5e7eb !important;
+}
+
+/* Grid lines and crosshairs */
+html.dark .apexcharts-gridline,
+html.dark .apexcharts-xcrosshairs,
+html.dark .apexcharts-ycrosshairs {
+  stroke: #374151 !important;
+}
+
+/* Axis labels */
+html.dark .apexcharts-xaxis-label,
+html.dark .apexcharts-yaxis-label,
+html.dark .apexcharts-xaxis text,
+html.dark .apexcharts-yaxis text {
+  fill: #d1d5db !important;
+}
+
+/* Axis titles */
+html.dark .apexcharts-xaxis-title text,
+html.dark .apexcharts-yaxis-title text {
+  fill: #d1d5db !important;
+}
+
+/* Crosshair cursor on chart hover */
+.apexcharts-canvas {
+  cursor: crosshair;
+}
+
+.apexcharts-legend-text {
+  color: #f9fafb !important; /* gray-50 */
+  fill: #f9fafb !important;
+}
+
+.apexcharts-xaxis-label,
+.apexcharts-yaxis-label,
+.apexcharts-datalabel-label,
+.apexcharts-datalabel-value,
+.apexcharts-text {
+  fill: #f9fafb !important;
+}

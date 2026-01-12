@@ -528,11 +528,14 @@ export const approve = mutation({
     startDate: v.optional(v.number()),
     vehicleId: v.optional(v.id("vehicles")),
     driverId: v.optional(v.id("drivers")),
+    // Trip leader contact info (from GroupLeaderModal)
+    tripLeaderPhone: v.optional(v.string()),
+    tripLeaderEmail: v.optional(v.string()),
     // Invoice details (required if creating invoice)
     paymentTermsDays: v.optional(v.number()), // Days until due date, defaults to tenant setting
   },
   handler: async (ctx, args) => {
-    const { id, createItinerary, createInvoice, startDate, vehicleId, driverId, paymentTermsDays } = args;
+    const { id, createItinerary, createInvoice, startDate, vehicleId, driverId, tripLeaderPhone, tripLeaderEmail, paymentTermsDays } = args;
     const now = Date.now();
 
     // Get the quotation
@@ -616,6 +619,10 @@ export const approve = mutation({
         totalTime: quotation.totalTime,
         startDate,
         estimatedDays: quotation.estimatedDays,
+        // Trip leader info from quotation + optional contact from modal
+        tripLeaderName: quotation.groupLeaderName,
+        tripLeaderPhone,
+        tripLeaderEmail,
         localCurrency: quotation.localCurrency,
         agreedPriceLocal: quotation.salePriceLocal,
         agreedPriceHnl: quotation.salePriceHnl,
@@ -937,6 +944,7 @@ function generateServiceDescription(
 }
 
 // Update quotation details
+// Force reload
 export const update = mutation({
   args: {
     id: v.id("quotations"),
@@ -999,17 +1007,112 @@ export const update = mutation({
     internalNotes: v.optional(v.string()),
     pdfUrl: v.optional(v.string()),
     pdfGeneratedAt: v.optional(v.number()),
+    // Added fields for edit form compatibility
+    assignedTo: v.optional(v.id("users")),
+    groupLeaderName: v.optional(v.string()),
+    paymentConditions: v.optional(v.string()),
+    isRoundTrip: v.optional(v.boolean()),
+    deadheadDistance: v.optional(v.number()),
+    mainTripDistance: v.optional(v.number()),
+    status: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const { id, ...updates } = args;
     const existing = await ctx.db.get(id);
     if (!existing) throw new Error("Quotation not found");
 
+    const patchData: any = { ...updates };
+
+    // Recalculate display names if name-affecting fields changed
+    const groupLeaderNameChanged = updates.groupLeaderName !== undefined;
+    const clientIdChanged = updates.clientId !== undefined;
+    const groupSizeChanged = updates.groupSize !== undefined;
+
+    if (groupLeaderNameChanged || clientIdChanged || groupSizeChanged) {
+      const leaderName = updates.groupLeaderName !== undefined ? updates.groupLeaderName : existing.groupLeaderName;
+      const clientId = updates.clientId !== undefined ? updates.clientId : existing.clientId;
+      const groupSize = updates.groupSize !== undefined ? updates.groupSize : existing.groupSize;
+
+      // Get client code
+      let clientCode = null;
+      if (clientId) {
+        const client = await ctx.db.get(clientId);
+        clientCode = client?.clientCode || null;
+      }
+
+      // Regenerate names
+      const leaderDisplay = formatLeaderNameDisplay(leaderName);
+      const leaderFileSafe = formatLeaderNameFileSafe(leaderName);
+
+      const displayName = buildDocumentName(
+        existing.quotationNumber,
+        clientCode,
+        leaderDisplay,
+        groupSize || 0,
+        true
+      );
+      const fileSafeName = buildDocumentName(
+        existing.quotationNumber,
+        clientCode,
+        leaderFileSafe,
+        groupSize || 0,
+        false
+      );
+
+      patchData.quotationDisplayName = displayName;
+      patchData.quotationFileSafeName = fileSafeName;
+      patchData.quotationLongName = fileSafeName; // preserve alias
+    }
+
     await ctx.db.patch(id, {
-      ...updates,
+      ...patchData,
       updatedAt: Date.now(),
     });
     return id;
+  },
+});
+
+// Update group leader name and regenerate display names
+export const updateGroupLeader = mutation({
+  args: {
+    id: v.id("quotations"),
+    groupLeaderName: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const existing = await ctx.db.get(args.id);
+    if (!existing) throw new Error("Quotation not found");
+
+    // Get client code if client exists
+    const client = existing.clientId ? await ctx.db.get(existing.clientId) : null;
+    const clientCode = client?.clientCode || null;
+
+    // Regenerate display/file-safe names with new leader name
+    const leaderDisplay = formatLeaderNameDisplay(args.groupLeaderName);
+    const leaderFileSafe = formatLeaderNameFileSafe(args.groupLeaderName);
+
+    const displayName = buildDocumentName(
+      existing.quotationNumber,
+      clientCode,
+      leaderDisplay,
+      existing.groupSize,
+      true
+    );
+    const fileSafeName = buildDocumentName(
+      existing.quotationNumber,
+      clientCode,
+      leaderFileSafe,
+      existing.groupSize,
+      false
+    );
+
+    await ctx.db.patch(args.id, {
+      groupLeaderName: args.groupLeaderName,
+      quotationDisplayName: displayName,
+      quotationFileSafeName: fileSafeName,
+      updatedAt: Date.now(),
+    });
+
+    return args.id;
   },
 });
 

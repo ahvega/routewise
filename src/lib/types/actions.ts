@@ -158,6 +158,34 @@ export function createEmailAction(
 }
 
 /**
+ * Formats a phone number for WhatsApp links (removes non-numeric chars except leading +)
+ */
+export function formatPhoneForWhatsApp(phone: string): string {
+	let cleaned = phone.replace(/[^+\d]/g, '');
+	if (cleaned.startsWith('+')) {
+		cleaned = cleaned.substring(1);
+	}
+	return cleaned;
+}
+
+/**
+ * Creates a WhatsApp action (returns null if no phone)
+ */
+export function createWhatsAppAction(
+	phone: string | undefined | null,
+	label = 'WhatsApp'
+): ActionItem | null {
+	if (!phone) return null;
+	return {
+		id: 'whatsapp',
+		label,
+		icon: null, // Custom SVG handled in ActionMenu components
+		href: `https://wa.me/${formatPhoneForWhatsApp(phone)}`,
+		color: 'default'
+	};
+}
+
+/**
  * Creates a PDF download action
  */
 export function createPdfAction(onClick: () => void, label = 'Descargar PDF'): ActionItem {

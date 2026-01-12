@@ -40,6 +40,8 @@
 		createViewAction,
 		createCallAction,
 		createEmailAction,
+		createWhatsAppAction,
+		formatPhoneForWhatsApp,
 		filterActions,
 		type ActionItem
 	} from '$lib/components/ui';
@@ -226,14 +228,6 @@
 		return phone.replace(/[^+\d]/g, '');
 	}
 
-	function formatPhoneForWhatsApp(phone: string): string {
-		let cleaned = phone.replace(/[^+\d]/g, '');
-		if (cleaned.startsWith('+')) {
-			cleaned = cleaned.substring(1);
-		}
-		return cleaned;
-	}
-
 	// Build actions for vehicle card
 	function getVehicleActions(): ActionItem[] {
 		if (!vehicle) return [];
@@ -250,6 +244,7 @@
 			clientData.phone
 				? { ...createCallAction(clientData.phone, $t('common.call'))!, dividerBefore: true }
 				: null,
+			createWhatsAppAction(clientData.phone),
 			createEmailAction(clientData.email, $t('common.email'))
 		]);
 	}
@@ -261,7 +256,9 @@
 			createViewAction(`/drivers?selected=${driver._id}`, $t('drivers.viewDriver')),
 			driver.phone
 				? { ...createCallAction(driver.phone, $t('common.call'))!, dividerBefore: true }
-				: null
+				: null,
+			createWhatsAppAction(driver.phone),
+			createEmailAction(driver.email, $t('common.email'))
 		]);
 	}
 

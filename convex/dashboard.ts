@@ -30,6 +30,13 @@ export const getStats = query({
       approvedValue: quotations
         .filter(q => q.status === "approved")
         .reduce((sum, q) => sum + q.salePriceHnl, 0),
+      // Total value of all quotations (any status)
+      totalValue: quotations.reduce((sum, q) => sum + q.salePriceHnl, 0),
+      totalValueUsd: quotations.reduce((sum, q) => sum + (q.salePriceUsd || q.salePriceHnl / (q.exchangeRateUsed || 26.31)), 0),
+      // Approved value in USD
+      approvedValueUsd: quotations
+        .filter(q => q.status === "approved")
+        .reduce((sum, q) => sum + (q.salePriceUsd || q.salePriceHnl / (q.exchangeRateUsed || 26.31)), 0),
       conversionRate: quotations.filter(q => q.status === "sent" || q.status === "approved" || q.status === "rejected").length > 0
         ? (quotations.filter(q => q.status === "approved").length /
            quotations.filter(q => q.status === "sent" || q.status === "approved" || q.status === "rejected").length) * 100
@@ -47,28 +54,33 @@ export const getStats = query({
     };
 
     // Invoice stats
+    const DEFAULT_EXCHANGE_RATE = 26.31;
+    const totalReceivablesHnl = invoices.filter(i => i.amountDue > 0).reduce((sum, i) => sum + i.amountDue, 0);
     const invoiceStats = {
       total: invoices.length,
       unpaid: invoices.filter(i => i.paymentStatus === "unpaid").length,
       partial: invoices.filter(i => i.paymentStatus === "partial").length,
       paid: invoices.filter(i => i.paymentStatus === "paid").length,
       overdue: invoices.filter(i => i.paymentStatus === "overdue" || (i.dueDate < now && i.amountDue > 0)).length,
-      totalReceivables: invoices.filter(i => i.amountDue > 0).reduce((sum, i) => sum + i.amountDue, 0),
+      totalReceivables: totalReceivablesHnl,
+      totalReceivablesUsd: totalReceivablesHnl / DEFAULT_EXCHANGE_RATE,
       overdueAmount: invoices
         .filter(i => i.dueDate < now && i.amountDue > 0)
         .reduce((sum, i) => sum + i.amountDue, 0),
     };
 
     // Expense advance stats
+    const outstandingAmountHnl = advances
+      .filter(a => a.status === "disbursed")
+      .reduce((sum, a) => sum + a.amountHnl, 0);
     const advanceStats = {
       total: advances.length,
       pending: advances.filter(a => a.status === "pending").length,
       approved: advances.filter(a => a.status === "approved").length,
       disbursed: advances.filter(a => a.status === "disbursed").length,
       settled: advances.filter(a => a.status === "settled").length,
-      outstandingAmount: advances
-        .filter(a => a.status === "disbursed")
-        .reduce((sum, a) => sum + a.amountHnl, 0),
+      outstandingAmount: outstandingAmountHnl,
+      outstandingAmountUsd: outstandingAmountHnl / DEFAULT_EXCHANGE_RATE,
     };
 
     // Resource stats
@@ -494,7 +506,7 @@ export const getUpcomingItineraries = query({
   },
 });
 
-// Get revenue history for charts
+// Get revenue history for charts (includes both revenue and profit)
 export const getRevenueHistory = query({
   args: {
     tenantId: v.id("tenants"),
@@ -517,7 +529,7 @@ export const getRevenueHistory = query({
 
     // Group by date (day or week depending on range)
     const groupByWeek = days > 30;
-    const dataPoints: Map<string, number> = new Map();
+    const dataPoints: Map<string, { value: number; profit: number }> = new Map();
 
     // Initialize all dates with 0
     for (let i = 0; i < days; i++) {
@@ -526,23 +538,29 @@ export const getRevenueHistory = query({
         ? getWeekKey(date)
         : date.toISOString().split('T')[0];
       if (!dataPoints.has(key)) {
-        dataPoints.set(key, 0);
+        dataPoints.set(key, { value: 0, profit: 0 });
       }
     }
 
-    // Add approved quotation values
+    // Add approved quotation values and profits
     for (const q of approvedQuotations) {
       const date = new Date(q.approvedAt!);
       const key = groupByWeek
         ? getWeekKey(date)
         : date.toISOString().split('T')[0];
-      dataPoints.set(key, (dataPoints.get(key) || 0) + q.salePriceHnl);
+      const current = dataPoints.get(key) || { value: 0, profit: 0 };
+      const cost = q.totalCost || 0;
+      const profit = q.salePriceHnl - cost;
+      dataPoints.set(key, {
+        value: current.value + q.salePriceHnl,
+        profit: current.profit + profit
+      });
     }
 
     // Convert to array sorted by date
     const result = Array.from(dataPoints.entries())
       .sort((a, b) => a[0].localeCompare(b[0]))
-      .map(([date, value]) => ({ date, value }));
+      .map(([date, data]) => ({ date, value: data.value, profit: data.profit }));
 
     return result;
   },

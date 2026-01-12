@@ -37,12 +37,15 @@
 	import {
 		StatusBadge,
 		ActionMenuCard,
+		ContactActions,
 		createViewAction,
 		createCallAction,
 		createEmailAction,
+		createWhatsAppAction,
 		filterActions,
 		type ActionItem
 	} from '$lib/components/ui';
+	import { GroupLeaderModal } from '$lib/components/modals';
 	import { t } from '$lib/i18n';
 	import type { Id } from '$convex/_generated/dataModel';
 	import type { QuotationPdfData } from '$lib/services/pdf';
@@ -108,6 +111,12 @@
 	const parameters = $derived(parametersQuery.data);
 	const isLoading = $derived(quotationQuery.isLoading);
 
+	// Quotation editability: editable if not approved
+	const canEditQuotation = $derived(() => {
+		if (!quotation) return false;
+		return quotation.status !== 'approved';
+	});
+
 	// Active resources for assignment
 	const activeDrivers = $derived(drivers.filter(d => d.status === 'active'));
 	const activeVehicles = $derived(vehicles.filter(v => v.status === 'active'));
@@ -139,11 +148,28 @@
 	let approvalCreateInvoice = $state(true);
 	let isApproving = $state(false);
 
+	// Group Leader Modal state (for itinerary generation)
+	let showGroupLeaderModal = $state(false);
+	let groupLeaderPhone = $state('');
+	let groupLeaderEmail = $state('');
+	let pendingAction = $state<'convert' | 'approve' | null>(null);
+
 	// PDF and Email state
 	let isGeneratingPdf = $state(false);
 	let isSendingEmail = $state(false);
 	let showEmailModal = $state(false);
 	let emailRecipient = $state('');
+
+	// Handle PDF download query param
+	$effect(() => {
+		if (quotation && vehicle && tenant && $page.url.searchParams.get('pdf') === 'true' && !isGeneratingPdf) {
+			const newUrl = new URL($page.url);
+			newUrl.searchParams.delete('pdf');
+			goto(newUrl.toString(), { replaceState: true });
+			
+			downloadPdf();
+		}
+	});
 
 	function getClientName(client: any): string {
 		if (!client) return 'Walk-in';
@@ -250,6 +276,14 @@
 	}
 
 	function openConvertModal() {
+		// Show GroupLeaderModal first to collect/confirm trip leader info
+		pendingAction = 'convert';
+		groupLeaderPhone = '';
+		groupLeaderEmail = '';
+		showGroupLeaderModal = true;
+	}
+
+	function proceedWithConvertModal() {
 		// Use quotation's departure date if available, otherwise default to tomorrow
 		if (quotation?.departureDate) {
 			convertStartDate = new Date(quotation.departureDate).toISOString().split('T')[0];
@@ -264,6 +298,14 @@
 	}
 
 	function openApprovalModal() {
+		// Show GroupLeaderModal first to collect/confirm trip leader info
+		pendingAction = 'approve';
+		groupLeaderPhone = '';
+		groupLeaderEmail = '';
+		showGroupLeaderModal = true;
+	}
+
+	function proceedWithApprovalModal() {
 		// Use quotation's departure date if available, otherwise default to tomorrow
 		if (quotation?.departureDate) {
 			approvalStartDate = new Date(quotation.departureDate).toISOString().split('T')[0];
@@ -277,6 +319,44 @@
 		showApprovalModal = true;
 	}
 
+	async function handleGroupLeaderConfirm(data: { name: string; phone: string; email: string }) {
+		if (!quotation) return;
+
+		showGroupLeaderModal = false;
+
+		// If name changed, update the quotation
+		if (data.name !== quotation.groupLeaderName) {
+			try {
+				await client.mutation(api.quotations.updateGroupLeader, {
+					id: quotation._id,
+					groupLeaderName: data.name
+				});
+			} catch (error) {
+				console.error('Failed to update group leader:', error);
+				showToastMessage($t('quotations.saveFailed'), 'error');
+				pendingAction = null;
+				return;
+			}
+		}
+
+		// Store phone/email for itinerary creation
+		groupLeaderPhone = data.phone;
+		groupLeaderEmail = data.email;
+
+		// Proceed with the pending action
+		if (pendingAction === 'convert') {
+			proceedWithConvertModal();
+		} else if (pendingAction === 'approve') {
+			proceedWithApprovalModal();
+		}
+		pendingAction = null;
+	}
+
+	function handleGroupLeaderCancel() {
+		showGroupLeaderModal = false;
+		pendingAction = null;
+	}
+
 	async function approveQuotation() {
 		if (!quotation) return;
 
@@ -288,7 +368,9 @@
 				id: quotation._id,
 				createItinerary: approvalCreateItinerary,
 				createInvoice: approvalCreateInvoice,
-				startDate: startDateTimestamp
+				startDate: startDateTimestamp,
+				tripLeaderPhone: groupLeaderPhone || undefined,
+				tripLeaderEmail: groupLeaderEmail || undefined,
 			});
 
 			showApprovalModal = false;
@@ -342,6 +424,8 @@
 				startDate: startDateTimestamp,
 				driverId: convertDriverId ? (convertDriverId as Id<'drivers'>) : undefined,
 				vehicleId: convertVehicleId ? (convertVehicleId as Id<'vehicles'>) : undefined,
+				tripLeaderPhone: groupLeaderPhone || undefined,
+				tripLeaderEmail: groupLeaderEmail || undefined,
 			});
 			showConvertModal = false;
 			showToastMessage($t('itineraries.createSuccess'), 'success');
@@ -370,6 +454,7 @@
 			clientData.phone
 				? { ...createCallAction(clientData.phone, $t('common.call'))!, dividerBefore: true }
 				: null,
+			createWhatsAppAction(clientData.phone),
 			createEmailAction(clientData.email, $t('common.email'))
 		]);
 	}
@@ -517,8 +602,19 @@
 			if (!pdfResponse.ok) throw new Error('Failed to generate PDF');
 
 			const pdfBlob = await pdfResponse.blob();
-			const pdfArrayBuffer = await pdfBlob.arrayBuffer();
-			const pdfBase64 = btoa(String.fromCharCode(...new Uint8Array(pdfArrayBuffer)));
+			
+			// Convert Blob to Base64 using FileReader to avoid stack overflow with large files
+			const pdfBase64 = await new Promise<string>((resolve, reject) => {
+				const reader = new FileReader();
+				reader.onloadend = () => {
+					const result = reader.result as string;
+					// Remove data URL prefix (e.g., "data:application/pdf;base64,")
+					const base64 = result.split(',')[1];
+					resolve(base64);
+				};
+				reader.onerror = reject;
+				reader.readAsDataURL(pdfBlob);
+			});
 
 			// Send the email
 			const emailResponse = await fetch('/api/email/send', {
@@ -582,6 +678,13 @@
 		{#if quotation}
 			<div class="flex items-center gap-2 flex-wrap">
 				<StatusBadge status={quotation.status} variant="quotation" />
+
+				{#if quotation.status !== 'approved'}
+					<Button size="sm" color="light" href="/quotations/{quotation._id}/edit">
+						<PenOutline class="w-4 h-4 mr-2" />
+						{$t('common.edit')}
+					</Button>
+				{/if}
 
 				<!-- PDF and Email buttons -->
 				<Button size="sm" color="light" onclick={downloadPdf} disabled={isGeneratingPdf || !vehicle || !tenant}>
@@ -667,16 +770,17 @@
 							</div>
 						</div>
 
-						<!-- Departure Date - Editable -->
+						<!-- Departure Date - Editable when quotation can be edited -->
 						<div class="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
 							<Label for="departure-date" class="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">{$t('quotations.new.departureDate')}</Label>
 							<Input
 								id="departure-date"
 								type="date"
 								value={quotation.departureDate ? new Date(quotation.departureDate).toISOString().split('T')[0] : ''}
+								disabled={!canEditQuotation()}
 								onchange={async (e) => {
 									const newDate = e.currentTarget?.value;
-									if (newDate && quotation) {
+									if (newDate && quotation && canEditQuotation()) {
 										try {
 											await client.mutation(api.quotations.update, {
 												id: quotation._id,
@@ -926,7 +1030,12 @@
 								<p class="text-sm text-gray-500 dark:text-gray-400">{clientData.email}</p>
 							{/if}
 							{#if clientData.phone}
-								<p class="text-sm text-gray-500 dark:text-gray-400">{clientData.phone}</p>
+								<div class="flex items-center gap-2 mt-1">
+									<span class="text-sm text-gray-500 dark:text-gray-400">{clientData.phone}</span>
+									<ContactActions phone={clientData.phone} email={clientData.email} size="xs" />
+								</div>
+							{:else if clientData.email}
+								<ContactActions email={clientData.email} size="xs" class="mt-1" />
 							{/if}
 						</div>
 					{:else}
@@ -1184,6 +1293,14 @@
 		</div>
 	{/snippet}
 </Modal>
+
+<!-- Group Leader Modal (shown before convert/approve) -->
+<GroupLeaderModal
+	bind:open={showGroupLeaderModal}
+	initialName={quotation?.groupLeaderName || ''}
+	onConfirm={handleGroupLeaderConfirm}
+	onCancel={handleGroupLeaderCancel}
+/>
 
 <!-- Toast notifications -->
 {#if showToast}

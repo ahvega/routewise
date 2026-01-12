@@ -1,7 +1,7 @@
 {
     "common": {
         "appName": "RouteWise",
-        "loading": "Cargando...",
+        "loading": "Cargando",
         "save": "Guardar",
         "cancel": "Cancelar",
         "delete": "Eliminar",
@@ -64,7 +64,8 @@
         "emailClient": "Email Cliente",
         "callDriver": "Llamar Conductor",
         "duplicate": "Duplicar",
-        "copy": "Copia"
+        "copy": "Copia",
+        "confirm": "Confirmar"
     },
     "statuses": {
         "active": "Activo",
@@ -210,7 +211,12 @@
         "unassignedItineraryBoth": "{itineraryNumber} necesita asignación de conductor y vehículo",
         "driver": "conductor",
         "vehicle": "vehículo",
-        "and": "y"
+        "and": "y",
+        "totalQuotationsValue": "Valor Total de Cotizaciones",
+        "profit": "Ganancia",
+        "filterByStatus": "Filtrar por Estado",
+        "alertsCount": "{count} alerta(s)",
+        "conversion": "conversión"
     },
     "vehicles": {
         "title": "Vehículos",
@@ -245,7 +251,7 @@
             "costPerDistance": "Costo por",
             "ownership": "Propiedad",
             "owned": "Propio",
-            "rented": "Rentado",
+            "rented": "Alquilado",
             "baseLocation": "Ubicación Base",
             "baseLocationPlaceholder": "ej., San Pedro Sula, Honduras",
             "baseLocationHelp": "Base del vehículo. Se usa para calcular costos de reposicionamiento cuando el origen del viaje difiere de la base."
@@ -255,9 +261,9 @@
             "upgradeToAddMore": "Actualiza tu plan para agregar más vehículos."
         },
         "filters": {
-            "searchPlaceholder": "Buscar vehículos...",
-            "ownershipPlaceholder": "Propiedad...",
-            "statusPlaceholder": "Estado..."
+            "searchPlaceholder": "Buscar vehículos",
+            "ownershipPlaceholder": "Filtrar por Propiedad",
+            "statusPlaceholder": "Filtrar por Estado"
         },
         "columns": {
             "vehicle": "Vehículo",
@@ -329,9 +335,10 @@
             "US": "Estados Unidos"
         },
         "filters": {
-            "searchPlaceholder": "Buscar clientes...",
-            "typePlaceholder": "Tipo...",
-            "statusPlaceholder": "Estado..."
+            "searchPlaceholder": "Buscar clientes",
+            "typePlaceholder": "Filtrar por Tipo",
+            "statusPlaceholder": "Filtrar por Estado",
+            "pricingPlaceholder": "Filtrar por Nivel"
         },
         "columns": {
             "client": "Cliente",
@@ -395,8 +402,9 @@
             "upgradeToAddMore": "Actualiza tu plan para agregar más conductores."
         },
         "filters": {
-            "searchPlaceholder": "Buscar conductores...",
-            "statusPlaceholder": "Estado..."
+            "searchPlaceholder": "Buscar conductores",
+            "statusPlaceholder": "Filtrar por Estado",
+            "categoryPlaceholder": "Filtrar por Categoría"
         },
         "columns": {
             "driver": "Conductor",
@@ -424,9 +432,9 @@
         "saveFailed": "Error al guardar la cotización",
         "deleteFailed": "Error al eliminar la cotización",
         "filters": {
-            "searchPlaceholder": "Buscar cotizaciones...",
-            "statusPlaceholder": "Estado...",
-            "clientPlaceholder": "Cliente..."
+            "searchPlaceholder": "Buscar cotizaciones",
+            "statusPlaceholder": "Filtrar por Estado",
+            "clientPlaceholder": "Filtrar por Cliente"
         },
         "columns": {
             "quotation": "Cotización",
@@ -463,7 +471,7 @@
             "selectClientPlaceholder": "Elige un cliente",
             "noClientsAvailable": "No hay clientes disponibles",
             "calculateRoute": "Calcular Ruta",
-            "calculating": "Calculando...",
+            "calculating": "Calculando",
             "routeInfo": "Información de Ruta",
             "totalDistance": "Distancia Total",
             "estimatedTime": "Tiempo Estimado",
@@ -805,8 +813,8 @@
         "vehicleAssigned": "Vehículo asignado exitosamente",
         "assignDriver": "Asignar Conductor",
         "assignVehicle": "Asignar Vehículo",
-        "selectDriver": "Selecciona un conductor...",
-        "selectVehicle": "Selecciona un vehículo...",
+        "selectDriver": "Selecciona un conductor",
+        "selectVehicle": "Selecciona un vehículo",
         "noDriverAssigned": "Sin conductor asignado",
         "noVehicleAssigned": "Sin vehículo asignado",
         "noTripLeader": "Sin líder de grupo asignado",
@@ -821,9 +829,9 @@
         "alreadyConverted": "Ya convertido a itinerario",
         "onlyApproved": "Solo cotizaciones aprobadas pueden convertirse",
         "filters": {
-            "searchPlaceholder": "Buscar itinerarios...",
-            "statusPlaceholder": "Estado...",
-            "driverPlaceholder": "Conductor..."
+            "searchPlaceholder": "Buscar itinerarios",
+            "statusPlaceholder": "Filtrar por Estado",
+            "driverPlaceholder": "Filtrar por Conductor"
         },
         "columns": {
             "itinerary": "Itinerario",
@@ -882,6 +890,13 @@
             "scheduleInfo": "Información de Programación",
             "assignmentInfo": "Asignación (Opcional)",
             "pickupDropoff": "Detalles de Recogida y Entrega"
+        },
+        "groupLeader": {
+            "title": "Información del Líder de Grupo",
+            "description": "Por favor confirma o actualiza la información de contacto del líder de grupo para este viaje.",
+            "name": "Nombre",
+            "phone": "Teléfono",
+            "email": "Correo Electrónico"
         }
     },
     "invoices": {
@@ -897,9 +912,9 @@
         "createFailed": "Error al crear la factura",
         "paymentRecorded": "Pago registrado exitosamente",
         "paymentDeleted": "Pago eliminado exitosamente",
-        "searchPlaceholder": "Buscar por número de factura, cliente...",
-        "filterByStatus": "Filtrar por estado...",
-        "filterByPayment": "Filtrar por pago...",
+        "searchPlaceholder": "Buscar por número de factura, cliente",
+        "filterByStatus": "Filtrar por Estado",
+        "filterByPayment": "Filtrar por Pago",
         "generateInvoice": "Generar Factura",
         "generateFromItinerary": "Genera una factura desde este itinerario completado",
         "viewInvoice": "Ver Factura",
@@ -968,7 +983,9 @@
             "markSent": "Marcar como Enviada",
             "recordPayment": "Registrar Pago",
             "addPayment": "Agregar Pago",
-            "cancel": "Cancelar Factura"
+            "cancel": "Cancelar Factura",
+            "sendViaEmail": "Enviar por Correo",
+            "markAsPaid": "Marcar como Pagada"
         },
         "emailDescription": "Envía esta factura por correo electrónico al cliente con el PDF adjunto."
     },
@@ -994,8 +1011,8 @@
         "noFuelAdvanceNeeded": "El viaje está dentro de la autonomía del tanque. No se requiere anticipo de combustible.",
         "totalTripFuelCost": "Costo total de combustible del viaje",
         "notRequired": "No requerido",
-        "filterByStatus": "Filtrar por estado...",
-        "searchPlaceholder": "Buscar anticipos...",
+        "filterByStatus": "Filtrar por Estado",
+        "searchPlaceholder": "Buscar anticipos",
         "notFound": "Anticipo no encontrado",
         "amount": "Monto del Anticipo",
         "actualExpenses": "Gastos Reales",

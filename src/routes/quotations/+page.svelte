@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { Button, Card, TableBodyCell, Spinner, Toast } from 'flowbite-svelte';
-	import { PlusOutline, CheckCircleOutline, CloseCircleOutline, FilterOutline } from 'flowbite-svelte-icons';
+	import { PlusOutline, CheckCircleOutline, CloseCircleOutline, FilterOutline, PenOutline } from 'flowbite-svelte-icons';
 	import { useQuery, useConvexClient } from 'convex-svelte';
 	import { api } from '$convex/_generated/api';
 	import { tenantStore } from '$lib/stores';
@@ -13,6 +13,7 @@
 		createCallAction,
 		createEmailAction,
 		createDeleteAction,
+		createWhatsAppAction,
 		filterActions,
 		type ActionItem
 	} from '$lib/components/ui';
@@ -80,7 +81,13 @@
 			key: 'status',
 			label: $t('quotations.columns.status'),
 			sortable: true,
-			filterOptions: ['draft', 'sent', 'approved', 'rejected', 'expired'],
+			filterOptions: [
+				{ label: $t('statuses.draft'), value: 'draft' },
+				{ label: $t('statuses.sent'), value: 'sent' },
+				{ label: $t('statuses.approved'), value: 'approved' },
+				{ label: $t('statuses.rejected'), value: 'rejected' },
+				{ label: $t('statuses.expired'), value: 'expired' }
+			],
 			filterPlaceholder: $t('quotations.filters.statusPlaceholder')
 		},
 		{
@@ -116,29 +123,53 @@
 	function getQuotationActions(quote: typeof quotations[0]): ActionItem[] {
 		const contact = getClientContact(quote.clientId);
 
+		const contactActions: (ActionItem | null)[] = [
+			contact.phone ? createCallAction(contact.phone, $t('common.callClient')) : null,
+			createWhatsAppAction(contact.phone, 'WhatsApp Cliente'),
+			createEmailAction(contact.email, $t('common.emailClient'))
+		];
+
+		// Filter valid contact actions and add divider to the first one
+		const validContactActions = contactActions.filter((a): a is ActionItem => a !== null);
+		if (validContactActions.length > 0) {
+			validContactActions[0].dividerBefore = true;
+		}
+
 		return filterActions([
+			// --- WORK GROUP ---
 			// View action
 			createViewAction(`/quotations/${quote._id}`, $t('quotations.viewQuotation')),
 
-			// Contact actions (with divider)
-			contact.phone ? { ...createCallAction(contact.phone, $t('common.callClient'))!, dividerBefore: true } : null,
-			createEmailAction(contact.email, $t('common.emailClient')),
+			// Edit action
+			{
+				id: 'edit',
+				label: $t('common.edit'),
+				icon: PenOutline,
+				href: `/quotations/${quote._id}/edit`,
+				disabled: quote.status === 'approved'
+			},
 
-			// Status actions (with divider)
+			// PDF action
+			{
+				id: 'pdf',
+				label: $t('common.downloadPdf'),
+				icon: FilePdfOutline,
+				href: `/quotations/${quote._id}?pdf=true`
+			},
+
+			// Status actions
 			quote.status === 'draft' ? {
 				id: 'send',
 				label: $t('common.sent'),
 				icon: PaperPlaneOutline,
-				onClick: () => updateStatus(quote._id, 'sent'),
-				dividerBefore: true
+				onClick: () => updateStatus(quote._id, 'sent')
 			} : null,
 			quote.status === 'sent' ? {
 				id: 'approve',
 				label: $t('common.accepted'),
 				icon: CheckCircleOutline,
 				onClick: () => updateStatus(quote._id, 'approved'),
-				color: 'success' as const,
-				dividerBefore: true
+				color: 'success' as const
 			} : null,
 			quote.status === 'sent' ? {
 				id: 'reject',
@@ -147,6 +178,9 @@
 				onClick: () => updateStatus(quote._id, 'rejected'),
 				color: 'warning' as const
 			} : null,
+
+			// --- CONTACT GROUP ---
+			...validContactActions,
 
 			// Delete action (always last, with divider)
 			createDeleteAction(() => handleDelete(quote._id), false, $t('common.delete'))
@@ -309,8 +343,8 @@
 			</Card>
 		</div>
 
-		<Card class="max-w-none !p-6">
-			{#if quotations.length === 0}
+		{#if quotations.length === 0}
+			<Card class="max-w-none !p-6">
 				<div class="text-center py-12">
 					<p class="text-gray-500 dark:text-gray-400 mb-4">
 						{$t('quotations.noQuotations')}
@@ -320,17 +354,13 @@
 						{$t('quotations.newQuotation')}
 					</Button>
 				</div>
-			{:else if filteredQuotations.length === 0}
-				<div class="text-center py-12">
-					<p class="text-gray-500 dark:text-gray-400 mb-4">
-						{$t('common.noResults')}
-					</p>
-					<Button color="alternative" onclick={() => clearFilters()}>
-						{$t('common.clearFilters')}
-					</Button>
-				</div>
-			{:else}
-				<DataTable data={filteredQuotations} {columns}>
+			</Card>
+		{:else}
+			<DataTable 
+				data={filteredQuotations} 
+				{columns} 
+				additionalSearchKeys={['quotationDisplayName', 'destination', 'groupLeaderName']}
+			>
 				{#snippet row(quote)}
 					<TableBodyCell>
 						<div class="flex items-center justify-between gap-2">
@@ -378,7 +408,6 @@
 				{/snippet}
 			</DataTable>
 		{/if}
-		</Card>
 	{/if}
 </div>
 

@@ -64,7 +64,8 @@
 		"emailClient": "Email Client",
 		"callDriver": "Call Driver",
 		"duplicate": "Duplicate",
-		"copy": "Copy"
+		"copy": "Copy",
+		"confirm": "Confirm"
 	},
 	"statuses": {
 		"active": "Active",
@@ -186,7 +187,12 @@
 		"licenseExpiring": "License Expiring: {name}'s license expires soon",
 		"upcomingTrips": "Upcoming Trips",
 		"noUpcomingTrips": "No upcoming trips scheduled",
-		"justNow": "Just now"
+		"justNow": "Just now",
+		"totalQuotationsValue": "Total Quotations Value",
+		"profit": "Profit",
+		"filterByStatus": "Filter by Status",
+		"alertsCount": "{count} alert(s)",
+		"conversion": "conversion"
 	},
 	"vehicles": {
 		"title": "Vehicles",
@@ -832,6 +838,13 @@
 			"scheduleInfo": "Schedule Information",
 			"assignmentInfo": "Assignment (Optional)",
 			"pickupDropoff": "Pickup & Dropoff Details"
+		},
+		"groupLeader": {
+			"title": "Group Leader Information",
+			"description": "Please confirm or update the group leader contact information for this trip.",
+			"name": "Name",
+			"phone": "Phone",
+			"email": "Email"
 		}
 	},
 	"invoices": {
