@@ -169,7 +169,7 @@
 					size: '70%',
 					labels: {
 						show: true,
-						name: { show: true, colors: '#f3f4f6' },
+						name: { show: true, color: '#f3f4f6' },
 						value: { show: true, fontSize: '16px', fontWeight: 600, color: '#ffffff' },
 						total: {
 							show: true,
@@ -605,6 +605,7 @@
 					<div class="space-y-3">
 						{#each activities.slice(0, 8) as activity}
 							{@const config = activityConfig[activity.type] || activityConfig.quotation}
+							{@const ActivityIcon = config.icon}
 							{@const entityUrl = activity.type === 'quotation' ? `/quotations/${activity.entityId}`
 								: activity.type === 'itinerary' ? `/itineraries/${activity.entityId}`
 								: activity.type === 'invoice' ? `/invoices/${activity.entityId}`
@@ -614,7 +615,7 @@
 								class="flex items-start gap-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
 							>
 								<div class="p-2 bg-white dark:bg-gray-900 rounded-lg shadow-sm">
-									<svelte:component this={config.icon} class="w-4 h-4 {config.color}" />
+									<ActivityIcon class="w-4 h-4 {config.color}" />
 								</div>
 								<div class="flex-1 min-w-0">
 									<div class="flex items-center gap-2">

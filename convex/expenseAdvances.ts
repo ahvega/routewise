@@ -1,5 +1,6 @@
 import { v } from "convex/values";
-import { query, mutation, QueryCtx } from "./_generated/server";
+import { query, mutation } from "./_generated/server";
+import type { QueryCtx } from "./_generated/server";
 
 // Generate advance number (A00001 format)
 // Uses sequential numbering based on existing advances

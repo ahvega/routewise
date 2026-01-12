@@ -43,7 +43,7 @@ export class LocationService {
 
 			// PlacesService requires a map or div element
 			if (mapElement) {
-				this.placesService = new google.maps.places.PlacesService(mapElement);
+				this.placesService = new google.maps.places.PlacesService(mapElement as HTMLDivElement);
 			}
 
 			this.isInitialized = true;

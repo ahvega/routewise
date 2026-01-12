@@ -2,10 +2,10 @@
 	import { Card, Tabs, TabItem, Spinner, Table, TableBody, TableBodyCell, TableBodyRow, TableHead, TableHeadCell, Button, Select, Badge } from 'flowbite-svelte';
 	import {
 		ChartPieSolid,
-		ChartMixedSolid,
+		ChartMixedDollarSolid,
 		UsersSolid,
 		TruckSolid,
-		MapLocationSolid,
+		MapPinSolid,
 		CashSolid,
 		DownloadOutline
 	} from 'flowbite-svelte-icons';
@@ -14,6 +14,71 @@
 	import { tenantStore } from '$lib/stores';
 	import { StatusBadge } from '$lib/components/ui';
 	import { t } from '$lib/i18n';
+
+	// Type definitions for report data
+	interface RevenueByClient {
+		clientName: string;
+		quotations: number;
+		approved: number;
+		revenue: number;
+	}
+	interface RevenueByVehicle {
+		vehicleName: string;
+		quotations: number;
+		approved: number;
+		revenue: number;
+	}
+	interface MonthlyRevenue {
+		month: string;
+		year: number;
+		quotationsCreated: number;
+		quotationsApproved: number;
+		quotationValue: number;
+		invoiced: number;
+		collected: number;
+	}
+	interface ReceivableInvoice {
+		invoiceNumber: string;
+		clientName: string;
+		amount: number;
+		dueDate: number;
+		daysOverdue: number;
+		bucket: string;
+	}
+	interface DriverUtilization {
+		driverName: string;
+		status: string;
+		completed: number;
+		inProgress: number;
+		scheduled: number;
+		tripDays: number;
+		utilizationRate: number;
+	}
+	interface VehicleUtilization {
+		vehicleName: string;
+		vehicleType: string;
+		status: string;
+		completed: number;
+		totalDistance: number;
+		utilizationRate: number;
+	}
+	interface RouteAnalysis {
+		origin: string;
+		destination: string;
+		count: number;
+		approved: number;
+		totalValue: number;
+		avgDistance: number;
+		conversionRate: number;
+	}
+	interface AgingBucket {
+		count: number;
+		amount: number;
+	}
+	interface PipelineStatus {
+		count: number;
+		value: number;
+	}
 
 	let { data } = $props();
 
@@ -151,7 +216,7 @@
 	function exportRevenueByClient() {
 		if (!revenueByClient.length) return;
 		downloadCSV(
-			revenueByClient.map(c => ({
+			revenueByClient.map((c: RevenueByClient) => ({
 				clientName: c.clientName,
 				quotations: c.quotations,
 				approved: c.approved,
@@ -165,7 +230,7 @@
 	function exportRevenueByVehicle() {
 		if (!revenueByVehicle.length) return;
 		downloadCSV(
-			revenueByVehicle.map(v => ({
+			revenueByVehicle.map((v: RevenueByVehicle) => ({
 				vehicleName: v.vehicleName,
 				quotations: v.quotations,
 				approved: v.approved,
@@ -179,7 +244,7 @@
 	function exportMonthlyRevenue() {
 		if (!monthlyRevenue.length) return;
 		downloadCSV(
-			monthlyRevenue.map(m => ({
+			monthlyRevenue.map((m: MonthlyRevenue) => ({
 				month: `${m.month} ${m.year}`,
 				quotationsCreated: m.quotationsCreated,
 				quotationsApproved: m.quotationsApproved,
@@ -195,7 +260,7 @@
 	function exportReceivables() {
 		if (!receivables?.invoices.length) return;
 		downloadCSV(
-			receivables.invoices.map(inv => ({
+			receivables.invoices.map((inv: ReceivableInvoice) => ({
 				invoiceNumber: inv.invoiceNumber,
 				clientName: inv.clientName,
 				amount: inv.amount,
@@ -211,7 +276,7 @@
 	function exportDriverUtilization() {
 		if (!driverUtil?.drivers.length) return;
 		downloadCSV(
-			driverUtil.drivers.map(d => ({
+			driverUtil.drivers.map((d: DriverUtilization) => ({
 				driverName: d.driverName,
 				status: d.status,
 				completed: d.completed,
@@ -228,7 +293,7 @@
 	function exportVehicleUtilization() {
 		if (!vehicleUtil?.vehicles.length) return;
 		downloadCSV(
-			vehicleUtil.vehicles.map(v => ({
+			vehicleUtil.vehicles.map((v: VehicleUtilization) => ({
 				vehicleName: v.vehicleName,
 				vehicleType: v.vehicleType,
 				status: v.status,
@@ -244,7 +309,7 @@
 	function exportRouteAnalysis() {
 		if (!routeAnalysis?.routes.length) return;
 		downloadCSV(
-			routeAnalysis.routes.map(r => ({
+			routeAnalysis.routes.map((r: RouteAnalysis) => ({
 				origin: r.origin,
 				destination: r.destination,
 				count: r.count,
@@ -292,7 +357,8 @@
 								{$t('reports.salesPipeline') || 'Sales Pipeline'}
 							</h3>
 							<div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
-								{#each Object.entries(pipeline.byStatus) as [status, data]}
+								{#each Object.entries(pipeline.byStatus) as [status, statusData]}
+									{@const data = statusData as PipelineStatus}
 									<div class="text-center p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
 										<p class="text-2xl font-bold text-gray-900 dark:text-white">{data.count}</p>
 										<p class="text-sm text-gray-500 dark:text-gray-400 capitalize">{status}</p>
@@ -303,7 +369,8 @@
 
 							<!-- Visual bar -->
 							<div class="h-8 flex rounded-lg overflow-hidden">
-								{#each Object.entries(pipeline.byStatus) as [status, data]}
+								{#each Object.entries(pipeline.byStatus) as [status, statusData]}
+									{@const data = statusData as PipelineStatus}
 									{@const width = getBarWidth(data.count, pipeline.total)}
 									{#if width > 0}
 										<div
@@ -351,7 +418,7 @@
 							{/if}
 						</div>
 						{#if revenueByClient.length > 0}
-							{@const maxRevenue = Math.max(...revenueByClient.map(c => c.revenue))}
+							{@const maxRevenue = Math.max(...revenueByClient.map((c: RevenueByClient) => c.revenue))}
 							<div class="space-y-3">
 								{#each revenueByClient.slice(0, 10) as client, i}
 									<div class="flex items-center gap-4">
@@ -393,7 +460,7 @@
 							{/if}
 						</div>
 						{#if revenueByVehicle.length > 0}
-							{@const maxRevenue = Math.max(...revenueByVehicle.map(v => v.revenue))}
+							{@const maxRevenue = Math.max(...revenueByVehicle.map((v: RevenueByVehicle) => v.revenue))}
 							<div class="space-y-3">
 								{#each revenueByVehicle as vehicle, i}
 									<div class="flex items-center gap-4">
@@ -440,7 +507,7 @@
 							{/if}
 						</div>
 						{#if monthlyRevenue.length > 0}
-							{@const maxValue = Math.max(...monthlyRevenue.map(m => Math.max(m.quotationValue, m.invoiced, m.collected)))}
+							{@const maxValue = Math.max(...monthlyRevenue.map((m: MonthlyRevenue) => Math.max(m.quotationValue, m.invoiced, m.collected)))}
 							<div class="overflow-x-auto">
 								<div class="flex gap-2 min-w-max pb-4">
 									{#each monthlyRevenue as month}
@@ -545,10 +612,11 @@
 							</div>
 
 							<!-- Aging buckets bar -->
-							{@const totalAging = Object.values(receivables.aging).reduce((sum, b) => sum + b.amount, 0)}
+							{@const totalAging = (Object.values(receivables.aging) as AgingBucket[]).reduce((sum, b) => sum + b.amount, 0)}
 							{#if totalAging > 0}
 								<div class="h-8 flex rounded-lg overflow-hidden mb-4">
-									{#each Object.entries(receivables.aging) as [bucket, data]}
+									{#each Object.entries(receivables.aging) as [bucket, bucketData]}
+										{@const data = bucketData as AgingBucket}
 										{@const width = getBarWidth(data.amount, totalAging)}
 										{#if width > 0}
 											<div

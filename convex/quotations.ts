@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { query, mutation, internalMutation } from "./_generated/server";
 import { internal } from "./_generated/api";
+import type { Id } from "./_generated/dataModel";
 import { canCreateQuotation, isTenantActive } from "./lib/planLimits";
 
 // List all quotations for a tenant
@@ -587,8 +588,8 @@ export const approve = mutation({
       reason: "Quotation approved",
     });
 
-    let itineraryId: string | undefined;
-    let invoiceId: string | undefined;
+    let itineraryId: Id<"itineraries"> | undefined;
+    let invoiceId: Id<"invoices"> | undefined;
 
     // Create itinerary if requested
     if (shouldCreateItinerary) {

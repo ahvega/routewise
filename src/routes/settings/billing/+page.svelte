@@ -27,7 +27,7 @@
 		UsersOutline,
 		TruckOutline,
 		UserOutline,
-		DocumentTextOutline,
+		FileLinesOutline,
 		EnvelopeOutline
 	} from 'flowbite-svelte-icons';
 	import { PLAN_CONFIG } from '$lib/config/plans';
@@ -66,13 +66,13 @@
 
 	// Usage percentages
 	const usersPercent = $derived(
-		tenant?.maxUsers === -1 ? 0 : Math.min(100, ((usage?.resourceCounts?.users || 0) / (tenant?.maxUsers || 1)) * 100)
+		tenant?.maxUsers === -1 ? 0 : Math.min(100, ((usage?.usersCount || 0) / (tenant?.maxUsers || 1)) * 100)
 	);
 	const vehiclesPercent = $derived(
-		tenant?.maxVehicles === -1 ? 0 : Math.min(100, ((usage?.resourceCounts?.vehicles || 0) / (tenant?.maxVehicles || 1)) * 100)
+		tenant?.maxVehicles === -1 ? 0 : Math.min(100, ((usage?.vehiclesCount || 0) / (tenant?.maxVehicles || 1)) * 100)
 	);
 	const driversPercent = $derived(
-		tenant?.maxDrivers === -1 ? 0 : Math.min(100, ((usage?.resourceCounts?.drivers || 0) / (tenant?.maxDrivers || 1)) * 100)
+		tenant?.maxDrivers === -1 ? 0 : Math.min(100, ((usage?.driversCount || 0) / (tenant?.maxDrivers || 1)) * 100)
 	);
 	const quotationsPercent = $derived(
 		tenant?.maxQuotationsPerMonth === -1 ? 0 : Math.min(100, ((usage?.quotationsCreated || 0) / (tenant?.maxQuotationsPerMonth || 1)) * 100)
@@ -112,7 +112,7 @@
 	}
 
 	// Get status badge color
-	function getStatusColor(status: string): 'green' | 'yellow' | 'red' | 'dark' {
+	function getStatusColor(status: string): 'green' | 'yellow' | 'red' | 'gray' {
 		switch (status) {
 			case 'active':
 				return 'green';
@@ -122,7 +122,7 @@
 			case 'expired':
 				return 'red';
 			default:
-				return 'dark';
+				return 'gray';
 		}
 	}
 
@@ -222,7 +222,7 @@
 							<span class="text-sm font-medium text-gray-700 dark:text-gray-300">{$t('settings.billing.users')}</span>
 						</div>
 						<span class="text-sm text-gray-600 dark:text-gray-400">
-							{usage?.resourceCounts?.users || 0} / {tenant.maxUsers === -1 ? $t('settings.billing.unlimited') : tenant.maxUsers}
+							{usage?.usersCount || 0} / {tenant.maxUsers === -1 ? $t('settings.billing.unlimited') : tenant.maxUsers}
 						</span>
 					</div>
 					{#if tenant.maxUsers !== -1}
@@ -242,7 +242,7 @@
 							<span class="text-sm font-medium text-gray-700 dark:text-gray-300">{$t('settings.billing.vehicles')}</span>
 						</div>
 						<span class="text-sm text-gray-600 dark:text-gray-400">
-							{usage?.resourceCounts?.vehicles || 0} / {tenant.maxVehicles === -1 ? $t('settings.billing.unlimited') : tenant.maxVehicles}
+							{usage?.vehiclesCount || 0} / {tenant.maxVehicles === -1 ? $t('settings.billing.unlimited') : tenant.maxVehicles}
 						</span>
 					</div>
 					{#if tenant.maxVehicles !== -1}
@@ -262,7 +262,7 @@
 							<span class="text-sm font-medium text-gray-700 dark:text-gray-300">{$t('settings.billing.drivers')}</span>
 						</div>
 						<span class="text-sm text-gray-600 dark:text-gray-400">
-							{usage?.resourceCounts?.drivers || 0} / {tenant.maxDrivers === -1 ? $t('settings.billing.unlimited') : tenant.maxDrivers}
+							{usage?.driversCount || 0} / {tenant.maxDrivers === -1 ? $t('settings.billing.unlimited') : tenant.maxDrivers}
 						</span>
 					</div>
 					{#if tenant.maxDrivers !== -1}
@@ -278,7 +278,7 @@
 				<div class="space-y-2">
 					<div class="flex items-center justify-between">
 						<div class="flex items-center gap-2">
-							<DocumentTextOutline class="w-4 h-4 text-gray-500" />
+							<FileLinesOutline class="w-4 h-4 text-gray-500" />
 							<span class="text-sm font-medium text-gray-700 dark:text-gray-300">{$t('settings.billing.quotationsThisMonth')}</span>
 						</div>
 						<span class="text-sm text-gray-600 dark:text-gray-400">

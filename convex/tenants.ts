@@ -398,11 +398,11 @@ export const saveLogo = mutation({
     // Update tenant with new logo
     await ctx.db.patch(args.tenantId, {
       logoStorageId: args.storageId,
-      logoUrl: url,
+      logoUrl: url ?? undefined,
       updatedAt: Date.now(),
     });
 
-    return { success: true, logoUrl: url };
+    return { success: true, logoUrl: url ?? undefined };
   },
 });
 

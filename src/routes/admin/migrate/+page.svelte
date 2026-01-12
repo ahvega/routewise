@@ -21,7 +21,7 @@
 		UsersOutline,
 		TruckOutline,
 		UserOutline,
-		DocumentTextOutline,
+		FileLinesOutline,
 		CloseCircleOutline
 	} from 'flowbite-svelte-icons';
 
@@ -203,7 +203,7 @@
 						</div>
 						<div class="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
 							<div class="flex items-center gap-2">
-								<DocumentTextOutline class="w-4 h-4 text-gray-500" />
+								<FileLinesOutline class="w-4 h-4 text-gray-500" />
 								<span class="text-sm text-gray-700 dark:text-gray-300">Quotations</span>
 							</div>
 							<Badge color="blue">{stats?.quotationsCount || 0}</Badge>

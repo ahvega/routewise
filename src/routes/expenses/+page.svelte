@@ -181,7 +181,26 @@
 	// Status update functions
 	async function updateStatus(id: Id<'expenseAdvances'>, status: string) {
 		try {
-			await client.mutation(api.expenseAdvances.updateStatus, { id, status });
+			// Map status to specific API functions
+			switch (status) {
+				case 'pending':
+					await client.mutation(api.expenseAdvances.submitForApproval, { id });
+					break;
+				case 'approved':
+					await client.mutation(api.expenseAdvances.approve, { id });
+					break;
+				case 'disbursed':
+					await client.mutation(api.expenseAdvances.disburse, { id });
+					break;
+				case 'settled':
+					await client.mutation(api.expenseAdvances.settle, { id });
+					break;
+				case 'cancelled':
+					await client.mutation(api.expenseAdvances.cancel, { id });
+					break;
+				default:
+					throw new Error(`Unknown status: ${status}`);
+			}
 			showToastMessage($t('expenses.updateSuccess'), 'success');
 		} catch (error) {
 			console.error('Failed to update status:', error);

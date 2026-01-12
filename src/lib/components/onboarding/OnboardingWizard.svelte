@@ -89,7 +89,10 @@
 			<!-- Icon -->
 			<div class="flex justify-center mb-6">
 				<div class="p-4 bg-gray-100 dark:bg-gray-700 rounded-full">
-					<svelte:component this={stepIcons[currentStep]} class="w-12 h-12 {stepColors[currentStep]}" />
+					{#if stepIcons[currentStep]}
+						{@const StepIcon = stepIcons[currentStep]}
+						<StepIcon class="w-12 h-12 {stepColors[currentStep]}" />
+					{/if}
 				</div>
 			</div>
 

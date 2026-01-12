@@ -207,7 +207,8 @@ export function suggestVehicleCombinations(
  */
 export function formatVehicleDisplay(vehicle: VehicleOption | SelectedVehicle, quantity: number = 1): string {
   const qtyPrefix = quantity > 1 ? `${quantity}x ` : '';
-  return `${qtyPrefix}${vehicle.vehicleName || (vehicle as VehicleOption).name} (${vehicle.capacity} pax)`;
+  const vehicleName = 'vehicleName' in vehicle ? vehicle.vehicleName : vehicle.name;
+  return `${qtyPrefix}${vehicleName} (${vehicle.capacity} pax)`;
 }
 
 /**

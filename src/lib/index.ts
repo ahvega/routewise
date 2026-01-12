@@ -15,8 +15,8 @@ export * from './types';
 // Utility functions
 export * from './utils';
 
-// Services
-export * from './services';
+// Services (import directly from $lib/services to avoid conflicts)
+// export * from './services';
 
 // Note: stores use Svelte 5 runes and should be imported directly
 // import { authStore } from '$lib/stores/auth';

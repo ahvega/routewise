@@ -198,7 +198,8 @@
 		{sizeClasses[size]} {className}"
 >
 	{#if showIcon && IconComponent}
-		<svelte:component this={IconComponent} class={iconSizeClasses[size]} />
+		{@const Icon = IconComponent}
+		<Icon class={iconSizeClasses[size]} />
 	{/if}
 	{#if children}
 		{@render children()}

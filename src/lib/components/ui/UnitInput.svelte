@@ -124,8 +124,8 @@
 		{id}
 		type="number"
 		value={value}
-		onchange={(e) => handleValueChange(parseFloat(e.currentTarget.value) || 0)}
-		oninput={(e) => handleValueChange(parseFloat(e.currentTarget.value) || 0)}
+		onchange={(e) => handleValueChange(parseFloat((e.currentTarget as HTMLInputElement)?.value) || 0)}
+		oninput={(e) => handleValueChange(parseFloat((e.currentTarget as HTMLInputElement)?.value) || 0)}
 		{required}
 		{min}
 		{max}

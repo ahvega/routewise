@@ -23,6 +23,8 @@
 		InfoCircleSolid,
 		FilterOutline
 	} from 'flowbite-svelte-icons';
+	import { page } from '$app/stores';
+	import { goto } from '$app/navigation';
 	import { useQuery, useConvexClient } from 'convex-svelte';
 	import { api } from '$convex/_generated/api';
 	import { tenantStore } from '$lib/stores';
@@ -301,6 +303,19 @@
 
 	const drivers = $derived(driversQuery.data || []);
 	const isLoading = $derived(driversQuery.isLoading);
+
+	// Handle URL param to auto-open modal for selected driver
+	$effect(() => {
+		const selectedId = $page.url.searchParams.get('selected');
+		if (selectedId && drivers.length > 0) {
+			const selectedDriver = drivers.find(d => d._id === selectedId);
+			if (selectedDriver) {
+				openEditModal(selectedDriver);
+				// Clear the URL param to prevent reopening on navigation
+				goto('/drivers', { replaceState: true });
+			}
+		}
+	});
 
 	// Status filter state
 	let statusFilter = $state('');

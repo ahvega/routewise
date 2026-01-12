@@ -56,6 +56,7 @@ export const getRevenueByClient = query({
     const revenueByClient: Record<string, { clientName: string; quotations: number; approved: number; revenue: number }> = {};
 
     for (const q of quotations) {
+      if (!q.clientId) continue; // Skip quotations without client
       const clientId = q.clientId as string;
       if (!revenueByClient[clientId]) {
         const client = clientMap.get(q.clientId);
@@ -95,6 +96,7 @@ export const getRevenueByVehicle = query({
     const revenueByVehicle: Record<string, { vehicleName: string; quotations: number; approved: number; revenue: number }> = {};
 
     for (const q of quotations) {
+      if (!q.vehicleId) continue; // Skip quotations without vehicle
       const vehicleId = q.vehicleId as string;
       if (!revenueByVehicle[vehicleId]) {
         const vehicle = vehicleMap.get(q.vehicleId);
@@ -222,7 +224,7 @@ export const getReceivablesAging = query({
 
     for (const inv of unpaidInvoices) {
       const daysOverdue = Math.floor((now - inv.dueDate) / (24 * 60 * 60 * 1000));
-      const client = clientMap.get(inv.clientId);
+      const client = inv.clientId ? clientMap.get(inv.clientId) : undefined;
       const clientName = client
         ? (client.type === "company" ? client.companyName || "Unknown" : `${client.firstName} ${client.lastName}`)
         : "Unknown";
@@ -295,7 +297,7 @@ export const getDriverUtilization = query({
 
       // Estimate trip days
       const tripDays = completed.reduce((sum, it) => {
-        return sum + it.tripDays;
+        return sum + (it.estimatedDays || 1);
       }, 0);
 
       return {
@@ -355,7 +357,7 @@ export const getVehicleUtilization = query({
       const scheduled = vehicleItineraries.filter(it => it.status === "scheduled");
 
       // Estimate trip days
-      const tripDays = completed.reduce((sum, it) => sum + it.tripDays, 0);
+      const tripDays = completed.reduce((sum, it) => sum + (it.estimatedDays || 1), 0);
 
       // Total distance
       const totalDistance = completed.reduce((sum, it) => sum + it.totalDistance, 0);
@@ -363,7 +365,7 @@ export const getVehicleUtilization = query({
       return {
         vehicleId: vehicle._id,
         vehicleName: vehicle.name,
-        vehicleType: vehicle.type,
+        vehicleType: vehicle.name, // Use name as type for now
         status: vehicle.status,
         totalTrips: vehicleItineraries.length,
         completed: completed.length,

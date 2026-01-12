@@ -45,7 +45,7 @@
 	</div>
 {:else if isOnboardingRoute}
 	<!-- Onboarding pages for authenticated users setting up their organization -->
-	<TenantProvider user={data.user} session={data.session}>
+	<TenantProvider user={data.user} session={data.session ?? undefined}>
 		{#snippet children()}
 			<div class="min-h-screen bg-gray-50 dark:bg-gray-900">
 				{@render children()}
@@ -54,7 +54,7 @@
 	</TenantProvider>
 {:else}
 	<!-- Authenticated users with tenant see the main application -->
-	<TenantProvider user={data.user} session={data.session}>
+	<TenantProvider user={data.user} session={data.session ?? undefined}>
 		{#snippet children()}
 			<div class="min-h-screen bg-gray-50 dark:bg-gray-900">
 				<Navbar user={data.user} />

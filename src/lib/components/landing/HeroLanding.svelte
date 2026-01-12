@@ -71,7 +71,7 @@
 
 					<!-- CTA Buttons -->
 					<div class="space-y-4">
-						<Button href={loginUrl} size="l" class="w-full justify-center text-lg py-4">
+						<Button href={loginUrl} size="lg" class="w-full justify-center text-lg py-4">
 							{$t('landing.getStarted')}
 							<ArrowRightOutline class="w-5 h-5 ml-2" />
 						</Button>

@@ -348,6 +348,7 @@
         "subtitle": "Administra tu equipo de conductores ({count} conductores)",
         "driver": "Conductor",
         "addDriver": "Agregar Conductor",
+        "viewDriver": "Ver Conductor",
         "editDriver": "Editar Conductor",
         "deleteDriver": "Eliminar Conductor",
         "deleteConfirm": "¿Estás seguro de que deseas eliminar este conductor?",

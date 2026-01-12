@@ -22,6 +22,8 @@
 		RefreshOutline,
 		FilterOutline
 	} from 'flowbite-svelte-icons';
+	import { page } from '$app/stores';
+	import { goto } from '$app/navigation';
 	import { useQuery, useConvexClient } from 'convex-svelte';
 	import { api } from '$convex/_generated/api';
 	import { tenantStore } from '$lib/stores';
@@ -214,7 +216,7 @@
 			state: '',
 			country: 'HN',
 			taxId: '',
-			pricingLevel: defaultLevel?.key || 'standard',
+			pricingLevel: (defaultLevel?.key || 'standard') as 'vip' | 'preferred' | 'standard',
 			discountPercentage: defaultLevel?.discountPercentage || 0,
 			creditLimit: 5000,
 			paymentTerms: 0,
@@ -255,7 +257,7 @@
 		const selectedKey = (event.target as HTMLSelectElement).value;
 		const level = pricingLevels.find(l => l.key === selectedKey);
 		if (level) {
-			formData.pricingLevel = level.key;
+			formData.pricingLevel = level.key as 'vip' | 'preferred' | 'standard';
 			formData.discountPercentage = level.discountPercentage;
 		}
 	}
@@ -336,6 +338,19 @@
 
 	const clients = $derived(clientsQuery.data || []);
 	const isLoading = $derived(clientsQuery.isLoading);
+
+	// Handle URL param to auto-open modal for selected client
+	$effect(() => {
+		const selectedId = $page.url.searchParams.get('selected');
+		if (selectedId && clients.length > 0) {
+			const selectedClient = clients.find(c => c._id === selectedId);
+			if (selectedClient) {
+				openEditModal(selectedClient);
+				// Clear the URL param to prevent reopening on navigation
+				goto('/clients', { replaceState: true });
+			}
+		}
+	});
 
 	// Status filter state
 	let statusFilter = $state('');
@@ -566,7 +581,7 @@
 							id="clientCode"
 							bind:value={formData.clientCode}
 							placeholder={codePreviewQuery.data || 'AUTO'}
-							maxlength="4"
+							maxlength={4}
 							class="uppercase font-mono flex-1"
 						/>
 						<Button
@@ -605,7 +620,7 @@
 							id="clientCode"
 							bind:value={formData.clientCode}
 							placeholder={codePreviewQuery.data || 'AUTO'}
-							maxlength="4"
+							maxlength={4}
 							class="uppercase font-mono flex-1"
 						/>
 						<Button

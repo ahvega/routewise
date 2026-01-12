@@ -43,6 +43,22 @@
 	import { t } from '$lib/i18n';
 	import type { Id } from '$convex/_generated/dataModel';
 
+	// Type definitions for query data
+	interface VehicleData {
+		_id: string;
+		name: string;
+		passengerCapacity: number;
+		baseLocation?: string;
+		status?: string;
+	}
+	interface ClientData {
+		_id: string;
+		discountPercentage?: number;
+		firstName?: string;
+		lastName?: string;
+		companyName?: string;
+	}
+
 	let { data } = $props();
 
 	const client = useConvexClient();
@@ -177,7 +193,7 @@
 
 	// Get selected client's discount
 	const selectedClient = $derived(
-		selectedClientId ? clients.find((c) => c._id === selectedClientId) : null
+		selectedClientId ? clients.find((c: ClientData) => c._id === selectedClientId) : null
 	);
 	const clientDiscount = $derived(selectedClient?.discountPercentage || 0);
 
@@ -188,7 +204,7 @@
 
 	// Derived: selected vehicle details
 	const selectedVehicle = $derived(
-		selectedVehicleId ? vehicles.find((v) => v._id === selectedVehicleId) : null
+		selectedVehicleId ? vehicles.find((v: VehicleData) => v._id === selectedVehicleId) : null
 	);
 
 	// Derived: vehicle base location (or default to origin if not set)
@@ -203,7 +219,7 @@
 
 	// Filter vehicles by capacity (availability is shown in UI but not filtered out)
 	const suitableVehicles = $derived(
-		activeVehicles.filter((v) => v.passengerCapacity >= groupSize)
+		activeVehicles.filter((v: VehicleData) => v.passengerCapacity >= groupSize)
 	);
 
 	// Check if a vehicle is unavailable for the selected dates
@@ -441,7 +457,7 @@
 		const priceAfterDiscount = priceBeforeDiscount - discountAmount;
 
 		// Get rounding parameters (defaults: HNL=50, USD=5)
-		const roundingHnl = parameters.roundingHnl || 50;
+		const roundingHnl = parameters.roundingLocal || 50;
 		const roundingUsd = parameters.roundingUsd || 5;
 
 		// Calculate USD price
@@ -960,7 +976,7 @@
 								disabled={isCalculatingRoute}
 							>
 								{#if isCalculatingRoute}
-									<Spinner size="3" class="mr-1" />
+									<Spinner size="4" class="mr-1" />
 								{:else}
 									<RefreshOutline class="w-3 h-3 mr-1" />
 								{/if}
@@ -1117,7 +1133,7 @@
 				<h5 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">{$t('quotations.new.costEstimate')}</h5>
 
 				{#if selectedVehicle && routeResult && estimatedCosts()}
-					{@const costs = estimatedCosts()}
+					{@const costs = estimatedCosts()!}
 					<div class="space-y-3 mb-4">
 						<div class="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
 							<p class="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">{$t('quotations.new.selectVehicle')}</p>

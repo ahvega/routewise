@@ -47,7 +47,7 @@ export const list = query({
         .withIndex("by_tenant_user_unread", (q) =>
           q
             .eq("tenantId", args.tenantId)
-            .eq("userId", args.userId ?? null)
+            .eq("userId", args.userId ?? undefined)
             .eq("read", false)
         )
         .order("desc")
@@ -87,7 +87,7 @@ export const getUnreadCount = query({
       .withIndex("by_tenant_user_unread", (q) =>
         q
           .eq("tenantId", args.tenantId)
-          .eq("userId", args.userId ?? null)
+          .eq("userId", args.userId ?? undefined)
           .eq("read", false)
       )
       .collect();
@@ -296,7 +296,7 @@ export const markAllRead = mutation({
       .withIndex("by_tenant_user_unread", (q) =>
         q
           .eq("tenantId", args.tenantId)
-          .eq("userId", args.userId ?? null)
+          .eq("userId", args.userId ?? undefined)
           .eq("read", false)
       )
       .collect();

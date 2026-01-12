@@ -3,6 +3,23 @@
 	import { api } from '$convex/_generated/api';
 	import { tenantStore } from '$lib/stores';
 	import { t } from '$lib/i18n';
+
+	// Type definitions for team data
+	interface TeamUser {
+		_id: string;
+		email: string;
+		fullName?: string;
+		role: string;
+		status?: string;
+	}
+	interface SalesAgentData {
+		userId: string;
+		initials: string;
+		isDefault?: boolean;
+		name?: string;
+		email?: string;
+		avatarUrl?: string;
+	}
 	import {
 		Card,
 		Button,
@@ -79,15 +96,16 @@
 
 	// Get users who are not yet sales agents
 	const availableForSalesAgent = $derived(
-		users.filter(u => !salesAgents.some(a => a.userId === u._id))
+		users.filter((u: TeamUser) => !salesAgents.some((a: SalesAgentData) => a.userId === u._id))
 	);
 
 	// Check if can invite more users
 	const canInvite = $derived(() => {
 		if (!tenant) return false;
-		if (tenant.maxUsers === -1) return true;
+		const maxUsers = tenant.maxUsers ?? -1;
+		if (maxUsers === -1) return true;
 		const currentCount = users.length + invitations.length;
-		return currentCount < tenant.maxUsers;
+		return currentCount < maxUsers;
 	});
 
 	// Modal state
@@ -121,11 +139,12 @@
 
 		isInviting = true;
 		try {
+			// Note: invitedBy expects a Convex user ID - using data.user.id (WorkOS ID) as fallback
 			await client.mutation(api.invitations.create, {
 				tenantId: tenantStore.tenantId,
 				email: inviteEmail.trim().toLowerCase(),
 				role: inviteRole,
-				invitedByUserId: data.user.convexUserId
+				invitedBy: data.user.id as any
 			});
 
 			showToastMessage($t('settings.team.inviteSent'), 'success');
@@ -144,7 +163,7 @@
 		if (!confirm($t('settings.team.confirmCancelInvite'))) return;
 
 		try {
-			await client.mutation(api.invitations.cancel, { invitationId: invitationId as any });
+			await client.mutation(api.invitations.cancel, { id: invitationId as any });
 			showToastMessage($t('settings.team.inviteCancelled'), 'success');
 		} catch (err) {
 			console.error('Failed to cancel invitation:', err);
@@ -154,7 +173,7 @@
 
 	async function handleResendInvitation(invitationId: string) {
 		try {
-			await client.mutation(api.invitations.resend, { invitationId: invitationId as any });
+			await client.mutation(api.invitations.resend, { id: invitationId as any });
 			showToastMessage($t('settings.team.inviteResent'), 'success');
 		} catch (err) {
 			console.error('Failed to resend invitation:', err);
@@ -186,7 +205,7 @@
 	// Handle user selection for sales agent
 	function handleUserSelect() {
 		if (selectedUserId) {
-			const user = users.find(u => u._id === selectedUserId);
+			const user = users.find((u: TeamUser) => u._id === selectedUserId);
 			if (user && user.fullName) {
 				agentInitials = generateInitials(user.fullName);
 			}
@@ -242,7 +261,7 @@
 		isUpdatingDefault = true;
 		try {
 			// Update all agents: set selected as default, others as non-default
-			const updatedAgents = salesAgents.map(a => ({
+			const updatedAgents = salesAgents.map((a: SalesAgentData) => ({
 				userId: a.userId as any,
 				initials: a.initials,
 				isDefault: a.userId === userId
@@ -286,7 +305,7 @@
 	// Check if user can be removed (not self, not last admin)
 	function canRemoveUser(user: typeof users[0]): boolean {
 		if (user.role !== 'admin') return true;
-		return users.filter(u => u.role === 'admin').length > 1;
+		return users.filter((u: TeamUser) => u.role === 'admin').length > 1;
 	}
 
 	// Build actions for a user row
@@ -638,7 +657,7 @@
 				id="agentInitials"
 				bind:value={agentInitials}
 				placeholder="Ej: AH, JM"
-				maxlength="3"
+				maxlength={3}
 				class="uppercase font-mono"
 			/>
 			<p class="text-xs text-gray-500 mt-1">

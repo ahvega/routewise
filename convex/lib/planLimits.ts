@@ -1,4 +1,5 @@
-import { QueryCtx, MutationCtx } from "../_generated/server";
+import type { QueryCtx, MutationCtx } from "../_generated/server";
+import type { Id } from "../_generated/dataModel";
 
 /**
  * Plan limit checking utilities for Convex mutations
@@ -11,15 +12,12 @@ export interface LimitCheckResult {
   message?: string;
 }
 
-// Type alias for tenant IDs
-type TenantId = string;
-
 /**
  * Check if tenant can add more users
  */
 export async function canAddUser(
   ctx: QueryCtx | MutationCtx,
-  tenantId: TenantId
+  tenantId: Id<"tenants">
 ): Promise<LimitCheckResult> {
   const tenant = await ctx.db.get(tenantId);
   if (!tenant) {
@@ -52,7 +50,7 @@ export async function canAddUser(
  */
 export async function canAddVehicle(
   ctx: QueryCtx | MutationCtx,
-  tenantId: TenantId
+  tenantId: Id<"tenants">
 ): Promise<LimitCheckResult> {
   const tenant = await ctx.db.get(tenantId);
   if (!tenant) {
@@ -85,7 +83,7 @@ export async function canAddVehicle(
  */
 export async function canAddDriver(
   ctx: QueryCtx | MutationCtx,
-  tenantId: TenantId
+  tenantId: Id<"tenants">
 ): Promise<LimitCheckResult> {
   const tenant = await ctx.db.get(tenantId);
   if (!tenant) {
@@ -118,7 +116,7 @@ export async function canAddDriver(
  */
 export async function canCreateQuotation(
   ctx: QueryCtx | MutationCtx,
-  tenantId: TenantId
+  tenantId: Id<"tenants">
 ): Promise<LimitCheckResult> {
   const tenant = await ctx.db.get(tenantId);
   if (!tenant) {
@@ -159,7 +157,7 @@ export async function canCreateQuotation(
  */
 export async function canSendEmail(
   ctx: QueryCtx | MutationCtx,
-  tenantId: TenantId
+  tenantId: Id<"tenants">
 ): Promise<LimitCheckResult> {
   const tenant = await ctx.db.get(tenantId);
   if (!tenant) {
@@ -205,7 +203,7 @@ export async function canSendEmail(
  */
 export async function hasFeature(
   ctx: QueryCtx | MutationCtx,
-  tenantId: TenantId,
+  tenantId: Id<"tenants">,
   feature: "emailEnabled" | "pdfExport" | "customBranding" | "apiAccess" | "advancedReports" | "multiCurrency"
 ): Promise<boolean> {
   const tenant = await ctx.db.get(tenantId);
@@ -220,7 +218,7 @@ export async function hasFeature(
  */
 export async function isTrialExpired(
   ctx: QueryCtx | MutationCtx,
-  tenantId: TenantId
+  tenantId: Id<"tenants">
 ): Promise<boolean> {
   const tenant = await ctx.db.get(tenantId);
   if (!tenant) return true;
@@ -238,7 +236,7 @@ export async function isTrialExpired(
  */
 export async function isTenantActive(
   ctx: QueryCtx | MutationCtx,
-  tenantId: TenantId
+  tenantId: Id<"tenants">
 ): Promise<{ active: boolean; message?: string }> {
   const tenant = await ctx.db.get(tenantId);
   if (!tenant) {

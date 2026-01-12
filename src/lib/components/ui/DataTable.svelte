@@ -1,3 +1,19 @@
+<script lang="ts" module>
+	// Module-level exports for types
+	export interface Column<T> {
+		key: keyof T | string;
+		label: string;
+		sortable?: boolean;
+		filterable?: boolean;
+		filterOptions?: string[]; // For dropdown filters
+		filterPlaceholder?: string;
+		sortFn?: (a: T, b: T, direction: 'asc' | 'desc') => number;
+		getValue?: (item: T) => any; // Custom value getter for sorting/filtering
+		class?: string;
+		headerClass?: string;
+	}
+</script>
+
 <script lang="ts" generics="T extends Record<string, any>">
 	/**
 	 * DataTable - A sortable, filterable table component
@@ -26,19 +42,6 @@
 	} from 'flowbite-svelte';
 	import { ChevronUpOutline, ChevronDownOutline, ChevronSortOutline } from 'flowbite-svelte-icons';
 	import type { Snippet } from 'svelte';
-
-	export interface Column<T> {
-		key: keyof T | string;
-		label: string;
-		sortable?: boolean;
-		filterable?: boolean;
-		filterOptions?: string[]; // For dropdown filters
-		filterPlaceholder?: string;
-		sortFn?: (a: T, b: T, direction: 'asc' | 'desc') => number;
-		getValue?: (item: T) => any; // Custom value getter for sorting/filtering
-		class?: string;
-		headerClass?: string;
-	}
 
 	interface Props {
 		data: T[];

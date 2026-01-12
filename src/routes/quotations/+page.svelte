@@ -231,7 +231,7 @@
 		<div>
 			<h1 class="text-3xl font-bold text-gray-900 dark:text-white">{$t('quotations.title')}</h1>
 			<p class="text-gray-600 dark:text-gray-400 mt-1">
-				{$t('quotations.subtitle', { count: stats.total })}
+				{$t('quotations.subtitle', { values: { count: stats.total } })}
 			</p>
 		</div>
 		<Button href="/quotations/new">

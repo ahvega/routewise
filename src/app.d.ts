@@ -11,9 +11,9 @@ declare global {
 				lastName: string | null;
 			};
 			session?: {
-				tenantId: string | null;
-				tenantSlug: string | null;
-				tenantName: string | null;
+				tenantId?: string;
+				tenantSlug?: string;
+				tenantName?: string;
 				needsOnboarding: boolean;
 			};
 		}
@@ -25,9 +25,9 @@ declare global {
 				lastName: string | null;
 			};
 			session?: {
-				tenantId: string | null;
-				tenantSlug: string | null;
-				tenantName: string | null;
+				tenantId?: string;
+				tenantSlug?: string;
+				tenantName?: string;
 				needsOnboarding: boolean;
 			};
 		}

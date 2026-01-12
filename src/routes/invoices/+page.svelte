@@ -193,7 +193,7 @@
 
 	async function markAsPaid(id: Id<'invoices'>) {
 		try {
-			await client.mutation(api.invoices.markAsPaid, { id });
+			await client.mutation(api.invoices.updateStatus, { id, status: 'paid' });
 			showToastMessage($t('invoices.markedAsPaid'), 'success');
 		} catch (error) {
 			console.error('Failed to mark as paid:', error);

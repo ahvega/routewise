@@ -45,7 +45,14 @@
 		DotsHorizontalOutline
 	} from 'flowbite-svelte-icons';
 	import { t } from '$lib/i18n';
-	import StatusBadge from '$lib/components/ui/StatusBadge.svelte';
+	import {
+		StatusBadge,
+		ActionMenuCard,
+		createViewAction,
+		createCallAction,
+		filterActions,
+		type ActionItem
+	} from '$lib/components/ui';
 
 	const client = useConvexClient();
 	const advanceId = $derived($page.params.id as Id<'expenseAdvances'>);
@@ -628,6 +635,17 @@
 		const dayNum = String(date.getDate()).padStart(2, '0');
 		const month = ['ene.', 'feb.', 'mar.', 'abr.', 'may.', 'jun.', 'jul.', 'ago.', 'sep.', 'oct.', 'nov.', 'dic.'][date.getMonth()];
 		return `${dayOfWeek}-${dayNum}/${month}`;
+	}
+
+	// Build actions for driver card
+	function getDriverActions(): ActionItem[] {
+		if (!driver) return [];
+		return filterActions([
+			createViewAction(`/drivers?selected=${driver._id}`, $t('drivers.viewDriver')),
+			driver.phone
+				? { ...createCallAction(driver.phone, $t('common.call'))!, dividerBefore: true }
+				: null
+		]);
 	}
 </script>
 
@@ -1337,10 +1355,16 @@
 				<!-- Driver Info -->
 				{#if driver}
 					<Card class="p-4!">
-						<h3 class="font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
-							<UserOutline class="w-5 h-5" />
-							{$t('drivers.driver')}
-						</h3>
+						<div class="flex items-center justify-between mb-4">
+							<h3 class="font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+								<UserOutline class="w-5 h-5" />
+								{$t('drivers.driver')}
+							</h3>
+							<ActionMenuCard
+								triggerId="driver-actions-{driver._id}"
+								actions={getDriverActions()}
+							/>
+						</div>
 						<div class="space-y-2 text-sm">
 							<p class="text-gray-900 dark:text-white font-medium">
 								{driver.firstName} {driver.lastName}

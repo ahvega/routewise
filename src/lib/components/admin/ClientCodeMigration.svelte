@@ -58,7 +58,9 @@
 	{#if migrationResult}
 		<!-- Migration completed -->
 		<Alert color="green" class="mb-4">
-			<CheckCircleOutline slot="icon" class="w-5 h-5" />
+			{#snippet icon()}
+				<CheckCircleOutline class="w-5 h-5" />
+			{/snippet}
 			<span class="font-medium">Migracion completada</span>
 			<p class="mt-1 text-sm">
 				{migrationResult.migrated} de {migrationResult.total} clientes actualizados.
@@ -95,7 +97,9 @@
 	{:else if error}
 		<!-- Error state -->
 		<Alert color="red" class="mb-4">
-			<ExclamationCircleOutline slot="icon" class="w-5 h-5" />
+			{#snippet icon()}
+				<ExclamationCircleOutline class="w-5 h-5" />
+			{/snippet}
 			<span class="font-medium">Error</span>
 			<p class="mt-1 text-sm">{error}</p>
 		</Alert>
@@ -111,7 +115,9 @@
 	{:else if pendingCount > 0}
 		<!-- Clients need migration -->
 		<Alert color="yellow" class="mb-4">
-			<ExclamationCircleOutline slot="icon" class="w-5 h-5" />
+			{#snippet icon()}
+				<ExclamationCircleOutline class="w-5 h-5" />
+			{/snippet}
 			<span class="font-medium">{pendingCount} clientes sin codigo</span>
 			<p class="mt-1 text-sm">
 				Estos clientes no tienen un codigo asignado para el sistema de numeracion de cotizaciones.
@@ -134,7 +140,9 @@
 	{:else}
 		<!-- All good -->
 		<Alert color="green">
-			<CheckCircleOutline slot="icon" class="w-5 h-5" />
+			{#snippet icon()}
+				<CheckCircleOutline class="w-5 h-5" />
+			{/snippet}
 			<span class="font-medium">Todos los clientes tienen codigo</span>
 			<p class="mt-1 text-sm">
 				No hay clientes pendientes de migracion.

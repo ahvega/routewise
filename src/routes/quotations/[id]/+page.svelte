@@ -358,7 +358,7 @@
 	function getVehicleActions(): ActionItem[] {
 		if (!vehicle) return [];
 		return filterActions([
-			createViewAction(`/vehicles`, $t('vehicles.viewVehicle'))
+			createViewAction(`/vehicles?selected=${vehicle._id}`, $t('vehicles.viewVehicle'))
 		]);
 	}
 
@@ -366,7 +366,7 @@
 	function getClientActions(): ActionItem[] {
 		if (!clientData) return [];
 		return filterActions([
-			createViewAction(`/clients`, $t('clients.viewClient')),
+			createViewAction(`/clients?selected=${clientData._id}`, $t('clients.viewClient')),
 			clientData.phone
 				? { ...createCallAction(clientData.phone, $t('common.call'))!, dividerBefore: true }
 				: null,

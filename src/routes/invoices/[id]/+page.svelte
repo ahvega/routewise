@@ -19,7 +19,15 @@
 	import { useQuery, useConvexClient } from 'convex-svelte';
 	import { api } from '$convex/_generated/api';
 	import { tenantStore } from '$lib/stores';
-	import { StatusBadge } from '$lib/components/ui';
+	import {
+		StatusBadge,
+		ActionMenuCard,
+		createViewAction,
+		createCallAction,
+		createEmailAction,
+		filterActions,
+		type ActionItem
+	} from '$lib/components/ui';
 	import { t } from '$lib/i18n';
 	import type { Id } from '$convex/_generated/dataModel';
 	import type { InvoicePdfData } from '$lib/services/pdf';
@@ -124,6 +132,18 @@
 		return clientData.type === 'company'
 			? clientData.companyName || '-'
 			: `${clientData.firstName} ${clientData.lastName}`;
+	}
+
+	// Build actions for client card
+	function getClientActions(): ActionItem[] {
+		if (!clientData) return [];
+		return filterActions([
+			createViewAction(`/clients?selected=${clientData._id}`, $t('clients.viewClient')),
+			clientData.phone
+				? { ...createCallAction(clientData.phone, $t('common.call'))!, dividerBefore: true }
+				: null,
+			createEmailAction(clientData.email, $t('common.email'))
+		]);
 	}
 
 	// Check if invoice is overdue
@@ -253,7 +273,7 @@
 				address: tenant.address || undefined
 			},
 			notes: invoice.notes,
-			paymentInstructions: invoice.paymentInstructions
+			paymentInstructions: undefined // TODO: Add paymentInstructions to invoice schema
 		};
 	}
 
@@ -345,7 +365,7 @@
 						companyName: tenant.companyName,
 						companyPhone: tenant.primaryContactPhone,
 						companyEmail: tenant.primaryContactEmail,
-						paymentInstructions: invoice.paymentInstructions
+						paymentInstructions: undefined // TODO: Add paymentInstructions to invoice schema
 					},
 					pdfBase64
 				})
@@ -451,7 +471,15 @@
 					<!-- Client Info -->
 					<div class="grid grid-cols-2 gap-6 mb-6">
 						<div>
-							<p class="text-sm text-gray-500 dark:text-gray-400">{$t('invoices.billTo')}</p>
+							<div class="flex items-center justify-between mb-1">
+								<p class="text-sm text-gray-500 dark:text-gray-400">{$t('invoices.billTo')}</p>
+								{#if clientData}
+									<ActionMenuCard
+										triggerId="client-actions-{clientData._id}"
+										actions={getClientActions()}
+									/>
+								{/if}
+							</div>
 							<p class="font-semibold text-gray-900 dark:text-white">{getClientName()}</p>
 							{#if clientData?.email}
 								<p class="text-sm text-gray-600 dark:text-gray-400">{clientData.email}</p>

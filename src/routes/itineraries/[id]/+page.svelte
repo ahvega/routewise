@@ -34,7 +34,15 @@
 	import { useQuery, useConvexClient } from 'convex-svelte';
 	import { api } from '$convex/_generated/api';
 	import { tenantStore } from '$lib/stores';
-	import { StatusBadge } from '$lib/components/ui';
+	import {
+		StatusBadge,
+		ActionMenuCard,
+		createViewAction,
+		createCallAction,
+		createEmailAction,
+		filterActions,
+		type ActionItem
+	} from '$lib/components/ui';
 	import { t } from '$lib/i18n';
 	import type { Id } from '$convex/_generated/dataModel';
 
@@ -224,6 +232,37 @@
 			cleaned = cleaned.substring(1);
 		}
 		return cleaned;
+	}
+
+	// Build actions for vehicle card
+	function getVehicleActions(): ActionItem[] {
+		if (!vehicle) return [];
+		return filterActions([
+			createViewAction(`/vehicles?selected=${vehicle._id}`, $t('vehicles.viewVehicle'))
+		]);
+	}
+
+	// Build actions for client card
+	function getClientActions(): ActionItem[] {
+		if (!clientData) return [];
+		return filterActions([
+			createViewAction(`/clients?selected=${clientData._id}`, $t('clients.viewClient')),
+			clientData.phone
+				? { ...createCallAction(clientData.phone, $t('common.call'))!, dividerBefore: true }
+				: null,
+			createEmailAction(clientData.email, $t('common.email'))
+		]);
+	}
+
+	// Build actions for driver card
+	function getDriverActions(): ActionItem[] {
+		if (!driver) return [];
+		return filterActions([
+			createViewAction(`/drivers?selected=${driver._id}`, $t('drivers.viewDriver')),
+			driver.phone
+				? { ...createCallAction(driver.phone, $t('common.call'))!, dividerBefore: true }
+				: null
+		]);
 	}
 
 	function showToastMessage(message: string, type: 'success' | 'error') {
@@ -491,6 +530,12 @@
 					<Card class="max-w-none !p-5">
 						<div class="flex items-center justify-between mb-2">
 							<p class="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">{$t('clients.client')}</p>
+							{#if clientData}
+								<ActionMenuCard
+									triggerId="client-actions-{clientData._id}"
+									actions={getClientActions()}
+								/>
+							{/if}
 						</div>
 						{#if clientData}
 							<p class="font-medium text-gray-900 dark:text-white truncate">{getClientName(clientData)}</p>
@@ -532,14 +577,22 @@
 					<Card class="max-w-none !p-5">
 						<div class="flex items-center justify-between mb-2">
 							<p class="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">{$t('vehicles.vehicle')}</p>
-							{#if itinerary.status === 'scheduled'}
-								<button
-									onclick={() => (showAssignVehicleModal = true)}
-									class="text-xs text-primary-600 dark:text-primary-400 hover:underline"
-								>
-									{vehicle ? $t('common.change') : $t('itineraries.assignVehicle')}
-								</button>
-							{/if}
+							<div class="flex items-center gap-2">
+								{#if itinerary.status === 'scheduled'}
+									<button
+										onclick={() => (showAssignVehicleModal = true)}
+										class="text-xs text-primary-600 dark:text-primary-400 hover:underline"
+									>
+										{vehicle ? $t('common.change') : $t('itineraries.assignVehicle')}
+									</button>
+								{/if}
+								{#if vehicle}
+									<ActionMenuCard
+										triggerId="vehicle-actions-{vehicle._id}"
+										actions={getVehicleActions()}
+									/>
+								{/if}
+							</div>
 						</div>
 						{#if vehicle}
 							<p class="font-medium text-gray-900 dark:text-white truncate">{vehicle.name}</p>
@@ -655,14 +708,22 @@
 								<UserOutline class="w-5 h-5 text-gray-500" />
 								<h3 class="font-semibold text-gray-900 dark:text-white">{$t('itineraries.columns.driver')}</h3>
 							</div>
-							{#if itinerary.status === 'scheduled'}
-								<button
-									onclick={() => (showAssignDriverModal = true)}
-									class="text-xs text-primary-600 dark:text-primary-400 hover:underline"
-								>
-									{driver ? $t('common.change') : $t('itineraries.assignDriver')}
-								</button>
-							{/if}
+							<div class="flex items-center gap-2">
+								{#if itinerary.status === 'scheduled'}
+									<button
+										onclick={() => (showAssignDriverModal = true)}
+										class="text-xs text-primary-600 dark:text-primary-400 hover:underline"
+									>
+										{driver ? $t('common.change') : $t('itineraries.assignDriver')}
+									</button>
+								{/if}
+								{#if driver}
+									<ActionMenuCard
+										triggerId="driver-actions-{driver._id}"
+										actions={getDriverActions()}
+									/>
+								{/if}
+							</div>
 						</div>
 						{#if driver}
 							<p class="font-medium text-gray-900 dark:text-white">{driver.firstName} {driver.lastName}</p>

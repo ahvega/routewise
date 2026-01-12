@@ -20,6 +20,8 @@
 		TruckOutline,
 		FilterOutline
 	} from 'flowbite-svelte-icons';
+	import { page } from '$app/stores';
+	import { goto } from '$app/navigation';
 	import { useQuery, useConvexClient } from 'convex-svelte';
 	import { api } from '$convex/_generated/api';
 	import { tenantStore } from '$lib/stores';
@@ -70,18 +72,6 @@
 	const preferredDistanceUnit = $derived(parameters?.preferredDistanceUnit || 'km');
 	const distanceUnitLabel = $derived(preferredDistanceUnit === 'km' ? 'Km' : 'mi');
 
-	// Vehicle makes/models - merge default list with tenant custom entries
-	const customVehicleMakes = $derived(parameters?.customVehicleMakes as VehicleMakeModel[] | undefined);
-	const availableMakes = $derived(getMergedMakes(customVehicleMakes));
-	const availableModels = $derived(getMergedModels(formData.make, customVehicleMakes));
-
-	// Check if can add more vehicles
-	const canAddVehicle = $derived(() => {
-		if (!tenant) return false;
-		if (tenant.maxVehicles === -1) return true;
-		return vehicles.length < (tenant.maxVehicles || 0);
-	});
-
 	// Modal state
 	let showModal = $state(false);
 	let isEditing = $state(false);
@@ -107,6 +97,18 @@
 		ownership: 'owned',
 		status: 'active',
 		baseLocation: ''
+	});
+
+	// Vehicle makes/models - merge default list with tenant custom entries
+	const customVehicleMakes = $derived(parameters?.customVehicleMakes as VehicleMakeModel[] | undefined);
+	const availableMakes = $derived(getMergedMakes(customVehicleMakes));
+	const availableModels = $derived(getMergedModels(formData.make, customVehicleMakes));
+
+	// Check if can add more vehicles
+	const canAddVehicle = $derived(() => {
+		if (!tenant) return false;
+		if (tenant.maxVehicles === -1) return true;
+		return vehicles.length < (tenant.maxVehicles || 0);
 	});
 
 	// Conversion constants
@@ -249,7 +251,7 @@
 			sortable: true,
 			filterable: true,
 			filterPlaceholder: $t('vehicles.filters.searchPlaceholder'),
-			getValue: (v) => v.name
+			getValue: (v: { name: string }) => v.name
 		},
 		{
 			key: 'passengerCapacity',
@@ -455,15 +457,28 @@
 	const vehicles = $derived(vehiclesQuery.data || []);
 	const isLoading = $derived(vehiclesQuery.isLoading);
 
+	// Handle URL param to auto-open modal for selected vehicle
+	$effect(() => {
+		const selectedId = $page.url.searchParams.get('selected');
+		if (selectedId && vehicles.length > 0) {
+			const selectedVehicle = vehicles.find((v: { _id: string }) => v._id === selectedId);
+			if (selectedVehicle) {
+				openEditModal(selectedVehicle);
+				// Clear the URL param to prevent reopening on navigation
+				goto('/vehicles', { replaceState: true });
+			}
+		}
+	});
+
 	// Status filter state
 	let statusFilter = $state('');
 
 	// Stats
 	const stats = $derived({
 		total: vehicles.length,
-		active: vehicles.filter((v) => v.status === 'active').length,
-		inactive: vehicles.filter((v) => v.status === 'inactive').length,
-		maintenance: vehicles.filter((v) => v.status === 'maintenance').length
+		active: vehicles.filter((v: { status: string }) => v.status === 'active').length,
+		inactive: vehicles.filter((v: { status: string }) => v.status === 'inactive').length,
+		maintenance: vehicles.filter((v: { status: string }) => v.status === 'maintenance').length
 	});
 
 	// Filter functions
@@ -481,7 +496,7 @@
 	// Pre-filtered vehicles for DataTable
 	const filteredVehicles = $derived(
 		statusFilter
-			? vehicles.filter((v) => v.status === statusFilter)
+			? vehicles.filter((v: { status: string }) => v.status === statusFilter)
 			: vehicles
 	);
 </script>
