@@ -202,7 +202,7 @@
 			clientData.phone
 				? { ...createCallAction(clientData.phone, $t('common.call'))!, dividerBefore: true }
 				: null,
-			createWhatsAppAction(clientData.phone),
+			createWhatsAppAction(clientData.phone, $t('common.chatClient')),
 			createEmailAction(clientData.email, $t('common.email')),
 
 			// Delete action

@@ -63,6 +63,10 @@
         "callClient": "Llamar Cliente",
         "emailClient": "Email Cliente",
         "callDriver": "Llamar Conductor",
+        "chatClient": "Chat Cliente",
+        "chatDriver": "Chat Conductor",
+        "chatTripLeader": "Chat Líder de Grupo",
+        "chatEmergencyContact": "Chat Contacto Emergencia",
         "duplicate": "Duplicar",
         "copy": "Copia",
         "confirm": "Confirmar"

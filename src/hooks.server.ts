@@ -50,13 +50,13 @@ export const handle: Handle = async ({ event, resolve }) => {
 						});
 
 						// Set user and session info
-						event.locals.user = {
-							id: session.userId,
-							email: session.email,
-							firstName: session.firstName,
-							lastName: session.lastName
-						};
-
+									event.locals.user = {
+										id: session.userId,
+										email: session.email,
+										firstName: session.firstName,
+										lastName: session.lastName,
+										avatarUrl: session.avatarUrl || null
+									};
 						event.locals.session = {
 							tenantId: session.tenantId || null,
 							tenantSlug: session.tenantSlug || null,
@@ -93,13 +93,13 @@ export const handle: Handle = async ({ event, resolve }) => {
 						maxAge: 60 * 60 * 24 * 7
 					});
 
-					event.locals.user = {
-						id: session.userId,
-						email: session.email,
-						firstName: session.firstName,
-						lastName: session.lastName
-					};
-
+								event.locals.user = {
+									id: session.userId,
+									email: session.email,
+									firstName: session.firstName,
+									lastName: session.lastName,
+									avatarUrl: session.avatarUrl || null
+								};
 					event.locals.session = {
 						tenantId: session.tenantId || null,
 						tenantSlug: session.tenantSlug || null,
@@ -109,13 +109,13 @@ export const handle: Handle = async ({ event, resolve }) => {
 				} catch {
 					// Proactive refresh failed, but session is still valid
 					// Continue with current session
-					event.locals.user = {
-						id: session.userId,
-						email: session.email,
-						firstName: session.firstName,
-						lastName: session.lastName
-					};
-
+								event.locals.user = {
+									id: session.userId,
+									email: session.email,
+									firstName: session.firstName,
+									lastName: session.lastName,
+									avatarUrl: session.avatarUrl || null
+								};
 					event.locals.session = {
 						tenantId: session.tenantId || null,
 						tenantSlug: session.tenantSlug || null,
@@ -125,13 +125,13 @@ export const handle: Handle = async ({ event, resolve }) => {
 				}
 			} else {
 				// Session is valid
-				event.locals.user = {
-					id: session.userId,
-					email: session.email,
-					firstName: session.firstName,
-					lastName: session.lastName
-				};
-
+							event.locals.user = {
+								id: session.userId,
+								email: session.email,
+								firstName: session.firstName,
+								lastName: session.lastName,
+								avatarUrl: session.avatarUrl || null
+							};
 				event.locals.session = {
 					tenantId: session.tenantId || null,
 					tenantSlug: session.tenantSlug || null,

@@ -54,7 +54,7 @@
 	// Note: Actions column removed - kebab menu is now in first column
 	const columns = $derived<Column<any>[]>([
 		{
-			key: 'quotationNumber',
+			key: 'quotationDisplayName',
 			label: $t('quotations.columns.quotation'),
 			sortable: true,
 			filterable: true,
@@ -125,7 +125,7 @@
 
 		const contactActions: (ActionItem | null)[] = [
 			contact.phone ? createCallAction(contact.phone, $t('common.callClient')) : null,
-			createWhatsAppAction(contact.phone, 'WhatsApp Cliente'),
+			createWhatsAppAction(contact.phone, $t('common.chatClient')),
 			createEmailAction(contact.email, $t('common.emailClient'))
 		];
 
@@ -366,7 +366,7 @@
 						<div class="flex items-center justify-between gap-2">
 							<div>
 								<div class="font-mono font-medium text-gray-900 dark:text-white">
-									{quote.quotationNumber}
+									{quote.quotationDisplayName || quote.quotationNumber}
 								</div>
 								<div class="text-xs text-gray-500 dark:text-gray-400">
 									{getClientName(quote.clientId)}

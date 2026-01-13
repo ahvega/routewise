@@ -63,6 +63,10 @@
 		"callClient": "Call Client",
 		"emailClient": "Email Client",
 		"callDriver": "Call Driver",
+		"chatClient": "Chat Client",
+		"chatDriver": "Chat Driver",
+		"chatTripLeader": "Chat Trip Leader",
+		"chatEmergencyContact": "Chat Emergency Contact",
 		"duplicate": "Duplicate",
 		"copy": "Copy",
 		"confirm": "Confirm"

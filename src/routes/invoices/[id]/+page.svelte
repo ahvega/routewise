@@ -25,6 +25,7 @@
 		createViewAction,
 		createCallAction,
 		createEmailAction,
+		createWhatsAppAction,
 		filterActions,
 		type ActionItem
 	} from '$lib/components/ui';
@@ -153,6 +154,7 @@
 			clientData.phone
 				? { ...createCallAction(clientData.phone, $t('common.call'))!, dividerBefore: true }
 				: null,
+			createWhatsAppAction(clientData.phone, $t('common.chatClient')),
 			createEmailAction(clientData.email, $t('common.email'))
 		]);
 	}
@@ -416,6 +418,49 @@
 			isSendingEmail = false;
 		}
 	}
+	// Build header actions
+	function getHeaderActions(): ActionItem[] {
+		if (!invoice) return [];
+
+		return filterActions([
+			// PDF
+			{
+				id: 'pdf',
+				label: 'PDF',
+				icon: isGeneratingPdf ? Spinner : DownloadOutline,
+				onClick: downloadPdf,
+				disabled: isGeneratingPdf || !tenant
+			},
+
+			// Email
+			{
+				id: 'email',
+				label: $t('common.email'),
+				icon: EnvelopeOutline,
+				onClick: openEmailModal,
+				disabled: !tenant
+			},
+
+			// Send (Draft)
+			invoice.status === 'draft' ? {
+				id: 'send',
+				label: $t('invoices.actions.markSent'),
+				icon: PaperPlaneSolid,
+				onClick: () => updateStatus('sent'),
+				dividerBefore: true
+			} : null,
+
+			// Record Payment
+			invoice.paymentStatus !== 'paid' ? {
+				id: 'record-payment',
+				label: $t('invoices.actions.recordPayment'),
+				icon: CashOutline,
+				onClick: openPaymentModal,
+				color: 'success',
+				dividerBefore: true
+			} : null
+		]);
+	}
 </script>
 
 <svelte:head>
@@ -438,49 +483,20 @@
 	<div class="space-y-6">
 		<!-- Header -->
 		<div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-			<div class="flex items-center gap-4">
-				<Button href="/invoices" color="light" size="sm">
-					<ArrowLeftOutline class="w-4 h-4" />
-				</Button>
-				<div>
-					<div class="flex items-center gap-3">
-						<h1 class="text-2xl font-bold text-gray-900 dark:text-white">{invoice.invoiceNumber}</h1>
-						<StatusBadge status={invoice.status} variant="invoice" />
-						<StatusBadge status={isOverdue() ? 'overdue' : invoice.paymentStatus} variant="payment" />
-					</div>
-					<p class="text-sm text-gray-500 dark:text-gray-400">
-						{$t('invoices.createdOn')} {formatDate(invoice.createdAt)}
-					</p>
+			<div>
+				<div class="flex items-center gap-3">
+					<h1 class="text-2xl font-bold text-gray-900 dark:text-white">{invoice.invoiceNumber}</h1>
+					<StatusBadge status={invoice.status} variant="invoice" />
+					<StatusBadge status={isOverdue() ? 'overdue' : invoice.paymentStatus} variant="payment" />
 				</div>
+				<p class="text-gray-600 dark:text-gray-400 mt-1">
+					{$t('invoices.createdOn')} {formatDate(invoice.createdAt)}
+				</p>
 			</div>
-			<div class="flex gap-2 flex-wrap">
-				<!-- PDF and Email buttons -->
-				<Button size="sm" color="light" onclick={downloadPdf} disabled={isGeneratingPdf || !tenant}>
-					{#if isGeneratingPdf}
-						<Spinner size="4" class="mr-2" />
-					{:else}
-						<DownloadOutline class="w-4 h-4 mr-2" />
-					{/if}
-					PDF
-				</Button>
-				<Button size="sm" color="light" onclick={openEmailModal} disabled={!tenant}>
-					<EnvelopeOutline class="w-4 h-4 mr-2" />
-					{$t('common.email')}
-				</Button>
-
-				{#if invoice.status === 'draft'}
-					<Button color="blue" onclick={() => updateStatus('sent')}>
-						<PaperPlaneSolid class="w-4 h-4 mr-2" />
-						{$t('invoices.actions.send')}
-					</Button>
-				{/if}
-				{#if invoice.paymentStatus !== 'paid'}
-					<Button color="green" onclick={openPaymentModal}>
-						<CashOutline class="w-4 h-4 mr-2" />
-						{$t('invoices.actions.recordPayment')}
-					</Button>
-				{/if}
-			</div>
+			<ActionMenuCard
+				triggerId="header-actions"
+				actions={getHeaderActions()}
+			/>
 		</div>
 
 		<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">

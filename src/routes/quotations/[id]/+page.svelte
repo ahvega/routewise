@@ -664,84 +664,111 @@
 			isSendingEmail = false;
 		}
 	}
+	// Build header actions
+	function getHeaderActions(): ActionItem[] {
+		if (!quotation) return [];
+		
+		return filterActions([
+			// Edit
+			quotation.status !== 'approved' ? {
+				id: 'edit',
+				label: $t('common.edit'),
+				icon: PenOutline,
+				href: `/quotations/${quotation._id}/edit`
+			} : null,
+
+			// PDF
+			{
+				id: 'pdf',
+				label: 'PDF',
+				icon: isGeneratingPdf ? Spinner : DownloadOutline,
+				onClick: downloadPdf,
+				disabled: isGeneratingPdf || !vehicle || !tenant
+			},
+
+			// Email
+			{
+				id: 'email',
+				label: $t('common.email'),
+				icon: EnvelopeOutline,
+				onClick: openEmailModal,
+				disabled: !vehicle || !tenant
+			},
+
+			// Send (Draft -> Sent)
+			quotation.status === 'draft' ? {
+				id: 'send',
+				label: $t('common.sent'),
+				icon: PaperPlaneOutline,
+				onClick: () => updateStatus('sent'),
+				dividerBefore: true
+			} : null,
+
+			// Approve/Reject (Sent -> Approved/Rejected)
+			quotation.status === 'sent' ? {
+				id: 'approve',
+				label: $t('common.accepted'),
+				icon: CheckCircleOutline,
+				onClick: openApprovalModal,
+				color: 'success'
+			} : null,
+			quotation.status === 'sent' ? {
+				id: 'reject',
+				label: $t('common.rejected'),
+				icon: CloseCircleOutline,
+				onClick: rejectQuotation,
+				color: 'warning'
+			} : null,
+
+			// Itinerary (Approved)
+			quotation.status === 'approved' && existingItinerary ? {
+				id: 'view-itinerary',
+				label: $t('itineraries.viewItinerary'),
+				icon: CalendarMonthOutline,
+				href: `/itineraries/${existingItinerary._id}`,
+				dividerBefore: true
+			} : null,
+			quotation.status === 'approved' && !existingItinerary ? {
+				id: 'convert',
+				label: $t('itineraries.convertFromQuotation'),
+				icon: ArrowRightOutline,
+				onClick: openConvertModal,
+				color: 'success',
+				dividerBefore: true
+			} : null,
+
+			// Delete (Draft)
+			quotation.status === 'draft' ? {
+				id: 'delete',
+				label: $t('common.delete'),
+				icon: TrashBinOutline,
+				onClick: handleDelete,
+				color: 'danger',
+				dividerBefore: true
+			} : null
+		]);
+	}
 </script>
 
 <div class="space-y-6">
 	<!-- Header -->
 	<div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-		<div class="flex items-center gap-4">
-			<Button href="/quotations" color="alternative" size="sm">
-				<ArrowLeftOutline class="w-4 h-4 mr-2" />
-				{$t('quotations.title')}
-			</Button>
+		<div>
+			<div class="flex items-center gap-3">
+				<h1 class="text-2xl font-bold text-gray-900 dark:text-white">{quotation?.quotationDisplayName || quotation?.quotationNumber}</h1>
+				{#if quotation}
+					<StatusBadge status={quotation.status} variant="quotation" />
+				{/if}
+			</div>
 			{#if quotation}
-				<div>
-					<h1 class="text-2xl font-bold text-gray-900 dark:text-white">{quotation.quotationDisplayName || quotation.quotationNumber}</h1>
-					<p class="text-gray-600 dark:text-gray-400">{formatDate(quotation.createdAt)}</p>
-				</div>
+				<p class="text-gray-600 dark:text-gray-400 mt-1">{formatDate(quotation.createdAt)}</p>
 			{/if}
 		</div>
 		{#if quotation}
-			<div class="flex items-center gap-2 flex-wrap">
-				<StatusBadge status={quotation.status} variant="quotation" />
-
-				{#if quotation.status !== 'approved'}
-					<Button size="sm" color="light" href="/quotations/{quotation._id}/edit">
-						<PenOutline class="w-4 h-4 mr-2" />
-						{$t('common.edit')}
-					</Button>
-				{/if}
-
-				<!-- PDF and Email buttons -->
-				<Button size="sm" color="light" onclick={downloadPdf} disabled={isGeneratingPdf || !vehicle || !tenant}>
-					{#if isGeneratingPdf}
-						<Spinner size="4" class="mr-2" />
-					{:else}
-						<DownloadOutline class="w-4 h-4 mr-2" />
-					{/if}
-					PDF
-				</Button>
-				<Button size="sm" color="light" onclick={openEmailModal} disabled={!vehicle || !tenant}>
-					<EnvelopeOutline class="w-4 h-4 mr-2" />
-					{$t('common.email')}
-				</Button>
-
-				{#if quotation.status === 'draft'}
-					<Button size="sm" onclick={() => updateStatus('sent')}>
-						<PaperPlaneOutline class="w-4 h-4 mr-2" />
-						{$t('common.sent')}
-					</Button>
-				{/if}
-				{#if quotation.status === 'sent'}
-					<Button size="sm" color="green" onclick={openApprovalModal}>
-						<CheckCircleOutline class="w-4 h-4 mr-2" />
-						{$t('common.accepted')}
-					</Button>
-					<Button size="sm" color="red" onclick={rejectQuotation}>
-						<CloseCircleOutline class="w-4 h-4 mr-2" />
-						{$t('common.rejected')}
-					</Button>
-				{/if}
-				{#if quotation.status === 'approved'}
-					{#if existingItinerary}
-						<Button size="sm" color="light" href="/itineraries/{existingItinerary._id}">
-							<CalendarMonthOutline class="w-4 h-4 mr-2" />
-							{$t('itineraries.viewItinerary')}
-						</Button>
-					{:else}
-						<Button size="sm" color="green" onclick={openConvertModal}>
-							<ArrowRightOutline class="w-4 h-4 mr-2" />
-							{$t('itineraries.convertFromQuotation')}
-						</Button>
-					{/if}
-				{/if}
-				{#if quotation.status === 'draft'}
-					<Button size="sm" color="red" outline onclick={handleDelete}>
-						<TrashBinOutline class="w-4 h-4 mr-2" />
-						{$t('common.delete')}
-					</Button>
-				{/if}
-			</div>
+			<ActionMenuCard
+				triggerId="header-actions"
+				actions={getHeaderActions()}
+			/>
 		{/if}
 	</div>
 

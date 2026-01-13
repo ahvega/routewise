@@ -173,10 +173,13 @@
 			driver.phone
 				? { ...createCallAction(driver.phone, $t('common.call'))!, dividerBefore: true }
 				: null,
-			createWhatsAppAction(driver.phone),
+			createWhatsAppAction(driver.phone, $t('common.chatDriver')),
+
+			// Emergency contact actions
 			driver.emergencyContactPhone
 				? createCallAction(driver.emergencyContactPhone, $t('drivers.callEmergencyContact'))
 				: null,
+			createWhatsAppAction(driver.emergencyContactPhone, $t('common.chatEmergencyContact')),
 
 			// Email action
 			createEmailAction(driver.email, $t('common.email')),

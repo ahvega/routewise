@@ -78,6 +78,7 @@ export const GET: RequestHandler = async ({ url, cookies }) => {
 			email: session.user.email,
 			firstName: session.user.firstName,
 			lastName: session.user.lastName,
+			avatarUrl: session.user.profilePictureUrl,
 			accessToken: session.accessToken,
 			refreshToken: session.refreshToken,
 			expiresAt: session.expiresAt,

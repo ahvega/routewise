@@ -50,6 +50,7 @@
 		ActionMenuCard,
 		createViewAction,
 		createCallAction,
+		createWhatsAppAction,
 		filterActions,
 		type ActionItem
 	} from '$lib/components/ui';
@@ -644,7 +645,90 @@
 			createViewAction(`/drivers?selected=${driver._id}`, $t('drivers.viewDriver')),
 			driver.phone
 				? { ...createCallAction(driver.phone, $t('common.call'))!, dividerBefore: true }
-				: null
+				: null,
+			createWhatsAppAction(driver.phone, $t('common.chatDriver'))
+		]);
+	}
+	// Build header actions
+	function getHeaderActions(): ActionItem[] {
+		if (!advance) return [];
+
+		return filterActions([
+			// PDF
+			advance.status !== 'draft' && advance.status !== 'cancelled' ? {
+				id: 'pdf',
+				label: $t('expenses.downloadPdf'),
+				icon: isDownloadingPdf ? Spinner : FilePdfOutline,
+				onClick: downloadPdf,
+				disabled: isDownloadingPdf
+			} : null,
+
+			// Edit (Draft)
+			advance.status === 'draft' ? {
+				id: 'edit',
+				label: $t('expenses.actions.edit'),
+				icon: EditOutline,
+				href: `/expenses/${advance._id}/edit`
+			} : null,
+
+			// Submit (Draft)
+			advance.status === 'draft' ? {
+				id: 'submit',
+				label: $t('expenses.actions.submitForApproval'),
+				icon: PaperPlaneOutline,
+				onClick: submitForApproval,
+				color: 'default',
+				disabled: isSubmitting,
+				dividerBefore: true
+			} : null,
+
+			// Approve (Pending)
+			advance.status === 'pending' ? {
+				id: 'approve',
+				label: $t('expenses.actions.approve'),
+				icon: CheckCircleOutline,
+				onClick: () => { showApproveModal = true; },
+				color: 'success'
+			} : null,
+
+			// Disburse (Approved)
+			advance.status === 'approved' ? {
+				id: 'disburse',
+				label: $t('expenses.actions.disburse'),
+				icon: CashOutline,
+				onClick: () => { showDisburseModal = true; },
+				color: 'default'
+			} : null,
+
+			// Settle (Disbursed)
+			advance.status === 'disbursed' ? {
+				id: 'settle',
+				label: $t('expenses.actions.settle'),
+				icon: ClipboardCheckOutline,
+				onClick: () => { showSettleModal = true; },
+				color: 'success'
+			} : null,
+
+			// Cancel (Pending/Approved)
+			(advance.status === 'pending' || advance.status === 'approved') ? {
+				id: 'cancel',
+				label: $t('expenses.actions.cancel'),
+				icon: CloseCircleOutline,
+				onClick: () => { showCancelModal = true; },
+				color: 'warning',
+				dividerBefore: true
+			} : null,
+
+			// Delete (Draft/Cancelled)
+			(advance.status === 'draft' || advance.status === 'cancelled') ? {
+				id: 'delete',
+				label: $t('expenses.actions.delete'),
+				icon: TrashBinOutline,
+				onClick: deleteAdvance,
+				color: 'danger',
+				disabled: isSubmitting,
+				dividerBefore: true
+			} : null
 		]);
 	}
 </script>
@@ -660,14 +744,6 @@
 {/if}
 
 <div class="p-4 md:p-6 space-y-6">
-	<!-- Header -->
-	<div class="flex items-center gap-4">
-		<Button href="/expenses" color="light" size="sm">
-			<ArrowLeftOutline class="w-4 h-4 mr-2" />
-			{$t('common.back')}
-		</Button>
-	</div>
-
 	{#if advanceQuery.isLoading}
 		<div class="flex items-center justify-center p-8">
 			<Spinner size="8" />
@@ -678,22 +754,26 @@
 			<p class="text-gray-500 dark:text-gray-400">{$t('expenses.notFound')}</p>
 		</Card>
 	{:else}
+		<!-- Header -->
+		<div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+			<div>
+				<div class="flex items-center gap-3">
+					<h1 class="text-2xl font-bold text-gray-900 dark:text-white">{advance.advanceNumber}</h1>
+					<StatusBadge status={advance.status} variant="advance" />
+				</div>
+				<p class="text-gray-600 dark:text-gray-400 mt-1">{advance.purpose}</p>
+			</div>
+			<ActionMenuCard
+				triggerId="header-actions"
+				actions={getHeaderActions()}
+			/>
+		</div>
+
 		<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
 			<!-- Main Content -->
 			<div class="lg:col-span-2 space-y-6">
-				<!-- Advance Header -->
+				<!-- Amount Card (was part of header) -->
 				<Card class="max-w-none p-6!">
-					<div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
-						<div>
-							<h1 class="text-2xl font-bold text-gray-900 dark:text-white">
-								{advance.advanceNumber}
-							</h1>
-							<p class="text-gray-500 dark:text-gray-400 mt-1">{advance.purpose}</p>
-						</div>
-						<StatusBadge status={advance.status} variant="advance" size="lg" showIcon />
-					</div>
-
-					<!-- Amount -->
 					<div class="grid grid-cols-2 gap-4">
 						<div class="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
 							<p class="text-sm text-gray-500 dark:text-gray-400">{$t('expenses.amount')}</p>
@@ -1254,68 +1334,6 @@
 
 			<!-- Sidebar -->
 			<div class="space-y-6">
-				<!-- Actions -->
-				<Card class="p-4!">
-					<h3 class="font-semibold text-gray-900 dark:text-white mb-4">{$t('common.actions')}</h3>
-					<div class="space-y-2">
-						<!-- PDF Download - available for all non-draft statuses -->
-						{#if advance.status !== 'draft' && advance.status !== 'cancelled'}
-							<Button color="light" class="w-full" onclick={downloadPdf} disabled={isDownloadingPdf}>
-								{#if isDownloadingPdf}
-									<Spinner size="4" class="mr-2" />
-								{:else}
-									<FilePdfOutline class="w-4 h-4 mr-2" />
-								{/if}
-								{$t('expenses.downloadPdf')}
-							</Button>
-						{/if}
-
-						{#if advance.status === 'draft'}
-							<Button color="light" href="/expenses/{advance._id}/edit" class="w-full">
-								<EditOutline class="w-4 h-4 mr-2" />
-								{$t('expenses.actions.edit')}
-							</Button>
-							<Button color="primary" class="w-full" onclick={submitForApproval} disabled={isSubmitting}>
-								<PaperPlaneOutline class="w-4 h-4 mr-2" />
-								{$t('expenses.actions.submitForApproval')}
-							</Button>
-							<Button color="red" outline class="w-full" onclick={deleteAdvance} disabled={isSubmitting}>
-								<TrashBinOutline class="w-4 h-4 mr-2" />
-								{$t('expenses.actions.delete')}
-							</Button>
-						{:else if advance.status === 'cancelled'}
-							<!-- Cancelled advances can be deleted to allow creating a new one -->
-							<Button color="red" outline class="w-full" onclick={deleteAdvance} disabled={isSubmitting}>
-								<TrashBinOutline class="w-4 h-4 mr-2" />
-								{$t('expenses.actions.delete')}
-							</Button>
-						{:else if advance.status === 'pending'}
-							<Button color="green" class="w-full" onclick={() => (showApproveModal = true)}>
-								<CheckCircleOutline class="w-4 h-4 mr-2" />
-								{$t('expenses.actions.approve')}
-							</Button>
-							<Button color="red" outline class="w-full" onclick={() => (showCancelModal = true)}>
-								<CloseCircleOutline class="w-4 h-4 mr-2" />
-								{$t('expenses.actions.cancel')}
-							</Button>
-						{:else if advance.status === 'approved'}
-							<Button color="primary" class="w-full" onclick={() => (showDisburseModal = true)}>
-								<CashOutline class="w-4 h-4 mr-2" />
-								{$t('expenses.actions.disburse')}
-							</Button>
-							<Button color="red" outline class="w-full" onclick={() => (showCancelModal = true)}>
-								<CloseCircleOutline class="w-4 h-4 mr-2" />
-								{$t('expenses.actions.cancel')}
-							</Button>
-						{:else if advance.status === 'disbursed'}
-							<Button color="green" class="w-full" onclick={() => (showSettleModal = true)}>
-								<ClipboardCheckOutline class="w-4 h-4 mr-2" />
-								{$t('expenses.actions.settle')}
-							</Button>
-						{/if}
-					</div>
-				</Card>
-
 				<!-- Itinerary Info -->
 				{#if itinerary}
 					<Card class="p-4!">

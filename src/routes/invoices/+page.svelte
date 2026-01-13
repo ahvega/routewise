@@ -18,6 +18,7 @@
 		createViewAction,
 		createCallAction,
 		createEmailAction,
+		createWhatsAppAction,
 		createDeleteAction,
 		filterActions,
 		type ActionItem
@@ -236,6 +237,7 @@
 			contact.phone
 				? { ...createCallAction(contact.phone, $t('common.callClient'))!, dividerBefore: true }
 				: null,
+			createWhatsAppAction(contact.phone, $t('common.chatClient')),
 			createEmailAction(contact.email, $t('common.emailClient')),
 
 			// PDF/Email actions (with divider)

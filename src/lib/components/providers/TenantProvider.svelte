@@ -16,7 +16,7 @@
 
 	let { children, user, session } = $props<{
 		children: any;
-		user?: { id: string; email: string; firstName: string | null; lastName: string | null } | null;
+		user?: { id: string; email: string; firstName: string | null; lastName: string | null; avatarUrl?: string | null } | null;
 		session?: SessionData | null;
 	}>();
 

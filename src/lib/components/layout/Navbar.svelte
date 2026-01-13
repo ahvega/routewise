@@ -33,6 +33,7 @@
 		email: string;
 		firstName: string | null;
 		lastName: string | null;
+		avatarUrl?: string | null;
 	}
 
 	let { user = null }: { user: User | null } = $props();
@@ -134,7 +135,7 @@
 				id="user-menu-button"
 				class="flex items-center gap-2 text-sm bg-gray-100 dark:bg-gray-700 rounded-full p-1 pr-3 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
 			>
-				<Avatar size="sm" class="bg-primary-600 text-white">{initials}</Avatar>
+				<Avatar size="sm" class="bg-primary-600 text-white" src={user.avatarUrl || undefined}>{initials}</Avatar>
 				<span class="hidden md:inline text-gray-700 dark:text-gray-300">{displayName}</span>
 			</button>
 			<Dropdown triggeredBy="#user-menu-button" class="w-48 !bg-white dark:!bg-gray-800">

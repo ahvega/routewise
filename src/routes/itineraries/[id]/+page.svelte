@@ -244,7 +244,7 @@
 			clientData.phone
 				? { ...createCallAction(clientData.phone, $t('common.call'))!, dividerBefore: true }
 				: null,
-			createWhatsAppAction(clientData.phone),
+			createWhatsAppAction(clientData.phone, $t('common.chatClient')),
 			createEmailAction(clientData.email, $t('common.email'))
 		]);
 	}
@@ -257,7 +257,7 @@
 			driver.phone
 				? { ...createCallAction(driver.phone, $t('common.call'))!, dividerBefore: true }
 				: null,
-			createWhatsAppAction(driver.phone),
+			createWhatsAppAction(driver.phone, $t('common.chatDriver')),
 			createEmailAction(driver.email, $t('common.email'))
 		]);
 	}
@@ -444,60 +444,85 @@
 			showToastMessage($t('expenses.createFailed'), 'error');
 		}
 	}
+	// Build header actions
+	function getHeaderActions(): ActionItem[] {
+		if (!itinerary) return [];
+
+		return filterActions([
+			// Scheduled actions
+			itinerary.status === 'scheduled' ? {
+				id: 'start',
+				label: $t('itineraries.startTrip'),
+				icon: CheckCircleOutline,
+				onClick: () => updateStatus('in_progress'),
+				color: 'success'
+			} : null,
+
+			// In Progress actions
+			itinerary.status === 'in_progress' ? {
+				id: 'complete',
+				label: $t('itineraries.completeTrip'),
+				icon: CheckCircleOutline,
+				onClick: () => updateStatus('completed'),
+				color: 'success'
+			} : null,
+			itinerary.status === 'in_progress' ? {
+				id: 'cancel',
+				label: $t('common.cancel'),
+				icon: CloseCircleOutline,
+				onClick: () => updateStatus('cancelled'),
+				color: 'warning'
+			} : null,
+
+			// Completed actions (Invoice)
+			itinerary.status === 'completed' && existingInvoice ? {
+				id: 'view-invoice',
+				label: $t('invoices.viewInvoice'),
+				icon: FileLinesOutline,
+				href: `/invoices/${existingInvoice._id}`,
+				dividerBefore: true
+			} : null,
+			itinerary.status === 'completed' && !existingInvoice ? {
+				id: 'generate-invoice',
+				label: $t('invoices.generateInvoice'),
+				icon: CashOutline,
+				onClick: () => { showInvoiceModal = true; },
+				color: 'default', // blue in original, but ActionMenu supports specific colors? 'default' is usually blue/primary
+				dividerBefore: true
+			} : null,
+
+			// Delete (Scheduled)
+			itinerary.status === 'scheduled' ? {
+				id: 'delete',
+				label: $t('common.delete'),
+				icon: TrashBinOutline,
+				onClick: handleDelete,
+				color: 'danger',
+				dividerBefore: true
+			} : null
+		]);
+	}
 </script>
 
 <div class="space-y-6">
 	<!-- Header -->
 	<div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-		<div class="flex items-center gap-4">
-			<Button href="/itineraries" color="alternative" size="sm">
-				<ArrowLeftOutline class="w-4 h-4 mr-2" />
-				{$t('itineraries.title')}
-			</Button>
+		<div>
+			<div class="flex items-center gap-3">
+				<h1 class="text-2xl font-bold text-gray-900 dark:text-white">{itinerary?.itineraryDisplayName || itinerary?.itineraryNumber}</h1>
+				{#if itinerary}
+					<StatusBadge status={itinerary.status} variant="itinerary" />
+				{/if}
+			</div>
 			{#if itinerary}
-				<div>
-					<h1 class="text-2xl font-bold text-gray-900 dark:text-white">{itinerary.itineraryDisplayName || itinerary.itineraryNumber}</h1>
-					<p class="text-gray-600 dark:text-gray-400">{formatDate(itinerary.startDate)}</p>
-				</div>
+				<p class="text-gray-600 dark:text-gray-400 mt-1">{formatDate(itinerary.startDate)}</p>
 			{/if}
 		</div>
 		{#if itinerary}
-			<div class="flex items-center gap-2">
-				<StatusBadge status={itinerary.status} variant="itinerary" showIcon />
-				{#if itinerary.status === 'scheduled'}
-					<Button size="sm" color="green" onclick={() => updateStatus('in_progress')}>
-						<CheckCircleOutline class="w-4 h-4 mr-2" />
-						{$t('itineraries.startTrip')}
-					</Button>
-					<Button size="sm" color="red" outline onclick={handleDelete}>
-						<TrashBinOutline class="w-4 h-4 mr-2" />
-						{$t('common.delete')}
-					</Button>
-				{/if}
-				{#if itinerary.status === 'in_progress'}
-					<Button size="sm" color="green" onclick={() => updateStatus('completed')}>
-						<CheckCircleOutline class="w-4 h-4 mr-2" />
-						{$t('itineraries.completeTrip')}
-					</Button>
-					<Button size="sm" color="red" outline onclick={() => updateStatus('cancelled')}>
-						<CloseCircleOutline class="w-4 h-4 mr-2" />
-						{$t('common.cancel')}
-					</Button>
-				{/if}
-				{#if itinerary.status === 'completed'}
-					{#if existingInvoice}
-						<Button size="sm" color="light" href="/invoices/{existingInvoice._id}">
-							<FileLinesOutline class="w-4 h-4 mr-2" />
-							{$t('invoices.viewInvoice')}
-						</Button>
-					{:else}
-						<Button size="sm" color="blue" onclick={() => (showInvoiceModal = true)}>
-							<CashOutline class="w-4 h-4 mr-2" />
-							{$t('invoices.generateInvoice')}
-						</Button>
-					{/if}
-				{/if}
-			</div>
+			<ActionMenuCard
+				triggerId="header-actions"
+				actions={getHeaderActions()}
+			/>
 		{/if}
 	</div>
 

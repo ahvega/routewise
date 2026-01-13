@@ -9,6 +9,7 @@ declare global {
 				email: string;
 				firstName: string | null;
 				lastName: string | null;
+				avatarUrl?: string | null;
 			};
 			session?: {
 				tenantId?: string;
@@ -23,6 +24,7 @@ declare global {
 				email: string;
 				firstName: string | null;
 				lastName: string | null;
+				avatarUrl?: string | null;
 			};
 			session?: {
 				tenantId?: string;

@@ -21,6 +21,7 @@
 		createViewAction,
 		createCallAction,
 		createEmailAction,
+		createWhatsAppAction,
 		createDeleteAction,
 		filterActions,
 		type ActionItem
@@ -90,13 +91,8 @@
 			sortFn: (a, b, dir) => dir === 'asc' ? a.startDate - b.startDate : b.startDate - a.startDate
 		},
 		{
-			key: 'driverId',
-			label: $t('itineraries.columns.driver'),
-			sortable: true
-		},
-		{
 			key: 'vehicleId',
-			label: $t('itineraries.columns.vehicle'),
+			label: $t('itineraries.columns.vehicle') + ' / ' + $t('itineraries.columns.driver'),
 			sortable: true
 		},
 		{
@@ -161,7 +157,9 @@
 				...createCallAction(itinerary.tripLeaderPhone, $t('itineraries.callTripLeader'))!,
 				dividerBefore: true
 			} : null,
+			createWhatsAppAction(itinerary.tripLeaderPhone, $t('common.chatTripLeader')),
 			driverContact.phone ? createCallAction(driverContact.phone, $t('common.callDriver')) : null,
+			createWhatsAppAction(driverContact.phone, $t('common.chatDriver')),
 			itinerary.tripLeaderEmail ? createEmailAction(itinerary.tripLeaderEmail, $t('itineraries.emailTripLeader')) : null,
 
 			// Status actions (with divider)
@@ -406,19 +404,19 @@
 						</div>
 					</TableBodyCell>
 					<TableBodyCell>
-						<div class="flex items-center gap-2">
-							<UserOutline class="w-4 h-4 text-gray-400" />
-							<span class="text-sm text-gray-700 dark:text-gray-300">
-								{getDriverName(itinerary.driverId)}
-							</span>
-						</div>
-					</TableBodyCell>
-					<TableBodyCell>
-						<div class="flex items-center gap-2">
-							<TruckOutline class="w-4 h-4 text-gray-400" />
-							<span class="text-sm text-gray-700 dark:text-gray-300">
-								{getVehicleName(itinerary.vehicleId)}
-							</span>
+						<div class="flex flex-col">
+							<div class="flex items-center gap-2">
+								<TruckOutline class="w-4 h-4 text-gray-400" />
+								<span class="text-sm font-medium text-gray-900 dark:text-white">
+									{getVehicleName(itinerary.vehicleId)}
+								</span>
+							</div>
+							<div class="flex items-center gap-2 mt-1">
+								<UserOutline class="w-3.5 h-3.5 text-gray-400" />
+								<span class="text-xs text-gray-500 dark:text-gray-400">
+									{getDriverName(itinerary.driverId)}
+								</span>
+							</div>
 						</div>
 					</TableBodyCell>
 					<TableBodyCell>

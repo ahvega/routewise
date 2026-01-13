@@ -32,6 +32,7 @@
 		ActionMenu,
 		createViewAction,
 		createCallAction,
+		createWhatsAppAction,
 		createDeleteAction,
 		createApproveAction,
 		createDisburseAction,
@@ -244,6 +245,7 @@
 			driverContact.phone
 				? { ...createCallAction(driverContact.phone, $t('common.callDriver'))!, dividerBefore: true }
 				: null,
+			createWhatsAppAction(driverContact.phone, $t('common.chatDriver')),
 
 			// PDF action (only for approved/disbursed/settled)
 			['approved', 'disbursed', 'settled'].includes(advance.status) ? {
