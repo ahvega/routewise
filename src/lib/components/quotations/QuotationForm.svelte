@@ -140,6 +140,8 @@
 
 	// New quotation standardization fields
 	let groupLeaderName = $state(quotation?.groupLeaderName || '');
+	let groupLeaderPhone = $state(quotation?.groupLeaderPhone || '');
+	let groupLeaderEmail = $state(quotation?.groupLeaderEmail || '');
 	let assignedToId = $state<string>(quotation?.assignedTo || '');
 	let paymentConditions = $state(quotation?.paymentConditions || 'contado');
 
@@ -604,6 +606,8 @@
 				// New quotation standardization fields
 				assignedTo: assignedToId ? (assignedToId as Id<'users'>) : undefined,
 				groupLeaderName: groupLeaderName.trim() || undefined,
+				groupLeaderPhone: groupLeaderPhone.trim() || undefined,
+				groupLeaderEmail: groupLeaderEmail.trim() || undefined,
 				paymentConditions: paymentConditions || undefined,
 				origin,
 				destination,
@@ -858,14 +862,33 @@
 
 				<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
 					<!-- Group Leader Name -->
-					<div>
-						<Label for="groupLeader" class="mb-2">Líder del Grupo / Contacto</Label>
-						<Input
-							id="groupLeader"
-							bind:value={groupLeaderName}
-							placeholder="Nombre del coordinador o líder"
-						/>
-						<p class="text-xs text-gray-500 mt-1">Nombre que aparecerá en el número de cotización</p>
+					<div class="md:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-4">
+						<div>
+							<Label for="groupLeader" class="mb-2">Líder del Grupo / Contacto</Label>
+							<Input
+								id="groupLeader"
+								bind:value={groupLeaderName}
+								placeholder="Nombre del coordinador o líder"
+							/>
+							<p class="text-xs text-gray-500 mt-1">Nombre que aparecerá en el número de cotización</p>
+						</div>
+						<div>
+							<Label for="groupLeaderPhone" class="mb-2">Teléfono</Label>
+							<Input
+								id="groupLeaderPhone"
+								bind:value={groupLeaderPhone}
+								placeholder="+504 9999-9999"
+							/>
+						</div>
+						<div>
+							<Label for="groupLeaderEmail" class="mb-2">Email</Label>
+							<Input
+								id="groupLeaderEmail"
+								bind:value={groupLeaderEmail}
+								placeholder="correo@ejemplo.com"
+								type="email"
+							/>
+						</div>
 					</div>
 
 					<!-- Payment Conditions -->

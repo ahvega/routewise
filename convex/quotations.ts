@@ -287,6 +287,8 @@ export const create = mutation({
     assignedTo: v.optional(v.id("users")),
     // Group leader info (for naming convention)
     groupLeaderName: v.optional(v.string()),
+    groupLeaderPhone: v.optional(v.string()),
+    groupLeaderEmail: v.optional(v.string()),
     // Payment and commercial terms
     paymentConditions: v.optional(v.string()),
     purchaseOrderNumber: v.optional(v.string()),
@@ -621,8 +623,8 @@ export const approve = mutation({
         estimatedDays: quotation.estimatedDays,
         // Trip leader info from quotation + optional contact from modal
         tripLeaderName: quotation.groupLeaderName,
-        tripLeaderPhone,
-        tripLeaderEmail,
+        tripLeaderPhone: tripLeaderPhone || quotation.groupLeaderPhone,
+        tripLeaderEmail: tripLeaderEmail || quotation.groupLeaderEmail,
         localCurrency: quotation.localCurrency,
         agreedPriceLocal: quotation.salePriceLocal,
         agreedPriceHnl: quotation.salePriceHnl,
@@ -1010,6 +1012,8 @@ export const update = mutation({
     // Added fields for edit form compatibility
     assignedTo: v.optional(v.id("users")),
     groupLeaderName: v.optional(v.string()),
+    groupLeaderPhone: v.optional(v.string()),
+    groupLeaderEmail: v.optional(v.string()),
     paymentConditions: v.optional(v.string()),
     isRoundTrip: v.optional(v.boolean()),
     deadheadDistance: v.optional(v.number()),
@@ -1077,6 +1081,8 @@ export const updateGroupLeader = mutation({
   args: {
     id: v.id("quotations"),
     groupLeaderName: v.string(),
+    groupLeaderPhone: v.optional(v.string()),
+    groupLeaderEmail: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const existing = await ctx.db.get(args.id);
@@ -1107,6 +1113,8 @@ export const updateGroupLeader = mutation({
 
     await ctx.db.patch(args.id, {
       groupLeaderName: args.groupLeaderName,
+      groupLeaderPhone: args.groupLeaderPhone,
+      groupLeaderEmail: args.groupLeaderEmail,
       quotationDisplayName: displayName,
       quotationFileSafeName: fileSafeName,
       updatedAt: Date.now(),

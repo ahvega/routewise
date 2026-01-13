@@ -278,8 +278,8 @@
 	function openConvertModal() {
 		// Show GroupLeaderModal first to collect/confirm trip leader info
 		pendingAction = 'convert';
-		groupLeaderPhone = '';
-		groupLeaderEmail = '';
+		groupLeaderPhone = quotation?.groupLeaderPhone || '';
+		groupLeaderEmail = quotation?.groupLeaderEmail || '';
 		showGroupLeaderModal = true;
 	}
 
@@ -300,8 +300,8 @@
 	function openApprovalModal() {
 		// Show GroupLeaderModal first to collect/confirm trip leader info
 		pendingAction = 'approve';
-		groupLeaderPhone = '';
-		groupLeaderEmail = '';
+		groupLeaderPhone = quotation?.groupLeaderPhone || '';
+		groupLeaderEmail = quotation?.groupLeaderEmail || '';
 		showGroupLeaderModal = true;
 	}
 
@@ -324,12 +324,18 @@
 
 		showGroupLeaderModal = false;
 
-		// If name changed, update the quotation
-		if (data.name !== quotation.groupLeaderName) {
+		// If info changed, update the quotation
+		if (
+			data.name !== quotation.groupLeaderName ||
+			data.phone !== quotation.groupLeaderPhone ||
+			data.email !== quotation.groupLeaderEmail
+		) {
 			try {
 				await client.mutation(api.quotations.updateGroupLeader, {
 					id: quotation._id,
-					groupLeaderName: data.name
+					groupLeaderName: data.name,
+					groupLeaderPhone: data.phone,
+					groupLeaderEmail: data.email
 				});
 			} catch (error) {
 				console.error('Failed to update group leader:', error);
@@ -1043,6 +1049,44 @@
 					{/if}
 				</Card>
 
+				<!-- Group Leader -->
+				<Card class="max-w-none !p-6">
+					<div class="flex items-center justify-between mb-3">
+						<div class="flex items-center gap-2">
+							<UserOutline class="w-5 h-5 text-gray-500" />
+							<h3 class="text-lg font-semibold text-gray-900 dark:text-white">{$t('itineraries.details.tripLeader')}</h3>
+						</div>
+						{#if quotation.groupLeaderPhone}
+							<ActionMenuCard
+								triggerId="leader-actions"
+								actions={filterActions([
+									createCallAction(quotation.groupLeaderPhone, $t('common.call')),
+									createWhatsAppAction(quotation.groupLeaderPhone),
+									createEmailAction(quotation.groupLeaderEmail, $t('common.email'))
+								])}
+							/>
+						{/if}
+					</div>
+					{#if quotation.groupLeaderName}
+						<div class="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+							<p class="font-medium text-gray-900 dark:text-white">{quotation.groupLeaderName}</p>
+							{#if quotation.groupLeaderEmail}
+								<p class="text-sm text-gray-500 dark:text-gray-400">{quotation.groupLeaderEmail}</p>
+							{/if}
+							{#if quotation.groupLeaderPhone}
+								<div class="flex items-center gap-2 mt-1">
+									<span class="text-sm text-gray-500 dark:text-gray-400">{quotation.groupLeaderPhone}</span>
+									<ContactActions phone={quotation.groupLeaderPhone} email={quotation.groupLeaderEmail} size="xs" />
+								</div>
+							{:else if quotation.groupLeaderEmail}
+								<ContactActions email={quotation.groupLeaderEmail} size="xs" class="mt-1" />
+							{/if}
+						</div>
+					{:else}
+						<p class="text-gray-500 dark:text-gray-400">{$t('itineraries.noTripLeader')}</p>
+					{/if}
+				</Card>
+
 				<!-- Dates -->
 				<Card class="max-w-none !p-6">
 					<div class="flex items-center gap-2 mb-3">
@@ -1298,6 +1342,8 @@
 <GroupLeaderModal
 	bind:open={showGroupLeaderModal}
 	initialName={quotation?.groupLeaderName || ''}
+	initialPhone={quotation?.groupLeaderPhone || ''}
+	initialEmail={quotation?.groupLeaderEmail || ''}
 	onConfirm={handleGroupLeaderConfirm}
 	onCancel={handleGroupLeaderCancel}
 />

@@ -256,6 +256,8 @@ export default defineSchema({
     assignedToInitials: v.optional(v.string()), // Cached initials for PDF display (e.g., "AH")
     // Group leader info (for naming convention)
     groupLeaderName: v.optional(v.string()), // e.g., "Erasmo Santos"
+    groupLeaderPhone: v.optional(v.string()),
+    groupLeaderEmail: v.optional(v.string()),
     // Payment and commercial terms
     paymentConditions: v.optional(v.string()), // "Contado", "Crédito 15 días", etc.
     purchaseOrderNumber: v.optional(v.string()), // Client's P.O. number
