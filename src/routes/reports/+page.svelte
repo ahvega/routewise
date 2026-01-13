@@ -361,7 +361,7 @@
 									{@const data = statusData as PipelineStatus}
 									<div class="text-center p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
 										<p class="text-2xl font-bold text-gray-900 dark:text-white">{data.count}</p>
-										<p class="text-sm text-gray-500 dark:text-gray-400 capitalize">{status}</p>
+										<p class="text-sm text-gray-500 dark:text-gray-400 capitalize">{$t('statuses.' + status) || status}</p>
 										<p class="text-xs text-gray-400 dark:text-gray-500">{formatCurrency(data.value)}</p>
 									</div>
 								{/each}
@@ -376,7 +376,7 @@
 										<div
 											class="{statusColors[status]} h-full flex items-center justify-center text-xs text-white font-medium"
 											style="width: {width}%"
-											title="{status}: {data.count}"
+											title="{$t('statuses.' + status) || status}: {data.count}"
 										>
 											{#if width > 10}
 												{data.count}
