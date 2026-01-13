@@ -39,6 +39,15 @@ export const GET: RequestHandler = async ({ url, cookies }) => {
 
 		// Check if user exists in Convex and get their tenant
 		const convex = getConvexClient();
+		
+		// Sync user data to Convex (update avatar, name, etc.)
+		await convex.mutation(api.users.syncUserData, {
+			workosUserId: session.user.id,
+			email: session.user.email,
+			fullName: [session.user.firstName, session.user.lastName].filter(Boolean).join(' ') || session.user.email.split('@')[0],
+			avatarUrl: session.user.profilePictureUrl || undefined
+		}).catch(err => console.error('Failed to sync user data to Convex:', err));
+
 		const userWithTenant = await convex.query(api.users.getWithTenant, {
 			workosUserId: session.user.id
 		});

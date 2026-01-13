@@ -130,6 +130,37 @@ export const upsertFromWorkos = mutation({
   },
 });
 
+// Sync user data from Auth (updates profile without requiring tenant/role)
+export const syncUserData = mutation({
+  args: {
+    workosUserId: v.string(),
+    email: v.optional(v.string()),
+    fullName: v.optional(v.string()),
+    avatarUrl: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const existing = await ctx.db
+      .query("users")
+      .withIndex("by_workos_id", (q) => q.eq("workosUserId", args.workosUserId))
+      .first();
+
+    if (existing) {
+      const updates: any = {
+        lastLoginAt: Date.now(),
+        updatedAt: Date.now(),
+      };
+
+      if (args.email) updates.email = args.email;
+      if (args.fullName) updates.fullName = args.fullName;
+      if (args.avatarUrl !== undefined) updates.avatarUrl = args.avatarUrl;
+
+      await ctx.db.patch(existing._id, updates);
+      return existing._id;
+    }
+    return null;
+  },
+});
+
 // Update user role
 export const updateRole = mutation({
   args: {

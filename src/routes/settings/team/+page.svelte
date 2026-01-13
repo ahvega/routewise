@@ -11,6 +11,7 @@
 		fullName?: string;
 		role: string;
 		status?: string;
+		avatarUrl?: string;
 	}
 	interface SalesAgentData {
 		userId: string;
